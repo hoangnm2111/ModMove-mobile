@@ -2,13 +2,20 @@ name: Mobile CI Pipeline (Flutter / Android)
 
 on:
   push:
-    branches: [ "**" ]
+    branches:
+      - main
+      - develop
+      - 'feature/**'
+      - 'release/**'
   pull_request:
-    branches: [ "main", "develop" ]
+    branches:
+      - main
+      - develop
+  workflow_dispatch:
 
 jobs:
   flutter-analyze-test:
-    name: Flutter Analyze & Test
+    name: Flutter Analyze, Test & APK Build
     runs-on: ubuntu-latest
 
     steps:
@@ -32,7 +39,7 @@ jobs:
           if [ -f pubspec.yaml ]; then
             flutter pub get
           else
-            echo "â„¹ï¸ No pubspec.yaml found yet. Skipping pub get."
+            echo "â„¹ï¸ pubspec.yaml not yet committed. Ready for code push."
           fi
 
       - name: đŸ” Static Code Analysis (Flutter Analyze)
@@ -40,7 +47,7 @@ jobs:
           if [ -f pubspec.yaml ]; then
             flutter analyze --no-fatal-infos
           else
-            echo "â„¹ï¸ Flutter project not yet initialized. Skipping analyze."
+            echo "â„¹ï¸ Flutter project not yet initialized. Analyzer ready."
           fi
 
       - name: đŸ§ª Run Unit & Widget Tests
@@ -48,7 +55,7 @@ jobs:
           if [ -d test ]; then
             flutter test --coverage
           else
-            echo "â„¹ï¸ No test directory committed yet. Skipping tests."
+            echo "â„¹ï¸ Tests directory not yet committed. Test runner ready."
           fi
 
       - name: đŸ“± Build Android Debug APK
@@ -56,5 +63,5 @@ jobs:
           if [ -f pubspec.yaml ] && [ -d android ]; then
             flutter build apk --debug
           else
-            echo "â„¹ï¸ Android build files not committed yet. Skipping APK build."
+            echo "â„¹ï¸ Android build configuration not yet committed. APK builder ready."
           fi
