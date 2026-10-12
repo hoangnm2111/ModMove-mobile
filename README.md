@@ -1,4 +1,4 @@
-# đŸ“± ModMove - Mobile Application
+# 📱 ModMove - Mobile Application
 
 [![Mobile CI Pipeline (Flutter / Android)](https://github.com/hoangnm2111/ModMove-mobile/actions/workflows/mobile-ci.yml/badge.svg)](https://github.com/hoangnm2111/ModMove-mobile/actions/workflows/mobile-ci.yml)
 
@@ -9,17 +9,17 @@ Cross-platform mobile application built with **Flutter (Android)** supporting tw
 
 ---
 
-## đŸ› ï¸ Technology Stack
+## 🛠️ Technology Stack
 - **Framework:** Flutter 3.x / Dart (Target: Android SDK 34+)
 - **State Management:** BLoC / Provider pattern
-- **Real-Time GPS Streaming:** WebSocket / SignalR client (5â€“10s ping interval)
+- **Real-Time GPS Streaming:** WebSocket / SignalR client (5-10s ping interval)
 - **Mapping & Routing:** Google Maps Flutter SDK + Directions API polyline
 - **Push Notifications:** Firebase Cloud Messaging (FCM)
 - **Media Upload:** Cloudinary SDK (Direct authenticated cargo & POD uploads)
 
 ---
 
-## đŸŒ¿ GitFlow & Contribution Rules
+## 🌿 GitFlow & Contribution Rules
 - `main`: Production-ready branch. Direct push is prohibited.
 - `develop`: Primary integration branch.
 - `feature/<name>`: Individual feature branch (e.g., `feature/tunm`).
