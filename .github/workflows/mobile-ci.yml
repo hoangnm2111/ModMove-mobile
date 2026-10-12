@@ -45,7 +45,7 @@ jobs:
 
       - name: đŸ§ª Run Unit & Widget Tests
         run: |
-          if [ -d test ] && [ "\" ]; then
+          if [ -d test ]; then
             flutter test --coverage
           else
             echo "â„¹ï¸ No test directory committed yet. Skipping tests."
