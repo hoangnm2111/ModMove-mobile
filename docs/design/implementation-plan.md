@@ -9,7 +9,7 @@ logical pixels, with native Android safe areas and scrollable content on smaller
 devices. Preserve large-text accessibility rather than scaling an entire screen
 as a bitmap.
 
-User-confirmed branch: `feature/tunm`. User-confirmed task IDs: `1`, `43`, `27`.
+User-confirmed branch: `feature/tunm`. User-confirmed ticket IDs: `FE-01`, `FE-43`, `FE-27`.
 Commit each verified implementation slice separately. Do not push to `main`.
 Integration into `develop` requires Mobile CI and one peer approval.
 
@@ -29,24 +29,24 @@ Integration into `develop` requires Mobile CI and one peer approval.
 
 ## Commit-sized milestones
 
-1. `[1] chore: initialize Flutter Android app and design foundations`
+1. `[FE-01] chore: initialize Flutter Android app and design foundations`
    - Preserve existing README/CI and local-agent ignores.
    - Scaffold Android, bundle font/license, theme, shared components, SVG icons,
      image assets, source prompts, and this plan.
    - Verify dependencies, static analysis and shell rendering.
-2. `[1] feat: reproduce guest home and public fare screens`
+2. `[FE-01] feat: reproduce guest home and public fare screens`
    - Home hero, service cards, price preview, driver registration entry, navigation.
    - Public fare screen, vehicle tabs, specifications and illustrative pricing.
    - Verify navigation and render both screens against the reference.
-3. `[43] feat: implement driver verification screens`
+3. `[FE-43] feat: implement driver verification screens`
    - Personal/vehicle steps, image picker and previews, 5 MB JPG/PNG validation,
      required-field feedback, upload slots, submission through a mock repository.
    - Verify form retention, invalid inputs, file checks and pending transition.
-4. `[27] feat: reproduce driver profile and approval states`
+4. `[FE-27] feat: reproduce driver profile and approval states`
    - Personal/vehicle tabs, approved/pending/rejected UI, online gating,
      item-specific correction and locked accepted documents.
    - Verify state gates, resubmission and all three visual variants.
-5. `[1] test: verify mobile layouts and refine reference fidelity`
+5. `[FE-01] test: verify mobile layouts and refine reference fidelity`
    - Capture all seven screens at the reference viewport; compare visually.
    - Check compact screens, text scaling and Android compilation.
    - Record commands, limitations and review screenshots; deliver a debug APK if
@@ -54,6 +54,7 @@ Integration into `develop` requires Mobile CI and one peer approval.
 
 ## Implementation boundaries
 
+Use Flutter Material components as the UI kit, customized to the reference.
 Use Provider / ChangeNotifier and a repository interface for onboarding state.
 Backend APIs are not part of this UI task. Demo fixtures must be isolated and
 clearly described in the project run instructions. Authentication, real pricing,
