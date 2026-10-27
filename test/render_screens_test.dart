@@ -4,7 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:modmove_mobile/main.dart';
+import 'package:modmove_mobile/app/app.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();

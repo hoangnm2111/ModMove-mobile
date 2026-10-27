@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:modmove_mobile/main.dart';
+import 'package:modmove_mobile/app/app.dart';
 
 void main() {
   testWidgets(
