@@ -28,3 +28,18 @@ Cross-platform mobile application built with **Flutter (Android)** supporting tw
   - Types: `feat`, `fix`, `refactor`, `test`, `docs`, `chore`
   - Example: `[FE-03] feat: integrate Google Maps route polyline in booking screen`
 - **Quality Gates:** All Pull Requests to `develop` must pass the Mobile CI pipeline and receive at least 1 peer approval.
+
+## Run and review the mobile UI
+
+The Home, public fare, driver verification and profile screens are implemented
+using Flutter Material, Provider and feature-first Clean Architecture.
+
+```sh
+flutter pub get
+flutter run
+```
+
+See the [UI review guide](docs/mobile-ui-review.md) for the seven screen entry
+points, validation commands, APK location and current mock-data boundaries.
+See [architecture](docs/architecture.md) for source organization and dependency
+direction. Review screenshots are generated locally and excluded from Git.

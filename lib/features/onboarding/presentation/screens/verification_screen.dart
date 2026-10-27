@@ -166,7 +166,7 @@ class _VerificationScreenState extends State<VerificationScreen> {
           padding: const EdgeInsets.fromLTRB(16, 0, 16, 6),
           children: [
             VerificationProgress(step),
-            const SizedBox(height: 12),
+            const SizedBox(height: 6),
             if (!driver.canEdit) ...[
               const Notice('Hồ sơ đang được khóa để xét duyệt.', peach: true),
               const SizedBox(height: 10),
