@@ -2,25 +2,11 @@ import 'dart:io';
 import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:modmove_mobile/app/app.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
-  setUpAll(() async {
-    final loader = FontLoader('Inter');
-    for (final weight in [
-      'Regular',
-      'Medium',
-      'SemiBold',
-      'Bold',
-      'ExtraBold',
-    ]) {
-      loader.addFont(rootBundle.load('assets/fonts/Inter-$weight.ttf'));
-    }
-    await loader.load();
-  });
 
   for (final screen in [
     'home',

@@ -81,14 +81,15 @@ class HomeScreen extends StatelessWidget {
             ),
             ClipRRect(
               borderRadius: BorderRadius.circular(12),
-              child: SizedBox(
-                height: 158,
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(minHeight: 158),
                 child: Stack(
-                  fit: StackFit.expand,
                   children: [
-                    Image.asset(
-                      'assets/images/hero-delivery.png',
-                      fit: BoxFit.cover,
+                    Positioned.fill(
+                      child: Image.asset(
+                        'assets/images/hero-delivery.png',
+                        fit: BoxFit.cover,
+                      ),
                     ),
                     Padding(
                       padding: const EdgeInsets.fromLTRB(14, 19, 0, 10),
