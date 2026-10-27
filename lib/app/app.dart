@@ -9,18 +9,44 @@ import '../features/home/presentation/controllers/home_controller.dart';
 import '../features/home/presentation/screens/home_screen.dart';
 import '../features/home/presentation/screens/pricing_screen.dart';
 import '../features/home/presentation/models/vehicle_option.dart';
+import '../features/onboarding/data/repositories/demo_driver_repository.dart';
+import '../features/onboarding/data/repositories/device_photo_repository.dart';
+import '../features/onboarding/domain/usecases/driver_usecases.dart';
+import '../features/onboarding/presentation/controllers/driver_controller.dart';
+import '../features/onboarding/presentation/screens/verification_screen.dart';
 
 class ModMoveApp extends StatelessWidget {
   const ModMoveApp({
     super.key,
     this.screen = const String.fromEnvironment('SCREEN', defaultValue: 'home'),
+    this.driverController,
   });
   final String screen;
+  final DriverController? driverController;
+
+  DriverController _createDriver() {
+    final repository = DemoDriverRepository(
+      completeDraft: screen == 'verification-vehicle',
+    );
+    return DriverController(
+      loadApplication: GetDriverApplication(repository),
+      submitApplication: SubmitDriverApplication(repository),
+      pickPhoto: PickDocumentPhoto(DevicePhotoRepository()),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
-    return ChangeNotifierProvider(
-      create: (_) => HomeController(const GetPublicFares(DemoFareRepository())),
+    return MultiProvider(
+      providers: [
+        ChangeNotifierProvider(
+          create: (_) =>
+              HomeController(const GetPublicFares(DemoFareRepository())),
+        ),
+        ChangeNotifierProvider(
+          create: (_) => driverController ?? _createDriver(),
+        ),
+      ],
       child: MaterialApp(
         title: 'ModMove',
         debugShowCheckedModeBanner: false,
@@ -31,12 +57,13 @@ class ModMoveApp extends StatelessWidget {
         home: Builder(
           builder: (context) => screen == 'pricing'
               ? const PricingScreen()
+              : screen.startsWith('verification')
+              ? VerificationScreen(
+                  initialStep: screen == 'verification-vehicle' ? 1 : 0,
+                )
               : HomeScreen(
-                  onRegister: () => showInfoSheet(
-                    context,
-                    'Đăng ký tài xế',
-                    'Chuẩn bị CCCD, giấy phép lái xe, đăng ký xe, đăng kiểm và ảnh phương tiện.',
-                  ),
+                  onRegister: () =>
+                      Navigator.pushNamed(context, '/verification'),
                   onAccount: () => showInfoSheet(
                     context,
                     'Tài khoản ModMove',
@@ -45,6 +72,12 @@ class ModMoveApp extends StatelessWidget {
                 ),
         ),
         onGenerateRoute: (settings) {
+          if (settings.name == '/verification') {
+            return MaterialPageRoute<void>(
+              settings: settings,
+              builder: (_) => const VerificationScreen(),
+            );
+          }
           if (settings.name == '/pricing') {
             return MaterialPageRoute<void>(
               settings: settings,

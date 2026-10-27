@@ -22,7 +22,12 @@ void main() {
     await loader.load();
   });
 
-  for (final screen in ['home', 'pricing']) {
+  for (final screen in [
+    'home',
+    'pricing',
+    'verification-personal',
+    'verification-vehicle',
+  ]) {
     testWidgets('$screen renders at the reference viewport', (tester) async {
       tester.view.physicalSize = const Size(390, 844);
       tester.view.devicePixelRatio = 1;

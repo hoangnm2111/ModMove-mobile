@@ -23,7 +23,7 @@ AGENTS.override.md
 .pub/
 .pub-cache/
 coverage/
-test/screenshots/
+screenshots/
 android/app/debug/
 android/app/profile/
 *.jks
