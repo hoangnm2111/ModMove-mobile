@@ -224,7 +224,9 @@ class AppBottomNav extends StatelessWidget {
                         mainAxisSize: MainAxisSize.min,
                         children: [
                           AppIcon(
-                            icons[i],
+                            i == selected && (i == 0 || i == 3)
+                                ? '${icons[i]}-filled'
+                                : icons[i],
                             size: 24,
                             color: i == selected
                                 ? AppColors.orange
