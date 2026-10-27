@@ -15,7 +15,8 @@ class DemoDriverRepository implements DriverRepository {
       version: status == ApprovalStatus.draft ? 0 : 1,
       submittedAt: status == ApprovalStatus.draft
           ? null
-          : (status == ApprovalStatus.rejected
+          : (status == ApprovalStatus.rejected ||
+                    status == ApprovalStatus.approved
                 ? DateTime(2026, 10, 26, 9)
                 : DateTime(2026, 10, 27, 9, 15)),
       reviewedAt:
@@ -23,6 +24,8 @@ class DemoDriverRepository implements DriverRepository {
           ? DateTime(2026, 10, 27, 8, 30)
           : null,
       fields: {
+        'fullName': 'Nguyễn Minh Anh',
+        'phone': '0901234678',
         'citizenId': complete ? '001201000123' : '',
         'license': complete ? '790123456789' : '',
         'vehicleType': 'Xe tải 1 tấn',

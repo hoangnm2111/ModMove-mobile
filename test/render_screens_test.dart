@@ -27,6 +27,9 @@ void main() {
     'pricing',
     'verification-personal',
     'verification-vehicle',
+    'profile-approved',
+    'profile-pending',
+    'profile-rejected',
   ]) {
     testWidgets('$screen renders at the reference viewport', (tester) async {
       tester.view.physicalSize = const Size(390, 844);
