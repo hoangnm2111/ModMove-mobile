@@ -74,6 +74,7 @@ out of product screens; expose reference states through test/run configuration.
   than claiming a 100% pixel match without evidence.
 - Run the checks relevant to each milestone before its commit. Keep agent files
   ignored, generated build files out of Git, and source assets/licenses tracked.
+- Keep all review screenshots ignored and out of commits, as requested by the user.
 
 ## Sources
 
