@@ -10,3 +10,22 @@ android/app/release/
 ios/.generated/
 *.log
 .env
+
+# Local AI agent instructions, skills, and configuration
+AGENTS.md
+AGENTS.override.md
+.agents/
+.codex/
+
+# Flutter tooling and local validation output
+.idea/
+*.iml
+.pub/
+.pub-cache/
+coverage/
+screenshots/
+android/app/debug/
+android/app/profile/
+*.jks
+*.keystore
+android/key.properties
