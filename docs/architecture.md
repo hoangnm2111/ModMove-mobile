@@ -12,6 +12,7 @@ lib/
     widgets/                    Shared visual components
   features/
     home/
+    driver_trip/                FE-19 to FE-23, shared trip lifecycle
     onboarding/
       domain/
         entities/               Pure Dart business values
@@ -22,6 +23,7 @@ lib/
         services/               Platform/plugin adapters when needed
       presentation/
         controllers/            Observable UI state, injected use cases
+        bloc/                   Trip BLoC events/states and evidence Cubit
         models/                 Display labels/formatting
         screens/                Flutter pages
         widgets/                Feature widgets
@@ -31,6 +33,13 @@ Dependency direction: presentation → domain ← data. `lib/app/` chooses concr
 repository implementations and injects use cases/controllers. Domain imports
 neither Flutter, Provider, platform plugins nor data-layer classes. Widgets do
 not instantiate repositories. Data fixtures stay outside presentation/domain.
+
+The driver pickup feature groups home, matching, navigation and evidence around
+one trip repository so all screens observe the same order state. Its three Blocs
+and EvidenceCubit are composed in `app/driver_trip_scope.dart`, which owns stream
+and timer lifetimes. Profile and trip availability use the same DriverHomeBloc;
+the profile API remains the persistence gateway. See the
+[pickup walkthrough](driver-pickup-mock.md) for boundaries and mock scenarios.
 
 Public fares use a demo repository. Driver profiles use `ApiDriverRepository`,
 which maps domain entities to JSON and sends HTTP requests through an injected

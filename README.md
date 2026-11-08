@@ -44,6 +44,20 @@ points, validation commands, APK location and current mock-data boundaries.
 See [architecture](docs/architecture.md) for source organization and dependency
 direction. Review screenshots are generated locally and excluded from Git.
 
+## Driver pickup (FE-19 to FE-23)
+
+Online/offline, mock GPS, 30-second job offers, job details/atomic acceptance,
+pickup navigation, cargo evidence uploads and customer approval are implemented
+with BLoC/Cubit. On an Android emulator, run:
+
+```sh
+flutter run --dart-define=SCREEN=driver-home
+```
+
+Read [the pickup walkthrough](docs/driver-pickup-mock.md) for demo scenarios,
+architecture, tests and optional Google Maps setup. The trip API, GPS, routing and
+uploads are mocked; the session resets on app restart. Screenshots stay ignored.
+
 ## Driver profile mock API
 
 Driver onboarding now supports a complete interactive demo: register, upload
@@ -54,5 +68,6 @@ and one-shot API failures; the driver screens expose loading, retry and draft sa
 
 Read [the Vietnamese walkthrough](docs/driver-profile-mock.md) for demo steps,
 the proposed mock HTTP contract and the exact source call order for submission.
-The implementation retains BLoC/Cubit. Trip, wallet and earnings
-features and the planned Cubit migration remain outside this profile-only scope.
+Presentation uses BLoC/Cubit, and the original profile mock API and persisted data
+remain compatible. The pickup flow is documented separately above; wallet and
+earnings operations remain planned.
