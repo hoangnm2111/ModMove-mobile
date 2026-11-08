@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
-import 'package:provider/provider.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 import '../core/theme/app_theme.dart';
 import '../features/home/data/repositories/demo_fare_repository.dart';
 import '../features/home/domain/usecases/get_public_fares.dart';
@@ -70,15 +70,13 @@ class ModMoveApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return MultiProvider(
+    return MultiBlocProvider(
       providers: [
-        ChangeNotifierProvider(
+        BlocProvider(
           create: (_) =>
               HomeController(const GetPublicFares(DemoFareRepository())),
         ),
-        ChangeNotifierProvider(
-          create: (_) => driverController ?? _createDriver(),
-        ),
+        BlocProvider(create: (_) => driverController ?? _createDriver()),
       ],
       child: MaterialApp(
         title: 'ModMove',
