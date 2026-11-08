@@ -4,6 +4,9 @@
 
 Mở máy ảo trong Android Studio, tại `ModMove-mobile` chạy:
 
+Cấu hình Google Maps một lần theo [hướng dẫn bản đồ Android](google-maps-android.md)
+để xem và thao tác trên đường phố thật.
+
 ```powershell
 flutter pub get
 flutter run
@@ -98,19 +101,12 @@ thu tiền người gửi, tối đa 5 lần gửi và chờ khách duyệt trư
   lại tạo phiên chuyến mới. Hồ sơ onboarding vẫn dùng kho lưu riêng như trước.
 - GPS phát tọa độ mô phỏng mỗi 5 giây khi app ở foreground và tài xế online.
   Ra nền thì dừng stream, trở lại thì lấy fix mới. Chưa có dịch vụ GPS chạy nền.
-- Bản đồ mặc định là vector mô phỏng, có pan/zoom, tuyến và vị trí minh họa. Không
-  dùng nó để chỉ đường thật. Nhấn thẻ ETA để mở Google Maps ngoài app khi cần.
-- Đã có Google Maps Flutter SDK tùy chọn. Để bật tiles thật, dùng key Android đã
-  giới hạn package/SHA và bật Maps SDK for Android:
-
-  ```powershell
-  $env:MAPS_API_KEY = '<Android Maps API key của bạn>'
-  flutter run --dart-define=SCREEN=driver-home --dart-define=GOOGLE_MAPS_ENABLED=true
-  ```
-
-  Key được truyền qua environment vào Android manifest; không commit key. Khi bật
-  tiles, tọa độ và polyline vẫn là mock; chưa gọi Directions API. Cần cấu hình key
-  mới kiểm tra được tiles thật. Mặc định không cần key, không gọi Google Maps.
+- Bản đồ dùng Google Maps SDK, kéo/zoom/xoay trực tiếp. Vùng nhận đơn 5 km có vòng
+  sóng khi online, cùng bán kính với mock matching; dừng khi offline hoặc có chuyến.
+  Key đọc từ `android/secrets.properties` (Git ignore) hoặc biến `MAPS_API_KEY`.
+  Không dùng ảnh/vector giả thay thế khi thiếu key. Xem [cấu hình và test](google-maps-android.md).
+- Tọa độ và đường nét đứt đến điểm lấy vẫn mô phỏng; chưa gọi Directions/Routes API.
+  Nhấn thẻ ETA để mở Google Maps ngoài app và tìm đường thật.
 - Nút gọi khách mở dialer, không tự gọi điện. Yêu cầu sự cố chỉ tạo biên nhận mock,
   chưa triển khai toàn bộ UC báo sự cố có ảnh và quy trình điều phối.
 - FE-25/26/28/29 nằm ngoài đợt này. Các số tổng hợp/ví ở Home là dữ liệu mock.
@@ -134,9 +130,14 @@ flutter test --dart-define=CAPTURE_SCREENSHOTS=true test/driver_trip_ui_test.dar
 Ảnh ở `test/screenshots/iteration2/` được Git bỏ qua. Không commit screenshots,
 file nén screenshots, APK, coverage hoặc cấu hình agent.
 
-Kết quả xác minh ngày 2026-11-08: analyzer không có vấn đề, toàn bộ **72 tests**
-qua với coverage; build debug APK thành công. Trên AVD Android 36 đã kiểm tra mở
-Home tài xế, popup, chi tiết/nhận chuyến, arrival qua GPS mô phỏng và chụp bằng
-camera Android → quay về app → upload mock thành công (`1/2` ảnh). Luồng hai ảnh,
-retry, khách từ chối/duyệt và responsive được kiểm tra tự động ở widget/repository.
-Google Maps tiles với key thật và backend thật chưa được kiểm tra.
+Kết quả xác minh ngày 2026-11-08: analyzer không có vấn đề, toàn bộ **76 tests**
+qua với coverage; build debug APK thành công. Trên AVD Android 36 đã kiểm tra
+gửi hồ sơ mẫu → chờ duyệt → đóng/mở lại app vẫn chờ duyệt → mô phỏng duyệt →
+trang chủ tài xế → online → popup tự phát → chi tiết → nhận chuyến → đến điểm lấy.
+Khi chưa có key, app hiển thị trạng thái Google Maps chưa được cấu hình.
+
+Tests mới còn kiểm tra hồ sơ đã duyệt sau restart, camera commands/gestures gửi
+đến SDK, circle theo tọa độ/mét, pulse/lifecycle/reduced motion. Google Maps tiles
+và thao tác native trên bản đồ với key thật chưa được xác minh vì chưa có key.
+Luồng hai ảnh, retry, khách từ chối/duyệt và responsive được kiểm tra tự động.
+Kiểm tra Android trước đó đã xác minh camera → quay về app → upload mock (`1/2`).

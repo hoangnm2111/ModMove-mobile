@@ -1,169 +1,326 @@
+import 'dart:async';
+import 'dart:math' as math;
+import 'package:flutter/foundation.dart';
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
+import '../../../../core/platform/maps_configuration.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/widgets/app_widgets.dart';
+import '../../domain/entities/driver_matching_policy.dart';
 import '../../domain/entities/trip_models.dart';
+import 'driver_map_marker.dart';
 
-/// Key-free map for the mock environment; never presented as live map tiles.
+/// Native Google Maps. Trip/GPS data still comes from the trip repository.
 class DriverMap extends StatefulWidget {
   const DriverMap({
     super.key,
     this.route = false,
-    this.near = false,
     this.available = true,
+    this.searching = false,
+    this.searchRadiusMeters = DriverMatchingPolicy.searchRadiusMeters,
     this.position,
     this.destination,
-  });
-  final bool route, near, available;
+  }) : assert(searchRadiusMeters > 0);
+
+  final bool route, available, searching;
+  final double searchRadiusMeters;
   final GeoPoint? position, destination;
+
   @override
   State<DriverMap> createState() => _DriverMapState();
 }
 
-class _DriverMapState extends State<DriverMap> {
-  final _transform = TransformationController();
+class _DriverMapState extends State<DriverMap>
+    with SingleTickerProviderStateMixin, WidgetsBindingObserver {
+  late final AnimationController _pulse;
   GoogleMapController? _google;
-  static const _googleEnabled = bool.fromEnvironment('GOOGLE_MAPS_ENABLED');
+  BitmapDescriptor? _vehicleIcon;
+  bool? _configured;
+  bool _foreground = true;
+  Duration _lastFrame = Duration.zero;
+
+  LatLng get _position =>
+      _latLng(widget.position ?? const GeoPoint(10.724, 106.7057));
+  bool get _coverageVisible => widget.searching && !widget.route;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+    _pulse = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 2600),
+    )..addListener(_animateCoverage);
+    unawaited(_loadConfiguration());
+  }
+
+  Future<void> _loadConfiguration() async {
+    final configured = await MapsConfiguration.isConfigured();
+    if (!mounted) return;
+    setState(() => _configured = configured);
+    _syncPulse();
+    if (configured && _vehicleIcon == null) {
+      final icon = await DriverMapMarker.load();
+      if (mounted) setState(() => _vehicleIcon = icon);
+    }
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _syncPulse();
+  }
+
+  @override
+  void didUpdateWidget(DriverMap oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    _syncPulse();
+    if (!widget.available) _google = null;
+    if (widget.searching && !oldWidget.searching) unawaited(_showArea());
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    _foreground = state == AppLifecycleState.resumed;
+    _syncPulse();
+  }
+
+  void _syncPulse() {
+    final animate =
+        _configured == true &&
+        widget.available &&
+        _coverageVisible &&
+        _foreground &&
+        TickerMode.valuesOf(context).enabled &&
+        !MediaQuery.disableAnimationsOf(context);
+    if (animate && !_pulse.isAnimating) {
+      _lastFrame = Duration.zero;
+      _pulse.repeat();
+    } else if (!animate) {
+      _pulse.stop();
+    }
+  }
+
+  void _animateCoverage() {
+    // Limit native circle updates to about 15 fps; don't recreate the map.
+    final elapsed = _pulse.lastElapsedDuration ?? Duration.zero;
+    if (elapsed - _lastFrame < const Duration(milliseconds: 66)) return;
+    _lastFrame = elapsed;
+    setState(() {});
+  }
+
+  Future<void> _moveCamera(CameraUpdate update) async {
+    final controller = _google;
+    if (controller == null) return;
+    try {
+      await controller.animateCamera(update);
+    } on PlatformException {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Chưa điều khiển được bản đồ. Vui lòng thử lại.'),
+          ),
+        );
+      }
+    }
+  }
+
+  Future<void> _showArea() async {
+    if (_coverageVisible) {
+      final latitudeDelta = widget.searchRadiusMeters / 111320;
+      final longitudeDelta =
+          latitudeDelta /
+          math.cos(_position.latitude * math.pi / 180).abs().clamp(.1, 1);
+      await _moveCamera(
+        CameraUpdate.newLatLngBounds(
+          LatLngBounds(
+            southwest: LatLng(
+              _position.latitude - latitudeDelta,
+              _position.longitude - longitudeDelta,
+            ),
+            northeast: LatLng(
+              _position.latitude + latitudeDelta,
+              _position.longitude + longitudeDelta,
+            ),
+          ),
+          28,
+        ),
+      );
+    } else if (widget.route && widget.destination != null) {
+      final destination = _latLng(widget.destination!);
+      await _moveCamera(
+        CameraUpdate.newLatLngBounds(
+          LatLngBounds(
+            southwest: LatLng(
+              math.min(_position.latitude, destination.latitude) - .001,
+              math.min(_position.longitude, destination.longitude) - .001,
+            ),
+            northeast: LatLng(
+              math.max(_position.latitude, destination.latitude) + .001,
+              math.max(_position.longitude, destination.longitude) + .001,
+            ),
+          ),
+          40,
+        ),
+      );
+    } else {
+      await _moveCamera(CameraUpdate.newLatLngZoom(_position, 14));
+    }
+  }
+
+  Set<Circle> _circles() {
+    if (!_coverageVisible) return {};
+    return {
+      Circle(
+        circleId: const CircleId('dispatch-boundary'),
+        center: _position,
+        radius: widget.searchRadiusMeters,
+        fillColor: AppColors.orange.withValues(alpha: .07),
+        strokeColor: AppColors.orange.withValues(alpha: .45),
+        strokeWidth: 1,
+      ),
+      if (_pulse.isAnimating)
+        for (var i = 0; i < 2; i++) _ripple(i, (_pulse.value + i * .5) % 1),
+    };
+  }
+
+  Circle _ripple(int index, double phase) => Circle(
+    circleId: CircleId('dispatch-pulse-$index'),
+    center: _position,
+    radius: widget.searchRadiusMeters * (.08 + .92 * phase),
+    fillColor: AppColors.orange.withValues(alpha: .10 * (1 - phase)),
+    strokeColor: AppColors.orange.withValues(alpha: .32 * (1 - phase)),
+    strokeWidth: 2,
+    zIndex: 1,
+  );
+
   @override
   void dispose() {
-    _transform.dispose();
-    _google?.dispose();
+    WidgetsBinding.instance.removeObserver(this);
+    _pulse.dispose();
+    // GoogleMap owns and disposes its platform controller.
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
-    if (!widget.available) {
-      return const ColoredBox(
-        color: AppColors.pale,
-        child: Center(
-          child: Padding(
-            padding: EdgeInsets.all(24),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                AppIcon('location-off', size: 36, color: AppColors.muted),
-                SizedBox(height: 10),
-                Text('Chưa tải được bản đồ', textAlign: TextAlign.center),
-                Text(
-                  'Địa chỉ và liên hệ vẫn có bên dưới.',
-                  textAlign: TextAlign.center,
-                ),
-              ],
-            ),
-          ),
-        ),
+    if (!widget.available || _configured == false) {
+      return _UnavailableMap(
+        configured: _configured == true,
+        onRetry: _loadConfiguration,
       );
     }
-    return Stack(
-      fit: StackFit.expand,
+    if (_configured == null) {
+      return const Center(child: CircularProgressIndicator(strokeWidth: 2));
+    }
+    return Column(
       children: [
-        if (_googleEnabled)
-          GoogleMap(
-            initialCameraPosition: CameraPosition(
-              target: _latLng(
-                widget.position ?? const GeoPoint(10.724, 106.7057),
-              ),
-              zoom: 14,
-            ),
-            onMapCreated: (controller) => _google = controller,
-            zoomControlsEnabled: false,
-            mapToolbarEnabled: false,
-            markers: {
-              Marker(
-                markerId: const MarkerId('driver'),
-                position: _latLng(
-                  widget.position ?? const GeoPoint(10.724, 106.7057),
+        Expanded(
+          child: Stack(
+            fit: StackFit.expand,
+            children: [
+              GoogleMap(
+                key: const Key('google-driver-map'),
+                initialCameraPosition: CameraPosition(
+                  target: _position,
+                  zoom: _coverageVisible ? 10.5 : 14,
                 ),
-                infoWindow: const InfoWindow(title: 'Vị trí GPS mô phỏng'),
+                onMapCreated: (controller) {
+                  if (!mounted || !widget.available) return;
+                  _google = controller;
+                  unawaited(_showArea());
+                },
+                // ListView must not steal vertical drags that start on the map.
+                gestureRecognizers: {
+                  Factory<EagerGestureRecognizer>(EagerGestureRecognizer.new),
+                },
+                scrollGesturesEnabled: true,
+                zoomGesturesEnabled: true,
+                rotateGesturesEnabled: true,
+                tiltGesturesEnabled: false,
+                zoomControlsEnabled: false,
+                mapToolbarEnabled: false,
+                padding: const EdgeInsets.only(right: 48),
+                markers: {
+                  Marker(
+                    markerId: const MarkerId('driver'),
+                    position: _position,
+                    anchor: const Offset(.5, .5),
+                    flat: true,
+                    icon:
+                        _vehicleIcon ??
+                        BitmapDescriptor.defaultMarkerWithHue(
+                          BitmapDescriptor.hueOrange,
+                        ),
+                    infoWindow: const InfoWindow(
+                      title: 'Vị trí tài xế thử nghiệm',
+                    ),
+                  ),
+                  if (widget.destination != null)
+                    Marker(
+                      markerId: const MarkerId('pickup'),
+                      position: _latLng(widget.destination!),
+                      infoWindow: const InfoWindow(title: 'Điểm lấy hàng'),
+                      icon: BitmapDescriptor.defaultMarkerWithHue(
+                        BitmapDescriptor.hueGreen,
+                      ),
+                    ),
+                },
+                circles: _circles(),
+                polylines: widget.route && widget.destination != null
+                    ? {
+                        Polyline(
+                          polylineId: const PolylineId('mock-pickup-direction'),
+                          color: AppColors.orange,
+                          width: 4,
+                          patterns: [PatternItem.dash(14), PatternItem.gap(8)],
+                          points: [_position, _latLng(widget.destination!)],
+                        ),
+                      }
+                    : {},
               ),
-              if (widget.destination != null)
-                Marker(
-                  markerId: const MarkerId('pickup'),
-                  position: _latLng(widget.destination!),
-                  icon: BitmapDescriptor.defaultMarkerWithHue(
-                    BitmapDescriptor.hueGreen,
+              Positioned(
+                right: 8,
+                bottom: 24,
+                child: Material(
+                  color: Colors.white,
+                  elevation: 2,
+                  borderRadius: BorderRadius.circular(12),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      _MapControl(
+                        'Phóng to',
+                        'plus',
+                        () => _moveCamera(CameraUpdate.zoomIn()),
+                      ),
+                      _MapControl(
+                        'Thu nhỏ',
+                        'minus',
+                        () => _moveCamera(CameraUpdate.zoomOut()),
+                      ),
+                      _MapControl('Về vị trí tài xế', 'target', _showArea),
+                    ],
                   ),
                 ),
-            },
-            polylines:
-                widget.route &&
-                    widget.position != null &&
-                    widget.destination != null
-                ? {
-                    Polyline(
-                      polylineId: const PolylineId('mock-pickup-route'),
-                      color: AppColors.orange,
-                      width: 5,
-                      points: [
-                        _latLng(widget.position!),
-                        LatLng(
-                          widget.position!.latitude,
-                          widget.destination!.longitude,
-                        ),
-                        _latLng(widget.destination!),
-                      ],
-                    ),
-                  }
-                : {},
-          )
-        else
-          InteractiveViewer(
-            transformationController: _transform,
-            minScale: 1,
-            maxScale: 3,
-            child: LayoutBuilder(
-              builder: (_, constraints) => CustomPaint(
-                size: Size(constraints.maxWidth, constraints.maxHeight),
-                painter: _StreetPainter(
-                  route: widget.route,
-                  near: widget.near,
-                  progress:
-                      widget.position == null || widget.destination == null
-                      ? 0
-                      : (1 -
-                                widget.position!.distanceTo(
-                                      widget.destination!,
-                                    ) /
-                                    1200)
-                            .clamp(0, 1),
-                ),
               ),
-            ),
-          ),
-        Positioned(
-          left: 8,
-          bottom: 6,
-          child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
-            color: Colors.white.withValues(alpha: .9),
-            child: Text(
-              _googleEnabled ? 'GPS / tuyến mô phỏng' : 'Bản đồ mô phỏng',
-              style: appText(size: 9, color: AppColors.secondary),
-            ),
+            ],
           ),
         ),
-        Positioned(
-          right: 12,
-          bottom: 14,
-          child: Material(
-            color: Colors.white,
-            elevation: 2,
-            shape: const CircleBorder(),
-            child: IconButton(
-              tooltip: 'Về vị trí hiện tại',
-              onPressed: () {
-                _transform.value = Matrix4.identity();
-                _google?.animateCamera(
-                  CameraUpdate.newLatLng(
-                    _latLng(
-                      widget.position ?? const GeoPoint(10.724, 106.7057),
-                    ),
-                  ),
-                );
-              },
-              icon: const AppIcon('target'),
-            ),
+        // Outside the native map so Google attribution is never covered.
+        Container(
+          width: double.infinity,
+          color: Colors.white,
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
+          child: Text(
+            _coverageVisible
+                ? 'Vùng nhận đơn · ${(widget.searchRadiusMeters / 1000).toStringAsFixed(0)} km · Vị trí thử nghiệm'
+                : widget.route
+                ? 'Vị trí / hướng đến điểm lấy mô phỏng'
+                : 'Vị trí tài xế thử nghiệm',
+            style: appText(size: 11, color: AppColors.secondary),
           ),
         ),
       ],
@@ -171,209 +328,52 @@ class _DriverMapState extends State<DriverMap> {
   }
 }
 
-LatLng _latLng(GeoPoint p) => LatLng(p.latitude, p.longitude);
+LatLng _latLng(GeoPoint point) => LatLng(point.latitude, point.longitude);
 
-class _StreetPainter extends CustomPainter {
-  const _StreetPainter({
-    required this.route,
-    required this.near,
-    required this.progress,
-  });
-  final bool route, near;
-  final double progress;
+class _MapControl extends StatelessWidget {
+  const _MapControl(this.label, this.icon, this.onPressed);
+  final String label, icon;
+  final VoidCallback onPressed;
   @override
-  void paint(Canvas canvas, Size size) {
-    final w = size.width, h = size.height;
-    canvas.drawRect(
-      Offset.zero & size,
-      Paint()..color = const Color(0xFFEBEEEC),
-    );
-    canvas.save();
-    canvas.clipRect(Offset.zero & size);
-    canvas.translate(w * .4, h * .4);
-    canvas.rotate(-.28);
-    for (var x = -12; x < 15; x++) {
-      for (var y = -22; y < 25; y++) {
-        final rect = Rect.fromLTWH(x * 32.0, y * 22.0, 27, 17);
-        canvas.drawRect(
-          rect,
-          Paint()
-            ..color = (x + y) % 9 == 0
-                ? const Color(0xFFDCE8D5)
-                : const Color(0xFFF4F3EF),
-        );
-        canvas.drawRect(
-          rect,
-          Paint()
-            ..color = const Color(0xFFD6DCD9)
-            ..style = PaintingStyle.stroke
-            ..strokeWidth = .6,
-        );
-      }
-    }
-    canvas.restore();
-    final river = Path()
-      ..moveTo(w * .82, -20)
-      ..cubicTo(w * .52, h * .3, w * 1.2, h * .42, w * .85, h * .65)
-      ..cubicTo(w * .7, h * .8, w * .86, h * .95, w * .75, h + 30);
-    canvas.drawPath(
-      river,
-      Paint()
-        ..color = Colors.white
-        ..style = PaintingStyle.stroke
-        ..strokeWidth = 40,
-    );
-    canvas.drawPath(
-      river,
-      Paint()
-        ..color = const Color(0xFFB5D9ED)
-        ..style = PaintingStyle.stroke
-        ..strokeWidth = 32,
-    );
-    final roads = [
-      Path()
-        ..moveTo(-10, h * .84)
-        ..cubicTo(w * .2, h * .56, w * .65, h * .75, w + 10, h * .43),
-      Path()
-        ..moveTo(w * .15, -10)
-        ..lineTo(w * .32, h * .36)
-        ..lineTo(w * .28, h * .74)
-        ..lineTo(w * .48, h + 10),
-      Path()
-        ..moveTo(w * .58, -10)
-        ..lineTo(w * .50, h * .4)
-        ..lineTo(w * .65, h + 10),
-    ];
-    for (final road in roads) {
-      canvas.drawPath(
-        road,
-        Paint()
-          ..color = const Color(0xFFCCD8DC)
-          ..style = PaintingStyle.stroke
-          ..strokeWidth = 11,
-      );
-      canvas.drawPath(
-        road,
-        Paint()
-          ..color = Colors.white
-          ..style = PaintingStyle.stroke
-          ..strokeWidth = 8,
-      );
-      canvas.drawPath(
-        road,
-        Paint()
-          ..color = const Color(0xFFFFE7AE)
-          ..style = PaintingStyle.stroke
-          ..strokeWidth = 2,
-      );
-    }
-    _label(canvas, 'PHÚ MỸ HƯNG', Offset(w * .49, h * .88), 10);
-    _label(canvas, 'Tân Phong', Offset(w * .08, h * .4), 11);
-    _label(canvas, 'Tân Thuận', Offset(w * .68, h * .2), 11);
-    _label(canvas, 'Nguyễn Văn Linh', Offset(w * .32, h * .71), 11);
-    final start = Offset(w * .21, h * .82), end = Offset(w * .69, h * .36);
-    var vehiclePoint = start;
-    if (route) {
-      final path = Path()
-        ..moveTo(start.dx, start.dy)
-        ..lineTo(w * .27, h * .72)
-        ..lineTo(w * .52, h * .64)
-        ..lineTo(w * .5, h * .56)
-        ..lineTo(w * .63, h * .49)
-        ..lineTo(end.dx, end.dy);
-      canvas.drawPath(
-        path,
-        Paint()
-          ..color = Colors.white
-          ..style = PaintingStyle.stroke
-          ..strokeWidth = 9
-          ..strokeJoin = StrokeJoin.round,
-      );
-      canvas.drawPath(
-        path,
-        Paint()
-          ..color = const Color(0xFFF66818)
-          ..style = PaintingStyle.stroke
-          ..strokeWidth = 5
-          ..strokeJoin = StrokeJoin.round,
-      );
-      _pin(canvas, end);
-      final metric = path.computeMetrics().first;
-      vehiclePoint = metric
-          .getTangentForOffset(metric.length * progress)!
-          .position;
-    } else {
-      canvas.drawCircle(
-        Offset(w * .51, h * .5),
-        48,
-        Paint()..color = AppColors.orange.withValues(alpha: .12),
-      );
-      canvas.drawCircle(
-        Offset(w * .51, h * .5),
-        48,
-        Paint()
-          ..color = AppColors.orange.withValues(alpha: .3)
-          ..style = PaintingStyle.stroke,
-      );
-    }
-    final truck = route ? vehiclePoint : Offset(w * .51, h * .5);
-    canvas.save();
-    canvas.translate(truck.dx, truck.dy);
-    canvas.rotate(.2);
-    for (final x in [-13.0, 9.0]) {
-      for (final y in [-14.0, 10.0]) {
-        canvas.drawRRect(
-          RRect.fromRectAndRadius(
-            Rect.fromLTWH(x, y, 4, 7),
-            const Radius.circular(1.5),
-          ),
-          Paint()..color = AppColors.ink,
-        );
-      }
-    }
-    canvas.drawRRect(
-      RRect.fromRectAndRadius(
-        const Rect.fromLTWH(-11, -21, 22, 42),
-        const Radius.circular(5),
-      ),
-      Paint()..color = Colors.white,
-    );
-    canvas.drawRRect(
-      RRect.fromRectAndRadius(
-        const Rect.fromLTWH(-9, -19, 18, 38),
-        const Radius.circular(3),
-      ),
-      Paint()..color = AppColors.orange,
-    );
-    canvas.drawRect(
-      const Rect.fromLTWH(-6, -15, 12, 23),
-      Paint()..color = Colors.white,
-    );
-    canvas.drawRect(
-      const Rect.fromLTWH(-6, 11, 12, 4),
-      Paint()..color = AppColors.ink,
-    );
-    canvas.restore();
-  }
+  Widget build(BuildContext context) => IconButton(
+    tooltip: label,
+    onPressed: onPressed,
+    constraints: const BoxConstraints(minWidth: 40, minHeight: 40),
+    visualDensity: VisualDensity.compact,
+    icon: AppIcon(icon, size: 21),
+  );
+}
 
-  void _pin(Canvas canvas, Offset p) {
-    canvas.drawCircle(p, 18, Paint()..color = Colors.white);
-    canvas.drawCircle(p, 14, Paint()..color = AppColors.green);
-    canvas.drawCircle(p, 5, Paint()..color = Colors.white);
-  }
-
-  void _label(Canvas canvas, String text, Offset at, double size) {
-    final painter = TextPainter(
-      text: TextSpan(
-        text: text,
-        style: appText(size: size, color: const Color(0xFF5D6872)),
-      ),
-      textDirection: TextDirection.ltr,
-    )..layout();
-    painter.paint(canvas, at);
-  }
-
+class _UnavailableMap extends StatelessWidget {
+  const _UnavailableMap({required this.configured, required this.onRetry});
+  final bool configured;
+  final VoidCallback onRetry;
   @override
-  bool shouldRepaint(_StreetPainter old) =>
-      old.route != route || old.near != near || old.progress != progress;
+  Widget build(BuildContext context) => ColoredBox(
+    color: AppColors.pale,
+    child: Center(
+      child: SingleChildScrollView(
+        padding: const EdgeInsets.all(12),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const AppIcon('map', size: 30, color: AppColors.muted),
+            const SizedBox(height: 6),
+            Text(
+              configured
+                  ? 'Chưa tải được Google Maps'
+                  : 'Google Maps chưa được cấu hình',
+              textAlign: TextAlign.center,
+            ),
+            const Text(
+              'Bạn vẫn có thể xem địa chỉ và thông tin chuyến.',
+              textAlign: TextAlign.center,
+              style: TextStyle(fontSize: 12),
+            ),
+            TextButton(onPressed: onRetry, child: const Text('Thử lại bản đồ')),
+          ],
+        ),
+      ),
+    ),
+  );
 }

@@ -1,8 +1,18 @@
+import java.util.Properties
+
 plugins {
     id("com.android.application")
     // The Flutter Gradle Plugin must be applied after the Android and Kotlin Gradle plugins.
     id("dev.flutter.flutter-gradle-plugin")
 }
+
+val mapsSecrets = Properties().apply {
+    val secretsFile = rootProject.file("secrets.properties")
+    if (secretsFile.exists()) secretsFile.inputStream().use { load(it) }
+}
+val mapsApiKey = providers.environmentVariable("MAPS_API_KEY").orNull
+    ?.takeIf { it.isNotBlank() }
+    ?: mapsSecrets.getProperty("MAPS_API_KEY", "")
 
 android {
     namespace = "vn.modmove.modmove_mobile"
@@ -22,7 +32,7 @@ android {
         targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode
         versionName = flutter.versionName
-        manifestPlaceholders["MAPS_API_KEY"] = providers.environmentVariable("MAPS_API_KEY").getOrElse("")
+        manifestPlaceholders["MAPS_API_KEY"] = mapsApiKey.trim()
     }
 
     buildTypes {
