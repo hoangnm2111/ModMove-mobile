@@ -30,6 +30,7 @@ Future<void> showTripSimulation(BuildContext context) async {
               TripSimulation.acceptElsewhere: 'Tài xế khác nhận đơn trước',
               TripSimulation.cancelOrder: 'Khách hủy chuyến',
               TripSimulation.nearPickup: 'GPS: đã ở điểm lấy hàng',
+              TripSimulation.advanceRoute: 'GPS: di chuyển 300 m theo tuyến',
               TripSimulation.gpsLost: 'GPS: mất quyền vị trí',
               TripSimulation.gpsRestored: 'GPS: khôi phục vị trí',
               TripSimulation.mapUnavailable: 'Bản đồ: không tải được',

@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:google_maps_flutter/google_maps_flutter.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/widgets/app_widgets.dart';
+import '../../domain/entities/trip_models.dart';
 
 /// Key-free map for the mock environment; never presented as live map tiles.
 class DriverMap extends StatefulWidget {
@@ -9,17 +11,23 @@ class DriverMap extends StatefulWidget {
     this.route = false,
     this.near = false,
     this.available = true,
+    this.position,
+    this.destination,
   });
   final bool route, near, available;
+  final GeoPoint? position, destination;
   @override
   State<DriverMap> createState() => _DriverMapState();
 }
 
 class _DriverMapState extends State<DriverMap> {
   final _transform = TransformationController();
+  GoogleMapController? _google;
+  static const _googleEnabled = bool.fromEnvironment('GOOGLE_MAPS_ENABLED');
   @override
   void dispose() {
     _transform.dispose();
+    _google?.dispose();
     super.dispose();
   }
 
@@ -50,17 +58,67 @@ class _DriverMapState extends State<DriverMap> {
     return Stack(
       fit: StackFit.expand,
       children: [
-        InteractiveViewer(
-          transformationController: _transform,
-          minScale: 1,
-          maxScale: 3,
-          child: LayoutBuilder(
-            builder: (_, constraints) => CustomPaint(
-              size: Size(constraints.maxWidth, constraints.maxHeight),
-              painter: _StreetPainter(route: widget.route, near: widget.near),
+        if (_googleEnabled)
+          GoogleMap(
+            initialCameraPosition: CameraPosition(
+              target: _latLng(
+                widget.position ?? const GeoPoint(10.724, 106.7057),
+              ),
+              zoom: 14,
+            ),
+            onMapCreated: (controller) => _google = controller,
+            zoomControlsEnabled: false,
+            mapToolbarEnabled: false,
+            markers: {
+              Marker(
+                markerId: const MarkerId('driver'),
+                position: _latLng(
+                  widget.position ?? const GeoPoint(10.724, 106.7057),
+                ),
+                infoWindow: const InfoWindow(title: 'Vị trí GPS mô phỏng'),
+              ),
+              if (widget.destination != null)
+                Marker(
+                  markerId: const MarkerId('pickup'),
+                  position: _latLng(widget.destination!),
+                  icon: BitmapDescriptor.defaultMarkerWithHue(
+                    BitmapDescriptor.hueGreen,
+                  ),
+                ),
+            },
+            polylines:
+                widget.route &&
+                    widget.position != null &&
+                    widget.destination != null
+                ? {
+                    Polyline(
+                      polylineId: const PolylineId('mock-pickup-route'),
+                      color: AppColors.orange,
+                      width: 5,
+                      points: [
+                        _latLng(widget.position!),
+                        LatLng(
+                          widget.position!.latitude,
+                          widget.destination!.longitude,
+                        ),
+                        _latLng(widget.destination!),
+                      ],
+                    ),
+                  }
+                : {},
+          )
+        else
+          InteractiveViewer(
+            transformationController: _transform,
+            minScale: 1,
+            maxScale: 3,
+            child: LayoutBuilder(
+              builder: (_, constraints) => CustomPaint(
+                size: Size(constraints.maxWidth, constraints.maxHeight),
+                painter: _StreetPainter(route: widget.route, near: widget.near),
+              ),
             ),
           ),
-        ),
         Positioned(
           left: 8,
           bottom: 6,
@@ -68,7 +126,7 @@ class _DriverMapState extends State<DriverMap> {
             padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
             color: Colors.white.withValues(alpha: .9),
             child: Text(
-              'Bản đồ mô phỏng',
+              _googleEnabled ? 'GPS / tuyến mô phỏng' : 'Bản đồ mô phỏng',
               style: appText(size: 9, color: AppColors.secondary),
             ),
           ),
@@ -82,7 +140,16 @@ class _DriverMapState extends State<DriverMap> {
             shape: const CircleBorder(),
             child: IconButton(
               tooltip: 'Về vị trí hiện tại',
-              onPressed: () => _transform.value = Matrix4.identity(),
+              onPressed: () {
+                _transform.value = Matrix4.identity();
+                _google?.animateCamera(
+                  CameraUpdate.newLatLng(
+                    _latLng(
+                      widget.position ?? const GeoPoint(10.724, 106.7057),
+                    ),
+                  ),
+                );
+              },
               icon: const AppIcon('target'),
             ),
           ),
@@ -91,6 +158,8 @@ class _DriverMapState extends State<DriverMap> {
     );
   }
 }
+
+LatLng _latLng(GeoPoint p) => LatLng(p.latitude, p.longitude);
 
 class _StreetPainter extends CustomPainter {
   const _StreetPainter({required this.route, required this.near});

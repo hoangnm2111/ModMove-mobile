@@ -5,6 +5,7 @@
 .packages
 build/
 android/.gradle/
+android/.kotlin/
 android/local.properties
 android/app/release/
 ios/.generated/

@@ -6,6 +6,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:modmove_mobile/app/app.dart';
 import 'package:modmove_mobile/features/driver_trip/data/repositories/mock_driver_trip_repository.dart';
 import 'package:modmove_mobile/features/driver_trip/domain/entities/trip_models.dart';
+import 'package:modmove_mobile/features/driver_trip/domain/repositories/driver_trip_repository.dart';
 
 Future<void> capture(WidgetTester tester, GlobalKey key, String name) async {
   if (!const bool.fromEnvironment('CAPTURE_SCREENSHOTS')) return;
@@ -50,7 +51,16 @@ void main() {
     await tester.tap(find.byKey(const Key('accept-job')));
     await tester.pumpAndSettle();
     expect(repo.current.trip!.stage, TripStage.accepted);
-    expect(find.text('Chuyến đang thực hiện'), findsOneWidget);
+    expect(find.text('Đến điểm lấy hàng'), findsOneWidget);
+    await capture(tester, key, 'pickup-navigation');
+    await tester.tap(find.byKey(const Key('arrive-pickup')));
+    await tester.pumpAndSettle();
+    expect(repo.current.trip!.stage, TripStage.accepted);
+    await tester.runAsync(() => repo.simulate(TripSimulation.nearPickup));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('arrive-pickup')));
+    await tester.pumpAndSettle();
+    expect(repo.current.trip!.stage, TripStage.arrived);
     await tester.pumpWidget(const SizedBox());
     await repo.close();
   });

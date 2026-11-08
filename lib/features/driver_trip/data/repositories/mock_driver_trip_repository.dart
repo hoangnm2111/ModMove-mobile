@@ -408,6 +408,15 @@ class MockDriverTripRepository implements DriverTripRepository, TripSimulator {
       case TripSimulation.nearPickup:
         _point = _requireTrip().job.pickupPoint;
         _ping();
+      case TripSimulation.advanceRoute:
+        final target = _requireTrip().job.pickupPoint;
+        final distance = _point.distanceTo(target);
+        final fraction = distance <= 300 ? 1.0 : 300 / distance;
+        _point = GeoPoint(
+          _point.latitude + (target.latitude - _point.latitude) * fraction,
+          _point.longitude + (target.longitude - _point.longitude) * fraction,
+        );
+        _ping();
       case TripSimulation.uploadFailure:
         _failUpload = true;
       case TripSimulation.requestFailure:

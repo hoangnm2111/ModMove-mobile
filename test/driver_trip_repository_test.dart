@@ -6,6 +6,35 @@ import 'package:modmove_mobile/features/driver_trip/domain/repositories/driver_t
 
 void main() {
   test(
+    'arrival requires fresh GPS within 500m; cancellation blocks arrival',
+    () async {
+      var now = DateTime(2026, 11, 8, 9);
+      final repo = MockDriverTripRepository(
+        delay: Duration.zero,
+        autoOffer: false,
+        clock: () => now,
+      );
+      addTearDown(repo.close);
+      await repo.setOnline(true);
+      final id = repo.current.jobs.first.id;
+      await repo.openOffer(id);
+      await repo.acceptOffer(id);
+      await expectLater(repo.arrive(), throwsA(isA<TripFailure>()));
+      expect(repo.current.trip!.stage, TripStage.accepted);
+      await repo.simulate(TripSimulation.nearPickup);
+      repo.setForeground(false);
+      now = now.add(const Duration(seconds: 31));
+      await expectLater(repo.arrive(), throwsA(isA<TripFailure>()));
+      repo.setForeground(true);
+      await repo.arrive();
+      final arrivedAt = repo.current.trip!.arrivedAt;
+      await repo.arrive();
+      expect(repo.current.trip!.arrivedAt, arrivedAt);
+      await repo.simulate(TripSimulation.cancelOrder);
+      await expectLater(repo.arrive(), throwsA(isA<TripFailure>()));
+    },
+  );
+  test(
     'first accept wins atomically and a second active job is forbidden',
     () async {
       final repo = MockDriverTripRepository(

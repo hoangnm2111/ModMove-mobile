@@ -29,6 +29,11 @@ abstract interface class CargoPhotoRepository {
   Future<CargoPhoto?> pick(CargoPhotoKind kind, CargoPhotoSource source);
 }
 
+abstract interface class TripContactRepository {
+  Future<bool> callCustomer(String phone);
+  Future<bool> openNavigation(GeoPoint destination);
+}
+
 /// Development controls are injected separately; remote implementations need
 /// not expose them. They never represent driver permissions on the real server.
 enum TripSimulation {
@@ -40,6 +45,7 @@ enum TripSimulation {
   mapUnavailable,
   mapRestored,
   nearPickup,
+  advanceRoute,
   uploadFailure,
   requestFailure,
   customerApproves,
