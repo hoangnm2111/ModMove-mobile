@@ -10,11 +10,19 @@ import '../features/driver_trip/presentation/bloc/driver_home_bloc.dart';
 import '../features/driver_trip/presentation/bloc/job_offer_bloc.dart';
 import '../features/driver_trip/presentation/bloc/active_trip_bloc.dart';
 import '../features/driver_trip/data/repositories/platform_trip_contact_repository.dart';
+import '../features/driver_trip/data/repositories/device_cargo_photo_repository.dart';
+import '../features/driver_trip/presentation/bloc/evidence_cubit.dart';
 
 class DriverTripScope extends StatefulWidget {
-  const DriverTripScope({super.key, required this.child, this.repository});
+  const DriverTripScope({
+    super.key,
+    required this.child,
+    this.repository,
+    this.cargoPhotos,
+  });
   final Widget child;
   final DriverTripRepository? repository;
+  final CargoPhotoRepository? cargoPhotos;
   @override
   State<DriverTripScope> createState() => _DriverTripScopeState();
 }
@@ -74,6 +82,12 @@ class _DriverTripScopeState extends State<DriverTripScope>
         value: _repository,
         child: MultiBlocProvider(
           providers: [
+            BlocProvider(
+              create: (_) => EvidenceCubit(
+                DriverTripActions(_repository),
+                widget.cargoPhotos ?? DeviceCargoPhotoRepository(),
+              ),
+            ),
             BlocProvider(
               create: (_) => DriverHomeBloc(DriverTripActions(_repository)),
             ),

@@ -94,7 +94,11 @@ class ActiveTripBloc extends Bloc<ActiveTripEvent, ActiveTripState> {
         );
       }
       if (event is ExternalNavigationOpened &&
-          !await contact.openNavigation(trip.job.pickupPoint)) {
+          !await contact.openNavigation(
+            trip.stage == TripStage.inTransit
+                ? trip.job.dropoffPoint
+                : trip.job.pickupPoint,
+          )) {
         throw const TripFailure(
           'Không mở được Google Maps. Hãy dùng địa chỉ điểm lấy hàng.',
         );
