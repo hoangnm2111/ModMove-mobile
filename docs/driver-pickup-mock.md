@@ -1,5 +1,7 @@
 # Driver pickup — FE-19 to FE-23
 
+> Tài liệu bản mock. App mặc định đã dùng backend thật: xem [hướng dẫn API](backend-api.md). Thêm `--dart-define=USE_MOCK_API=true` vào các lệnh demo bên dưới.
+
 ## Chạy ngay trên máy ảo Android
 
 Mở máy ảo trong Android Studio, tại `ModMove-mobile` chạy:

@@ -31,6 +31,10 @@ Cross-platform mobile application built with **Flutter (Android)** supporting tw
 
 ## Run and review the mobile UI
 
+The app now defaults to the real local backend at `http://10.0.2.2:5133` on Android Emulator. Start the backend, then run `flutter run` from this repository. See [backend API setup and sequential driver testing](docs/backend-api.md) for authentication, onboarding, GPS, matching, wallet, and currently unavailable endpoints.
+
+The UI fixture commands below describe the earlier demo. Add `--dart-define=USE_MOCK_API=true` when reviewing those mock screens; `SCREEN` does not bypass authentication in real API mode.
+
 The Home, public fare, driver verification and profile screens are implemented
 using Flutter Material, BLoC and feature-first Clean Architecture.
 
