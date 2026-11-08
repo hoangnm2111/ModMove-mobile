@@ -7,6 +7,7 @@ import '../features/driver_trip/presentation/screens/driver_dashboard.dart';
 import '../features/driver_trip/presentation/screens/job_details_screen.dart';
 import '../features/driver_trip/presentation/screens/active_trip_screen.dart';
 import '../core/theme/app_theme.dart';
+import '../core/widgets/app_widgets.dart';
 import '../features/home/data/repositories/demo_fare_repository.dart';
 import '../features/home/domain/usecases/get_public_fares.dart';
 import '../features/home/presentation/controllers/home_controller.dart';
@@ -202,6 +203,25 @@ class ModMoveApp extends StatelessWidget {
   Widget _profile(BuildContext context) => DriverProfileScreen(
     onDemo: () => Navigator.pushNamed(context, '/driver-demo'),
     onHistory: () => Navigator.pushNamed(context, '/driver-history'),
+    onOrders: () {
+      final trip = context.read<DriverTripRepository>().current.trip;
+      if (trip?.ongoing ?? false) {
+        Navigator.pushNamed(context, '/active-trip');
+      } else if (context.read<DriverController>().canGoOnline) {
+        Navigator.pushNamedAndRemoveUntil(
+          context,
+          '/driver-home',
+          (_) => false,
+        );
+      } else {
+        showInfoSheet(
+          context,
+          'Chưa thể nhận đơn',
+          'Hoàn thiện hồ sơ tài xế và chờ xét duyệt. Sau khi hồ sơ được duyệt '
+              'và tài khoản hoạt động, bạn có thể vào trang chủ tài xế để nhận đơn.',
+        );
+      }
+    },
     onHome: () => Navigator.pushNamedAndRemoveUntil(
       context,
       context.read<DriverController>().canGoOnline ? '/driver-home' : '/home',

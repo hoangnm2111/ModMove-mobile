@@ -2,6 +2,10 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:modmove_mobile/app/app.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:modmove_mobile/features/driver_trip/domain/repositories/driver_trip_repository.dart';
+import 'package:modmove_mobile/features/driver_trip/domain/entities/trip_models.dart';
+import 'package:modmove_mobile/features/driver_trip/presentation/screens/driver_dashboard.dart';
 import 'package:modmove_mobile/features/onboarding/data/repositories/api_driver_repository.dart';
 import 'package:modmove_mobile/features/onboarding/data/repositories/demo_photo_repository.dart';
 import 'package:modmove_mobile/features/onboarding/data/repositories/device_photo_repository.dart';
@@ -43,6 +47,13 @@ DriverController controller(
 }
 
 Future<void> click(WidgetTester tester, Finder finder) async {
+  if (finder.evaluate().isEmpty) {
+    await tester.scrollUntilVisible(
+      finder,
+      200,
+      scrollable: find.byType(Scrollable).last,
+    );
+  }
   await tester.ensureVisible(finder);
   await tester.pumpAndSettle();
   await tester.tap(finder);
@@ -113,17 +124,16 @@ void main() {
   );
 
   testWidgets(
-    'registration -> reject -> correct -> approve -> online entirely through UI',
+    'guest home -> registration -> review -> profile -> accept trip through UI',
     (tester) async {
       tester.view.physicalSize = const Size(390, 844);
       tester.view.devicePixelRatio = 1;
       addTearDown(tester.view.reset);
       final api = MockDriverApi(latency: Duration.zero);
       final driver = controller(api);
-      await tester.pumpWidget(
-        ModMoveApp(screen: 'driver-onboarding', driverController: driver),
-      );
+      await tester.pumpWidget(ModMoveApp(driverController: driver));
       await tester.pumpAndSettle();
+      await click(tester, find.text('Đăng ký tài xế  →'));
       await tester.enterText(
         find.byKey(const ValueKey('field-citizenId')),
         '001201000123',
@@ -153,6 +163,7 @@ void main() {
       }
       await click(tester, find.text('Gửi hồ sơ xét duyệt'));
       expect(find.text('Hồ sơ đang chờ duyệt'), findsOneWidget);
+      expect(find.byKey(const Key('open-driver-home')), findsNothing);
       expect(driver.version, 1);
       await click(tester, find.text('Mô phỏng'));
       await click(tester, find.byKey(const ValueKey('demo-reject')));
@@ -173,6 +184,24 @@ void main() {
       await click(tester, find.text('Lịch sử các lần gửi'));
       expect(find.text('Phiên bản 2'), findsOneWidget);
       expect(driver.versions.map((item) => item.version), [2, 1]);
+      await click(tester, find.byTooltip('Quay lại'));
+      await click(tester, find.byKey(const Key('open-driver-home')));
+      expect(find.text('Trang chủ tài xế'), findsOneWidget);
+      expect(find.text('Bạn đang trực tuyến'), findsOneWidget);
+      final trips = tester
+          .element(find.byType(DriverDashboard))
+          .read<DriverTripRepository>();
+      expect(trips.current.online, isTrue);
+      await click(tester, find.text('Tài khoản'));
+      expect(find.text('Hồ sơ đã duyệt'), findsOneWidget);
+      expect(find.text('Nguyễn Minh Anh'), findsNWidgets(2));
+      await click(tester, find.text('Đơn hàng'));
+      expect(find.text('Trang chủ tài xế'), findsOneWidget);
+      await click(tester, find.text('12 Nguyễn Văn Linh, Quận 7'));
+      await click(tester, find.text('Xem chi tiết'));
+      await click(tester, find.byKey(const Key('accept-job')));
+      expect(trips.current.trip!.stage, TripStage.accepted);
+      expect(find.text('Đến điểm lấy hàng'), findsOneWidget);
       expect(tester.takeException(), isNull);
     },
   );
