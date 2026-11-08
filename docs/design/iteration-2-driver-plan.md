@@ -1,5 +1,14 @@
 # Iteration 2: Driver trip and earnings plan
 
+## Implementation status — 2026-11-08
+
+FE-19, FE-20, FE-21, FE-22 and FE-23 are implemented, including the Cubit migration
+of existing Home/Onboarding. They share `features/driver_trip` to keep one active
+trip state across the five screens; presentation/domain/data boundaries remain.
+FE-25, FE-26, FE-28 and FE-29 remain planned. See
+[the runnable pickup guide](../driver-pickup-mock.md) for setup, scenarios,
+validation and the limits of the mock transport/GPS/maps/uploads.
+
 ## Scope and constraints
 
 This plan covers tickets `FE-19`, `FE-20`, `FE-21`, `FE-22`, `FE-23`,

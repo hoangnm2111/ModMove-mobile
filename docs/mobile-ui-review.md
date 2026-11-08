@@ -36,7 +36,7 @@ replacement: the back of the driving licence and the inspection certificate.
 ## Implementation and behavior
 
 Source follows feature-first [Clean Architecture](architecture.md), with pure
-Dart domain entities, repository interfaces and use cases. Provider controllers
+Dart domain entities, repository interfaces and use cases. Cubit controllers
 hold presentation state. `lib/app/app.dart` composes repositories and routes.
 
 Flutter Material is the base UI kit. Inter fonts are bundled for offline use;
