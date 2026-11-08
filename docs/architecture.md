@@ -46,8 +46,11 @@ pure-Dart `DriverMatchingPolicy.searchRadiusMeters`. Online/GPS/trip state comes
 from `DriverHomeBloc`; the widget's animation controller handles only visual
 timing and respects lifecycle, ticker visibility and reduced motion. Android key
 presence is read through `core/platform/maps_configuration.dart`; the key itself
-remains in native manifest metadata. Missing configuration is explicit and never
-falls back to a simulated map. See [Google Maps setup](google-maps-android.md).
+remains in native manifest metadata. Without a configured key, `MockDriverMap`
+temporarily renders the original illustrative streets, route and vehicle with
+pan/zoom and the same lifecycle-aware pulse. It is labelled as a simulation.
+Rebuilding after key/Billing setup automatically selects Google Maps again.
+See [Google Maps setup](google-maps-android.md).
 
 Public fares use a demo repository. Driver profiles use `ApiDriverRepository`,
 which maps domain entities to JSON and sends HTTP requests through an injected

@@ -65,6 +65,9 @@ Configure the Android key once using [Google Maps setup and sequential UI tests]
 Maps use the native Google Maps SDK, with pan/pinch/rotate, zoom/recenter controls
 and an animated 5 km dispatch area while searching. `android/secrets.properties`
 stays ignored. No extra `GOOGLE_MAPS_ENABLED` flag is needed.
+Until a key is configured, the app automatically uses the labelled original mock
+map with pan/zoom and animated search waves. Run `flutter run` now to test the
+full driver flow; after key/Billing setup, rebuild to switch to Google Maps.
 
 Read [the pickup walkthrough](docs/driver-pickup-mock.md) for demo scenarios,
 architecture and tests. The trip API, GPS, routing and
