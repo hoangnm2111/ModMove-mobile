@@ -1,10 +1,26 @@
-import 'package:flutter/foundation.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../domain/entities/driver_application.dart';
 import '../../domain/repositories/driver_repository.dart';
 import '../../domain/usecases/driver_usecases.dart';
 import '../../domain/usecases/validate_driver_application.dart';
 
-class DriverController extends ChangeNotifier {
+/// Immutable snapshots let consumers compare previous and current form state.
+class DriverPresentationState {
+  DriverPresentationState({
+    this.application,
+    this.busy = false,
+    this.error,
+    this.revision = 0,
+    Map<DocumentKind, String> uploadErrors = const {},
+  }) : uploadErrors = Map.unmodifiable(uploadErrors);
+  final DriverApplication? application;
+  final bool busy;
+  final String? error;
+  final int revision;
+  final Map<DocumentKind, String> uploadErrors;
+}
+
+class DriverController extends Cubit<DriverPresentationState> {
   DriverController({
     required GetDriverApplication loadApplication,
     required this._submitApplication,
@@ -12,15 +28,16 @@ class DriverController extends ChangeNotifier {
     this._profile,
     this.simulator,
     this.onDispose,
-  }) {
+  }) : super(DriverPresentationState()) {
     _apply(loadApplication(), initial: true);
     if (_profile == null) online = application.canGoOnline;
+    _notify();
   }
   final SubmitDriverApplication _submitApplication;
   final PickDocumentPhoto _pickPhoto;
   final ManageDriverProfile? _profile;
   final DriverReviewSimulator? simulator;
-  final VoidCallback? onDispose;
+  final void Function()? onDispose;
   static const validation = ValidateDriverApplication();
   late ApprovalStatus _status;
   ApprovalStatus get status => _status;
@@ -74,7 +91,17 @@ class DriverController extends ChangeNotifier {
   }
 
   void _notify() {
-    if (!_disposed) notifyListeners();
+    if (!_disposed && !isClosed) {
+      emit(
+        DriverPresentationState(
+          application: application,
+          busy: busy,
+          error: lastError,
+          uploadErrors: uploadErrors,
+          revision: state.revision + 1,
+        ),
+      );
+    }
   }
 
   String _error(Object error) => error is ApplicationFailure
@@ -307,9 +334,9 @@ class DriverController extends ChangeNotifier {
   }
 
   @override
-  void dispose() {
+  Future<void> close() {
     _disposed = true;
     onDispose?.call();
-    super.dispose();
+    return super.close();
   }
 }

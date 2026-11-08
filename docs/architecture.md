@@ -1,6 +1,6 @@
 # Mobile architecture
 
-The app uses feature-first Clean Architecture with Provider/ChangeNotifier in the
+The app uses feature-first Clean Architecture with BLoC/Cubit in the
 presentation layer and customized Flutter Material components as its UI kit.
 
 ```text

@@ -65,7 +65,7 @@ void main() {
     () async {
       final api = MockDriverApi(latency: Duration.zero);
       final driver = controller(api, photos: TestPhotos());
-      addTearDown(driver.dispose);
+      addTearDown(driver.close);
       await driver.failNext('upload');
       expect(
         await driver.pickDocument(
@@ -98,7 +98,7 @@ void main() {
         latency: const Duration(milliseconds: 1),
       );
       final driver = controller(api, photos: TestPhotos());
-      addTearDown(driver.dispose);
+      addTearDown(driver.close);
       await driver.failNext('submit');
       final first = driver.submit();
       expect(driver.submitting, isTrue);

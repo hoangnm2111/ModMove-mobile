@@ -1,6 +1,6 @@
 # Hồ sơ Driver với mock API — hướng dẫn thao tác và đọc source
 
-Phạm vi: **đăng ký hồ sơ → gửi duyệt → bổ sung giấy tờ → được duyệt → bật/tắt hoạt động**. Đây là phần hồ sơ Driver trong mobile, giữ Provider/ChangeNotifier. Không triển khai nhận chuyến, giao hàng, ví, đăng nhập hoặc backend thật trong thay đổi này.
+Phạm vi: **đăng ký hồ sơ → gửi duyệt → bổ sung giấy tờ → được duyệt → bật/tắt hoạt động**. Đây là phần hồ sơ Driver trong mobile, giữ BLoC/Cubit. Không triển khai nhận chuyến, giao hàng, ví, đăng nhập hoặc backend thật trong thay đổi này.
 
 ## 1. Chạy và demo
 
@@ -99,7 +99,7 @@ Response gửi thành công có `version` và `submittedAt`; lỗi có `message`
 3. **`MockDriverApi(...)`** khôi phục database mock hoặc tạo hồ sơ nháp mới; tạo `MockClient(_handle)`.
 4. **`ModMoveApp._createDriver()` trong `lib/app/app.dart`** tạo `ApiDriverRepository`, truyền mock client và cache ban đầu vào repository.
 5. App tạo `GetDriverApplication`, `SubmitDriverApplication(requireUploadedDocuments: true)`, `PickDocumentPhoto` và `ManageDriverProfile` rồi inject vào `DriverController`.
-6. `MultiProvider` giữ controller trên các route. Widget đọc controller bằng `context.read` khi xử lý hành động, và `context.watch` khi cần cập nhật UI.
+6. `MultiBlocProvider` giữ controller trên các route. Widget đọc controller bằng `context.read` khi xử lý hành động, và `context.watch` khi cần cập nhật UI.
 
 Nếu dữ liệu lưu không đọc được, app hiện màn hình lỗi với **Thử lại** hoặc **Mở phiên tạm, không lưu**; không tự xóa dữ liệu cũ. Hồ sơ mặc định giả định người dùng đã có tài khoản Driver; phần đăng nhập/OTP không nằm trong phạm vi này.
 
@@ -110,7 +110,7 @@ Nếu dữ liệu lưu không đọc được, app hiện màn hình lỗi với
 | Bước | File / hàm | Nội dung cần quan sát |
 | --- | --- | --- |
 | 1 | `presentation/screens/verification_screen.dart` — `_continue()` | Callback nút gửi; kiểm tra FormState và danh sách ảnh còn thiếu/chưa upload |
-| 2 | `presentation/controllers/driver_controller.dart` — `submit()` | Chặn thao tác đồng thời, đặt submitting=true, notifyListeners |
+| 2 | `presentation/controllers/driver_controller.dart` — `submit()` | Chặn thao tác đồng thời, đặt submitting=true, emit(snapshot) |
 | 3 | `domain/usecases/driver_usecases.dart` — `SubmitDriverApplication.call()` | Kiểm tra quyền sửa, dữ liệu cá nhân/xe, giấy tờ bị trả, tham chiếu upload |
 | 4 | `data/repositories/api_driver_repository.dart` — `submit()` | Chuyển entity sang DTO; tạo/tái sử dụng Idempotency-Key cho cùng body |
 | 5 | Cùng file — `_request()` | Tạo POST `/driver/applications`, gửi Request JSON và chờ response |
@@ -119,7 +119,7 @@ Nếu dữ liệu lưu không đọc được, app hiện màn hình lỗi với
 | 8 | Cùng file — `_submit()` | Tạo version+1, submittedAt, status=pending, online=false; thêm lịch sử và receipt |
 | 9 | `data/services/profile_mock_store.dart` — `write()` | Ghi JSON vào file tạm, flush và rename; lỗi ghi thì server mock rollback |
 | 10 | `ApiDriverRepository._request()` → `submit()` | Nhận HTTP/JSON, chuyển thành ApplicationReceipt hoặc ApplicationFailure |
-| 11 | `DriverController.submit()` | Cập nhật version/thời gian/pending; lấy lịch sử; finally tắt submitting và notifyListeners |
+| 11 | `DriverController.submit()` | Cập nhật version/thời gian/pending; lấy lịch sử; finally tắt submitting và emit(snapshot) |
 | 12 | `VerificationScreen._continue()` → callback trong `app.dart` | Thành công: pushReplacementNamed('/profile'); lỗi: giữ form và hiện thông báo |
 | 13 | `DriverProfileScreen.build()` | context.watch nhận thay đổi; hiển thị pending và khóa công tắc hoạt động |
 
@@ -137,7 +137,7 @@ sequenceDiagram
     D->>V: Bấm Gửi hồ sơ xét duyệt
     V->>V: Validate form + giấy tờ
     V->>C: submit()
-    C->>C: submitting=true, notifyListeners()
+    C->>C: submitting=true, emit(snapshot)
     C->>U: call(application snapshot)
     U->>U: Kiểm tra quy tắc nghiệp vụ
     U->>R: submit(application)
@@ -166,7 +166,7 @@ Nhánh validation lỗi có thể dừng ngay ở screen/use case trước khi g
 
 ### Cách nói khoảng một phút
 
-“Khi bấm gửi, VerificationScreen kiểm tra form rồi gọi DriverController.submit. Controller bật loading và đưa snapshot hồ sơ vào SubmitDriverApplication. Use case kiểm tra quy tắc, sau đó gọi interface DriverRepository. Implementation hiện tại là ApiDriverRepository: nó tạo POST JSON và Idempotency-Key. Request đi qua MockClient vào MockDriverApi. Mock API kiểm tra lại theo dữ liệu của nó, tạo phiên bản pending và lưu xuống file. Response được repository đổi thành ApplicationReceipt. Controller cập nhật state, notifyListeners, rồi screen điều hướng sang hồ sơ chờ duyệt. Nếu lỗi, trạng thái busy được tắt trong finally và dữ liệu trên form được giữ để thử lại.”
+“Khi bấm gửi, VerificationScreen kiểm tra form rồi gọi DriverController.submit. Controller bật loading và đưa snapshot hồ sơ vào SubmitDriverApplication. Use case kiểm tra quy tắc, sau đó gọi interface DriverRepository. Implementation hiện tại là ApiDriverRepository: nó tạo POST JSON và Idempotency-Key. Request đi qua MockClient vào MockDriverApi. Mock API kiểm tra lại theo dữ liệu của nó, tạo phiên bản pending và lưu xuống file. Response được repository đổi thành ApplicationReceipt. Controller cập nhật state, emit(snapshot), rồi screen điều hướng sang hồ sơ chờ duyệt. Nếu lỗi, trạng thái busy được tắt trong finally và dữ liệu trên form được giữ để thử lại.”
 
 ## 5. Luồng tải ảnh và thử lại
 
@@ -297,7 +297,7 @@ Sơ đồ rút gọn các lớp của luồng hồ sơ. Mũi tên nét đứt ta
 | Repository | Hợp đồng domain cho việc lấy/lưu/gửi hồ sơ. Use case gọi hợp đồng; app inject ApiDriverRepository để thực hiện. |
 | Use case | Một hành động hoặc nhóm thao tác nghiệp vụ. `SubmitDriverApplication` kiểm tra điều kiện gửi trước khi gọi repository. |
 | Dependency injection | `app.dart` tạo repository/use case và truyền qua constructor; controller không tự tạo HTTP client. Tests thay bằng mock/fake và bỏ độ trễ. |
-| Provider / ChangeNotifier | Provider cung cấp controller cho cây widget; `notifyListeners()` báo state đổi, `context.watch` làm widget build lại. `context.read` lấy controller để gọi hành động mà không đăng ký rebuild. |
+| BLoC / Cubit | BlocProvider cung cấp Cubit cho cây widget; `emit(snapshot)` báo state đổi, `context.watch` làm widget build lại. `context.read` lấy controller để gọi hành động mà không đăng ký rebuild. |
 | Future / async / await | Gửi request trả Future; await đợi kết quả mà không cố định một giá trị thành công trước. UI dùng busy/loading và try/catch/finally để phản ánh quá trình. |
 | Mock và fixture | Mock mô phỏng hành vi/API, trạng thái và lỗi. Fixture là bộ dữ liệu khởi đầu cố định như profile-pending; một ảnh giao diện fixture không chứng minh toàn bộ luồng thao tác. |
 | Idempotency | Cùng key và cùng body được gửi lại sẽ nhận cùng receipt. Mục tiêu là tránh tạo thêm phiên bản do retry; khóa nút ở UI chỉ là một lớp phòng ngừa. |

@@ -11,7 +11,7 @@ Cross-platform mobile application built with **Flutter (Android)** supporting tw
 
 ## 🛠️ Technology Stack
 - **Framework:** Flutter 3.x / Dart (Target: Android SDK 34+)
-- **State Management:** BLoC / Provider pattern
+- **State Management:** BLoC / Cubit
 - **Real-Time GPS Streaming:** WebSocket / SignalR client (5-10s ping interval)
 - **Mapping & Routing:** Google Maps Flutter SDK + Directions API polyline
 - **Push Notifications:** Firebase Cloud Messaging (FCM)
@@ -32,7 +32,7 @@ Cross-platform mobile application built with **Flutter (Android)** supporting tw
 ## Run and review the mobile UI
 
 The Home, public fare, driver verification and profile screens are implemented
-using Flutter Material, Provider and feature-first Clean Architecture.
+using Flutter Material, BLoC and feature-first Clean Architecture.
 
 ```sh
 flutter pub get
@@ -54,5 +54,5 @@ and one-shot API failures; the driver screens expose loading, retry and draft sa
 
 Read [the Vietnamese walkthrough](docs/driver-profile-mock.md) for demo steps,
 the proposed mock HTTP contract and the exact source call order for submission.
-The implementation retains Provider/ChangeNotifier. Trip, wallet and earnings
+The implementation retains BLoC/Cubit. Trip, wallet and earnings
 features and the planned Cubit migration remain outside this profile-only scope.
