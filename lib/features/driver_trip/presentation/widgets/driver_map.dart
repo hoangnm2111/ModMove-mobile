@@ -23,9 +23,11 @@ class DriverMap extends StatefulWidget {
     this.searchRadiusMeters = DriverMatchingPolicy.searchRadiusMeters,
     this.position,
     this.destination,
+    this.liveLocation = false,
   }) : assert(searchRadiusMeters > 0);
 
   final bool route, available, searching;
+  final bool liveLocation;
   final double searchRadiusMeters;
   final GeoPoint? position, destination;
 
@@ -325,9 +327,13 @@ class _DriverMapState extends State<DriverMap>
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
           child: Text(
             _coverageVisible
-                ? 'Vùng nhận đơn · ${(widget.searchRadiusMeters / 1000).toStringAsFixed(0)} km · Vị trí thử nghiệm'
+                ? 'Vùng nhận đơn · ${(widget.searchRadiusMeters / 1000).toStringAsFixed(0)} km · ${widget.liveLocation ? 'GPS thiết bị' : 'Vị trí thử nghiệm'}'
                 : widget.route
-                ? 'Vị trí / hướng đến điểm lấy mô phỏng'
+                ? widget.liveLocation
+                      ? 'Hướng đến điểm lấy · Mở Google Maps để chỉ đường'
+                      : 'Vị trí / hướng đến điểm lấy mô phỏng'
+                : widget.liveLocation
+                ? 'Vị trí GPS thiết bị'
                 : 'Vị trí tài xế thử nghiệm',
             style: appText(size: 11, color: AppColors.secondary),
           ),

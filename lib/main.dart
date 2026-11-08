@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'dart:io';
 import 'package:path_provider/path_provider.dart';
 import 'app/app.dart';
+import 'app/remote_app.dart';
 import 'features/onboarding/data/services/mock_driver_api.dart';
 import 'features/onboarding/data/services/profile_mock_store.dart';
 
@@ -16,6 +17,11 @@ Future<void> main() async {
       systemNavigationBarIconBrightness: Brightness.dark,
     ),
   );
+  const mock = bool.fromEnvironment('USE_MOCK_API', defaultValue: false);
+  if (!mock) {
+    runApp(const RemoteApp());
+    return;
+  }
   const screen = String.fromEnvironment('SCREEN', defaultValue: 'home');
   // Reference fixtures remain isolated; the ordinary app restores its mock data.
   if (screen != 'home' && screen != 'driver-onboarding') {

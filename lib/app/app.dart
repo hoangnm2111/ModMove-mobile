@@ -35,12 +35,16 @@ class ModMoveApp extends StatelessWidget {
     this.mockApi,
     this.tripRepository,
     this.cargoPhotos,
+    this.onLogout,
+    this.walletBuilder,
   });
   final String screen;
   final DriverController? driverController;
   final MockDriverApi? mockApi;
   final DriverTripRepository? tripRepository;
   final CargoPhotoRepository? cargoPhotos;
+  final VoidCallback? onLogout;
+  final WidgetBuilder? walletBuilder;
 
   DriverController _createDriver() {
     final fixture = DemoDriverRepository(
@@ -117,6 +121,12 @@ class ModMoveApp extends StatelessWidget {
                 : _home(context),
           ),
           onGenerateRoute: (settings) {
+            if (settings.name == '/wallet' && walletBuilder != null) {
+              return MaterialPageRoute<void>(
+                settings: settings,
+                builder: walletBuilder!,
+              );
+            }
             if (settings.name == '/active-trip') {
               return MaterialPageRoute<void>(
                 settings: settings,
@@ -190,17 +200,23 @@ class ModMoveApp extends StatelessWidget {
     );
   }
 
-  Widget _home(BuildContext context) => HomeScreen(
-    onRegister: () => Navigator.pushNamed(
-      context,
-      context.read<DriverController>().status == ApprovalStatus.draft
-          ? '/verification'
-          : '/profile',
-    ),
-    onAccount: () => Navigator.pushNamed(context, '/profile'),
-  );
+  Widget _home(BuildContext context) => context.read<DriverController>().remote
+      ? _profile(context)
+      : HomeScreen(
+          onRegister: () => Navigator.pushNamed(
+            context,
+            context.read<DriverController>().status == ApprovalStatus.draft
+                ? '/verification'
+                : '/profile',
+          ),
+          onAccount: () => Navigator.pushNamed(context, '/profile'),
+        );
 
   Widget _profile(BuildContext context) => DriverProfileScreen(
+    onLogout: onLogout,
+    onWallet: walletBuilder == null
+        ? null
+        : () => Navigator.pushNamed(context, '/wallet'),
     onDemo: () => Navigator.pushNamed(context, '/driver-demo'),
     onHistory: () => Navigator.pushNamed(context, '/driver-history'),
     onOrders: () {

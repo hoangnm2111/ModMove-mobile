@@ -33,6 +33,7 @@ class _DriverTripScopeState extends State<DriverTripScope>
   late final DriverHomeBloc _homeBloc;
   late final DriverController _driver;
   late final StreamSubscription<DriverPresentationState> _profileSubscription;
+  late final StreamSubscription<DriverSession> _tripSubscription;
   @override
   void initState() {
     super.initState();
@@ -50,6 +51,9 @@ class _DriverTripScopeState extends State<DriverTripScope>
           initialOnline: driver.online,
         );
     _homeBloc = DriverHomeBloc(DriverTripActions(_repository));
+    _tripSubscription = _repository.changes.listen((session) {
+      driver.receiveOnline(session.online);
+    });
     driver.availabilityDelegate = (value) async {
       final success = await _homeBloc.changeAvailability(value);
       if (!success) driver.reportAvailabilityError(_homeBloc.state.error);
@@ -82,6 +86,7 @@ class _DriverTripScopeState extends State<DriverTripScope>
     _driver.availabilityDelegate = null;
     unawaited(_homeBloc.close());
     unawaited(_profileSubscription.cancel());
+    unawaited(_tripSubscription.cancel());
     if (widget.repository == null) {
       unawaited((_repository as MockDriverTripRepository).close());
     }

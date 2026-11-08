@@ -12,70 +12,84 @@ import 'driver_simulation_sheet.dart';
 class ActiveTripScreen extends StatelessWidget {
   const ActiveTripScreen({super.key});
   @override
-  Widget build(BuildContext context) =>
-      BlocBuilder<ActiveTripBloc, ActiveTripState>(
-        builder: (context, state) {
-          final trip = state.session.trip;
-          if (trip == null || !trip.ongoing) {
-            return Scaffold(
-              appBar: const AppHeader('Chuyến giao hàng'),
-              body: Padding(
-                padding: const EdgeInsets.all(20),
-                child: Column(
-                  children: [
-                    const Notice(
-                      'Chuyến đã hủy hoặc không còn hoạt động.',
-                      icon: 'warning',
-                    ),
-                    const SizedBox(height: 16),
-                    PrimaryButton(
-                      'Về trang chủ',
-                      onPressed: () =>
-                          Navigator.popUntil(context, (route) => route.isFirst),
-                    ),
-                  ],
+  Widget build(
+    BuildContext context,
+  ) => BlocBuilder<ActiveTripBloc, ActiveTripState>(
+    builder: (context, state) {
+      final trip = state.session.trip;
+      if (trip == null || !trip.ongoing) {
+        return Scaffold(
+          appBar: const AppHeader('Chuyến giao hàng'),
+          body: Padding(
+            padding: const EdgeInsets.all(20),
+            child: Column(
+              children: [
+                const Notice(
+                  'Chuyến đã hủy hoặc không còn hoạt động.',
+                  icon: 'warning',
                 ),
-              ),
-            );
-          }
-          if (trip.stage == TripStage.accepted) {
-            return PickupNavigationScreen(state: state);
-          }
-          if (trip.editable) return CargoInspectionScreen(tripState: state);
-          if (trip.stage == TripStage.pickedUp) {
-            return PickupApprovalScreen(state: state);
-          }
-          return Scaffold(
-            appBar: AppHeader(
-              'Đang giao hàng',
-              onHelp: () => showTripSimulation(context),
+                const SizedBox(height: 16),
+                PrimaryButton(
+                  'Về trang chủ',
+                  onPressed: () =>
+                      Navigator.popUntil(context, (route) => route.isFirst),
+                ),
+              ],
             ),
-            body: SingleChildScrollView(
-              padding: const EdgeInsets.all(16),
-              child: Column(
-                children: [
-                  const PickupStepper(3),
-                  RouteCard(trip.job),
-                  const SizedBox(height: 16),
-                  const Notice(
-                    'Khách đã xác nhận hàng. Chuyến đã bắt đầu giao.',
-                    icon: 'check',
-                  ),
-                  const SizedBox(height: 16),
-                  if (state.error != null) TripError(state.error!),
-                  PrimaryButton(
-                    'Mở chỉ đường giao hàng',
-                    icon: 'navigation',
-                    onPressed: state.busy
-                        ? null
-                        : () => context.read<ActiveTripBloc>().add(
-                            ExternalNavigationOpened(),
-                          ),
-                  ),
-                ],
+          ),
+        );
+      }
+      if (trip.stage == TripStage.accepted) {
+        if (!trip.job.detailsAvailable) {
+          return Scaffold(
+            appBar: const AppHeader('Chuyến đang thực hiện'),
+            body: Padding(
+              padding: const EdgeInsets.all(20),
+              child: Notice(
+                'Bạn đang có đơn #${trip.job.id}.',
+                detail:
+                    'Server xác nhận đơn đang hoạt động. API chi tiết chuyến dành cho tài xế chưa được cung cấp.',
               ),
             ),
           );
-        },
+        }
+        return PickupNavigationScreen(state: state);
+      }
+      if (trip.editable) return CargoInspectionScreen(tripState: state);
+      if (trip.stage == TripStage.pickedUp) {
+        return PickupApprovalScreen(state: state);
+      }
+      return Scaffold(
+        appBar: AppHeader(
+          'Đang giao hàng',
+          onHelp: () => showTripSimulation(context),
+        ),
+        body: SingleChildScrollView(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            children: [
+              const PickupStepper(3),
+              RouteCard(trip.job),
+              const SizedBox(height: 16),
+              const Notice(
+                'Khách đã xác nhận hàng. Chuyến đã bắt đầu giao.',
+                icon: 'check',
+              ),
+              const SizedBox(height: 16),
+              if (state.error != null) TripError(state.error!),
+              PrimaryButton(
+                'Mở chỉ đường giao hàng',
+                icon: 'navigation',
+                onPressed: state.busy
+                    ? null
+                    : () => context.read<ActiveTripBloc>().add(
+                        ExternalNavigationOpened(),
+                      ),
+              ),
+            ],
+          ),
+        ),
       );
+    },
+  );
 }

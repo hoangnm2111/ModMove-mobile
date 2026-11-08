@@ -69,7 +69,7 @@ class JobDetailsScreen extends StatelessWidget {
               children: [
                 Expanded(
                   child: Text(
-                    '#${job.id}',
+                    '#${job.displayCode}',
                     style: appText(size: 15, weight: FontWeight.w700),
                   ),
                 ),
@@ -112,10 +112,49 @@ class JobDetailsScreen extends StatelessWidget {
                           style: appText(size: 16, weight: FontWeight.w700),
                         ),
                         const SizedBox(height: 6),
-                        Text(
-                          'Thùng xe 3,1 × 1,6 × 1,6 m',
-                          style: appText(size: 13, color: AppColors.secondary),
-                        ),
+                        if (context.read<DriverTripRepository>()
+                            is TripSimulator)
+                          Text(
+                            'Thùng xe 3,1 × 1,6 × 1,6 m',
+                            style: appText(
+                              size: 13,
+                              color: AppColors.secondary,
+                            ),
+                          ),
+                        if (job.cargoDescription.isNotEmpty)
+                          Text(
+                            job.cargoDescription,
+                            style: appText(
+                              size: 13,
+                              color: AppColors.secondary,
+                            ),
+                          ),
+                        if (job.loadingService)
+                          const Text('Có dịch vụ bốc xếp'),
+                        if (job.notes.isNotEmpty)
+                          Padding(
+                            padding: const EdgeInsets.only(top: 8),
+                            child: Text(job.notes),
+                          ),
+                        if (job.photoUrls.isNotEmpty)
+                          SizedBox(
+                            height: 90,
+                            child: ListView.separated(
+                              scrollDirection: Axis.horizontal,
+                              itemCount: job.photoUrls.length,
+                              separatorBuilder: (_, _) =>
+                                  const SizedBox(width: 8),
+                              itemBuilder: (_, index) => Image.network(
+                                job.photoUrls[index],
+                                width: 110,
+                                fit: BoxFit.cover,
+                                errorBuilder: (_, _, _) => const SizedBox(
+                                  width: 110,
+                                  child: Icon(Icons.broken_image_outlined),
+                                ),
+                              ),
+                            ),
+                          ),
                         if (job.fragile) ...[
                           const SizedBox(height: 10),
                           const Notice(
@@ -196,7 +235,7 @@ class JobDetailsScreen extends StatelessWidget {
                     padding: EdgeInsets.symmetric(horizontal: 14),
                     child: Divider(height: 1),
                   ),
-                  _fare('Phí nền tảng (10%)', job.commission),
+                  _fare('Phí nền tảng', job.commission),
                   ColoredBox(
                     color: AppColors.peach,
                     child: _fare('Thực nhận', job.net, total: true),

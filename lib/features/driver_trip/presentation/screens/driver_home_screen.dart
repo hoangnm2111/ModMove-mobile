@@ -57,6 +57,10 @@ class DriverHomeScreen extends StatelessWidget {
               }
             }
             if (i == 2) {
+              if (onSimulation == null) {
+                Navigator.pushNamed(context, '/wallet');
+                return;
+              }
               showInfoSheet(
                 context,
                 'Số dư ví',
@@ -155,6 +159,7 @@ class DriverHomeScreen extends StatelessWidget {
               SizedBox(
                 height: 220,
                 child: DriverMap(
+                  liveLocation: onSimulation == null,
                   available: session.mapAvailable,
                   position: session.fix?.point,
                   searching:
@@ -244,7 +249,7 @@ class DriverHomeScreen extends StatelessWidget {
                         ),
                       ),
                     ],
-                    if (session.deposit < 200000)
+                    if (session.deposit < 200000 && onSimulation != null)
                       const Padding(
                         padding: EdgeInsets.only(bottom: 8),
                         child: Notice(
@@ -267,19 +272,25 @@ class DriverHomeScreen extends StatelessWidget {
                             children: [
                               _summary(
                                 'route',
-                                '${session.shift.completed}',
+                                onSimulation == null
+                                    ? '—'
+                                    : '${session.shift.completed}',
                                 'chuyến',
                               ),
                               const SizedBox(width: 5),
                               _summary(
                                 'coins',
-                                vnd(session.shift.income),
+                                onSimulation == null
+                                    ? '—'
+                                    : vnd(session.shift.income),
                                 'Thu nhập',
                               ),
                               const SizedBox(width: 5),
                               _summary(
                                 'chart-bar',
-                                '${session.shift.acceptanceRate}%',
+                                onSimulation == null
+                                    ? '—'
+                                    : '${session.shift.acceptanceRate}%',
                                 'Tỷ lệ nhận',
                               ),
                             ],
@@ -299,7 +310,7 @@ class DriverHomeScreen extends StatelessWidget {
                       children: [
                         Expanded(
                           child: Text(
-                            'Mô phỏng • GPS ${session.online ? '5 giây/lần' : 'đã tắt'}',
+                            '${onSimulation == null ? 'GPS thiết bị' : 'Mô phỏng • GPS'} ${session.online || session.trip != null ? '5 giây/lần' : 'đã tắt'}',
                             style: appText(size: 9, color: AppColors.muted),
                           ),
                         ),

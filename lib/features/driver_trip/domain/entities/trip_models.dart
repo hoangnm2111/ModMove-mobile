@@ -66,6 +66,12 @@ class DeliveryJob {
     this.vehicle = 'Xe tải 1 tấn',
     this.customerName = 'Anh Hùng',
     this.customerPhone = '0900000321',
+    this.detailsAvailable = true,
+    this.orderCode = '',
+    this.cargoDescription = '',
+    this.notes = '',
+    this.photoUrls = const [],
+    this.loadingService = false,
   });
   final String id, pickup, dropoff, vehicle, customerName, customerPhone;
   final GeoPoint pickupPoint, dropoffPoint;
@@ -74,6 +80,11 @@ class DeliveryJob {
   final int minutes, boxes, weightKg, fare, commission;
   final PaymentMethod payment;
   final bool paid, fragile;
+  final bool detailsAvailable;
+  final String orderCode, cargoDescription, notes;
+  final List<String> photoUrls;
+  final bool loadingService;
+  String get displayCode => orderCode.isEmpty ? id : orderCode;
   int get net => fare - commission;
   bool get cash => payment != PaymentMethod.payos;
   bool expiredAt(DateTime now) =>

@@ -4,6 +4,7 @@ import '../bloc/job_offer_bloc.dart';
 import '../widgets/job_alert_sheet.dart';
 import 'driver_home_screen.dart';
 import 'driver_simulation_sheet.dart';
+import '../../domain/repositories/driver_trip_repository.dart';
 
 class DriverDashboard extends StatefulWidget {
   const DriverDashboard({super.key});
@@ -40,7 +41,9 @@ class _DriverDashboardState extends State<DriverDashboard> {
         listener: (_, _) => _showOffer(),
         child: DriverHomeScreen(
           onActiveTrip: () => Navigator.pushNamed(context, '/active-trip'),
-          onSimulation: () => showTripSimulation(context),
+          onSimulation: context.read<DriverTripRepository>() is TripSimulator
+              ? () => showTripSimulation(context)
+              : null,
           onJob: (job) {
             final bloc = context.read<JobOfferBloc>();
             if (bloc.state.offer?.job.id == job.id) {
