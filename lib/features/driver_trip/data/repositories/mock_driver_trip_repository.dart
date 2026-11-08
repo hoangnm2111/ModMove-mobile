@@ -1,5 +1,6 @@
 import 'dart:async';
 import '../../domain/entities/trip_models.dart';
+import '../../domain/entities/driver_matching_policy.dart';
 import '../../domain/repositories/driver_trip_repository.dart';
 import '../../domain/usecases/validate_cargo_photo.dart';
 
@@ -55,7 +56,8 @@ class MockDriverTripRepository implements DriverTripRepository, TripSimulator {
       !_ignored.contains(job.id) &&
       (!_deadlines.containsKey(job.id) || now.isBefore(_deadlines[job.id]!)) &&
       !job.expiredAt(now) &&
-      _fix!.point.distanceTo(job.pickupPoint) <= 5000 &&
+      _fix!.point.distanceTo(job.pickupPoint) <=
+          DriverMatchingPolicy.searchRadiusMeters &&
       job.weightKg <= 1000 &&
       job.vehicle == 'Xe tải 1 tấn' &&
       (job.cash ? _deposit >= 200000 && _deposit >= job.commission : job.paid);

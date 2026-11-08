@@ -16,6 +16,10 @@
 These are separate assets used by native Flutter controls. App screens are not
 flattened images. All displayed vehicle specifications and fares are demo data.
 
+The driver map is a native Google Maps view, not a raster asset. Its top-down
+vehicle marker is drawn once in `driver_map_marker.dart` and supplied to the SDK
+as a bitmap; the geographic coverage and animated waves are native SDK circles.
+
 ## Driver profile sample image
 
 `images/demo-document.png` is a raster rendering of the repository's existing

@@ -9,5 +9,14 @@ Future<void> testExecutable(FutureOr<void> Function() testMain) async {
     loader.addFont(rootBundle.load('assets/fonts/Inter-$weight.ttf'));
   }
   await loader.load();
+  // Widget tests don't run MainActivity. Map-specific tests install a recording
+  // platform; other UI tests exercise the explicit unconfigured-map state.
+  setUp(() {
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockMethodCallHandler(
+          const MethodChannel('vn.modmove/maps_configuration'),
+          (_) async => false,
+        );
+  });
   await testMain();
 }

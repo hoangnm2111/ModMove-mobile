@@ -61,8 +61,13 @@ profile; its **Đơn hàng** tab opens the active trip. Pending/rejected profile
 cannot go online. The separate `--dart-define=SCREEN=driver-home` shortcut seeds
 an approved demo driver and skips onboarding; it is only for isolated trip tests.
 
+Configure the Android key once using [Google Maps setup and sequential UI tests](docs/google-maps-android.md).
+Maps use the native Google Maps SDK, with pan/pinch/rotate, zoom/recenter controls
+and an animated 5 km dispatch area while searching. `android/secrets.properties`
+stays ignored. No extra `GOOGLE_MAPS_ENABLED` flag is needed.
+
 Read [the pickup walkthrough](docs/driver-pickup-mock.md) for demo scenarios,
-architecture, tests and optional Google Maps setup. The trip API, GPS, routing and
+architecture and tests. The trip API, GPS, routing and
 uploads are mocked; the session resets on app restart. Screenshots stay ignored.
 
 ## Driver profile mock API
