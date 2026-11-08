@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'driver_trip_scope.dart';
+import '../features/driver_trip/domain/repositories/driver_trip_repository.dart';
+import '../features/driver_trip/presentation/screens/driver_dashboard.dart';
 import '../core/theme/app_theme.dart';
 import '../features/home/data/repositories/demo_fare_repository.dart';
 import '../features/home/domain/usecases/get_public_fares.dart';
@@ -27,15 +30,18 @@ class ModMoveApp extends StatelessWidget {
     this.screen = const String.fromEnvironment('SCREEN', defaultValue: 'home'),
     this.driverController,
     this.mockApi,
+    this.tripRepository,
   });
   final String screen;
   final DriverController? driverController;
   final MockDriverApi? mockApi;
+  final DriverTripRepository? tripRepository;
 
   DriverController _createDriver() {
     final fixture = DemoDriverRepository(
       status: switch (screen) {
         'profile-approved' => ApprovalStatus.approved,
+        'driver-home' => ApprovalStatus.approved,
         'profile-pending' => ApprovalStatus.pending,
         'profile-rejected' => ApprovalStatus.rejected,
         _ => ApprovalStatus.draft,
@@ -78,72 +84,87 @@ class ModMoveApp extends StatelessWidget {
         ),
         BlocProvider(create: (_) => driverController ?? _createDriver()),
       ],
-      child: MaterialApp(
-        title: 'ModMove',
-        debugShowCheckedModeBanner: false,
-        theme: buildAppTheme(),
-        locale: const Locale('vi'),
-        supportedLocales: const [Locale('vi')],
-        localizationsDelegates: GlobalMaterialLocalizations.delegates,
-        home: Builder(
-          builder: (context) => screen == 'pricing'
-              ? const PricingScreen()
-              : screen.startsWith('verification') ||
-                    screen == 'driver-onboarding'
-              ? VerificationScreen(
-                  initialStep: screen == 'verification-vehicle' ? 1 : 0,
+      child: DriverTripScope(
+        repository: tripRepository,
+        child: MaterialApp(
+          title: 'ModMove',
+          debugShowCheckedModeBanner: false,
+          theme: buildAppTheme(),
+          locale: const Locale('vi'),
+          supportedLocales: const [Locale('vi')],
+          localizationsDelegates: GlobalMaterialLocalizations.delegates,
+          home: Builder(
+            builder: (context) => screen == 'driver-home'
+                ? const DriverDashboard()
+                : screen == 'pricing'
+                ? const PricingScreen()
+                : screen.startsWith('verification') ||
+                      screen == 'driver-onboarding'
+                ? VerificationScreen(
+                    initialStep: screen == 'verification-vehicle' ? 1 : 0,
+                    onDemo: () => Navigator.pushNamed(context, '/driver-demo'),
+                    onSubmitted: () =>
+                        Navigator.pushReplacementNamed(context, '/profile'),
+                  )
+                : screen.startsWith('profile')
+                ? _profile(context)
+                : _home(context),
+          ),
+          onGenerateRoute: (settings) {
+            if (settings.name == '/driver-home') {
+              return MaterialPageRoute<void>(
+                settings: settings,
+                builder: (_) => const DriverDashboard(),
+              );
+            }
+            if (settings.name == '/driver-demo') {
+              return MaterialPageRoute<void>(
+                settings: settings,
+                builder: (_) => const DriverDemoScreen(),
+              );
+            }
+            if (settings.name == '/driver-history') {
+              return MaterialPageRoute<void>(
+                settings: settings,
+                builder: (_) => const DriverHistoryScreen(),
+              );
+            }
+            if (settings.name == '/verification') {
+              return MaterialPageRoute<void>(
+                settings: settings,
+                builder: (context) => VerificationScreen(
+                  initialStep: settings.arguments as int? ?? 0,
                   onDemo: () => Navigator.pushNamed(context, '/driver-demo'),
                   onSubmitted: () =>
                       Navigator.pushReplacementNamed(context, '/profile'),
-                )
-              : screen.startsWith('profile')
-              ? _profile(context)
-              : _home(context),
+                ),
+              );
+            }
+            if (settings.name == '/profile') {
+              return MaterialPageRoute<void>(
+                settings: settings,
+                builder: _profile,
+              );
+            }
+            if (settings.name == '/home') {
+              return MaterialPageRoute<void>(
+                settings: settings,
+                builder: _home,
+              );
+            }
+            if (settings.name == '/pricing') {
+              return MaterialPageRoute<void>(
+                settings: settings,
+                builder: (_) => PricingScreen(
+                  initialVehicle:
+                      settings.arguments as VehicleOption? ??
+                      VehicleOption.truck,
+                ),
+              );
+            }
+            return null;
+          },
         ),
-        onGenerateRoute: (settings) {
-          if (settings.name == '/driver-demo') {
-            return MaterialPageRoute<void>(
-              settings: settings,
-              builder: (_) => const DriverDemoScreen(),
-            );
-          }
-          if (settings.name == '/driver-history') {
-            return MaterialPageRoute<void>(
-              settings: settings,
-              builder: (_) => const DriverHistoryScreen(),
-            );
-          }
-          if (settings.name == '/verification') {
-            return MaterialPageRoute<void>(
-              settings: settings,
-              builder: (context) => VerificationScreen(
-                initialStep: settings.arguments as int? ?? 0,
-                onDemo: () => Navigator.pushNamed(context, '/driver-demo'),
-                onSubmitted: () =>
-                    Navigator.pushReplacementNamed(context, '/profile'),
-              ),
-            );
-          }
-          if (settings.name == '/profile') {
-            return MaterialPageRoute<void>(
-              settings: settings,
-              builder: _profile,
-            );
-          }
-          if (settings.name == '/home') {
-            return MaterialPageRoute<void>(settings: settings, builder: _home);
-          }
-          if (settings.name == '/pricing') {
-            return MaterialPageRoute<void>(
-              settings: settings,
-              builder: (_) => PricingScreen(
-                initialVehicle:
-                    settings.arguments as VehicleOption? ?? VehicleOption.truck,
-              ),
-            );
-          }
-          return null;
-        },
       ),
     );
   }
@@ -161,8 +182,11 @@ class ModMoveApp extends StatelessWidget {
   Widget _profile(BuildContext context) => DriverProfileScreen(
     onDemo: () => Navigator.pushNamed(context, '/driver-demo'),
     onHistory: () => Navigator.pushNamed(context, '/driver-history'),
-    onHome: () =>
-        Navigator.pushNamedAndRemoveUntil(context, '/home', (_) => false),
+    onHome: () => Navigator.pushNamedAndRemoveUntil(
+      context,
+      context.read<DriverController>().canGoOnline ? '/driver-home' : '/home',
+      (_) => false,
+    ),
     onUpdate: (step) =>
         Navigator.pushNamed(context, '/verification', arguments: step),
   );
