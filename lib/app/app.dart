@@ -5,6 +5,7 @@ import 'driver_trip_scope.dart';
 import '../features/driver_trip/domain/repositories/driver_trip_repository.dart';
 import '../features/driver_trip/presentation/screens/driver_dashboard.dart';
 import '../features/driver_trip/presentation/screens/job_details_screen.dart';
+import '../features/driver_trip/presentation/screens/active_trip_screen.dart';
 import '../core/theme/app_theme.dart';
 import '../features/home/data/repositories/demo_fare_repository.dart';
 import '../features/home/domain/usecases/get_public_fares.dart';
@@ -112,10 +113,19 @@ class ModMoveApp extends StatelessWidget {
                 : _home(context),
           ),
           onGenerateRoute: (settings) {
+            if (settings.name == '/active-trip') {
+              return MaterialPageRoute<void>(
+                settings: settings,
+                builder: (_) => const ActiveTripScreen(),
+              );
+            }
             if (settings.name == '/job-details') {
               return MaterialPageRoute<void>(
                 settings: settings,
-                builder: (_) => const JobDetailsScreen(),
+                builder: (context) => JobDetailsScreen(
+                  onAccepted: () =>
+                      Navigator.pushReplacementNamed(context, '/active-trip'),
+                ),
               );
             }
             if (settings.name == '/driver-home') {
