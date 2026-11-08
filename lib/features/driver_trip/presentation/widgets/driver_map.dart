@@ -115,7 +115,19 @@ class _DriverMapState extends State<DriverMap> {
             child: LayoutBuilder(
               builder: (_, constraints) => CustomPaint(
                 size: Size(constraints.maxWidth, constraints.maxHeight),
-                painter: _StreetPainter(route: widget.route, near: widget.near),
+                painter: _StreetPainter(
+                  route: widget.route,
+                  near: widget.near,
+                  progress:
+                      widget.position == null || widget.destination == null
+                      ? 0
+                      : (1 -
+                                widget.position!.distanceTo(
+                                      widget.destination!,
+                                    ) /
+                                    1200)
+                            .clamp(0, 1),
+                ),
               ),
             ),
           ),
@@ -162,8 +174,13 @@ class _DriverMapState extends State<DriverMap> {
 LatLng _latLng(GeoPoint p) => LatLng(p.latitude, p.longitude);
 
 class _StreetPainter extends CustomPainter {
-  const _StreetPainter({required this.route, required this.near});
+  const _StreetPainter({
+    required this.route,
+    required this.near,
+    required this.progress,
+  });
   final bool route, near;
+  final double progress;
   @override
   void paint(Canvas canvas, Size size) {
     final w = size.width, h = size.height;
@@ -255,6 +272,7 @@ class _StreetPainter extends CustomPainter {
     _label(canvas, 'Tân Thuận', Offset(w * .68, h * .2), 11);
     _label(canvas, 'Nguyễn Văn Linh', Offset(w * .32, h * .71), 11);
     final start = Offset(w * .21, h * .82), end = Offset(w * .69, h * .36);
+    var vehiclePoint = start;
     if (route) {
       final path = Path()
         ..moveTo(start.dx, start.dy)
@@ -280,6 +298,10 @@ class _StreetPainter extends CustomPainter {
           ..strokeJoin = StrokeJoin.round,
       );
       _pin(canvas, end);
+      final metric = path.computeMetrics().first;
+      vehiclePoint = metric
+          .getTangentForOffset(metric.length * progress)!
+          .position;
     } else {
       canvas.drawCircle(
         Offset(w * .51, h * .5),
@@ -294,12 +316,21 @@ class _StreetPainter extends CustomPainter {
           ..style = PaintingStyle.stroke,
       );
     }
-    final truck = route
-        ? (near ? end + const Offset(-12, 20) : start)
-        : Offset(w * .51, h * .5);
+    final truck = route ? vehiclePoint : Offset(w * .51, h * .5);
     canvas.save();
     canvas.translate(truck.dx, truck.dy);
     canvas.rotate(.2);
+    for (final x in [-13.0, 9.0]) {
+      for (final y in [-14.0, 10.0]) {
+        canvas.drawRRect(
+          RRect.fromRectAndRadius(
+            Rect.fromLTWH(x, y, 4, 7),
+            const Radius.circular(1.5),
+          ),
+          Paint()..color = AppColors.ink,
+        );
+      }
+    }
     canvas.drawRRect(
       RRect.fromRectAndRadius(
         const Rect.fromLTWH(-11, -21, 22, 42),
@@ -344,5 +375,5 @@ class _StreetPainter extends CustomPainter {
 
   @override
   bool shouldRepaint(_StreetPainter old) =>
-      old.route != route || old.near != near;
+      old.route != route || old.near != near || old.progress != progress;
 }
