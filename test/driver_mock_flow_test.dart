@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:modmove_mobile/app/app.dart';
@@ -10,6 +11,7 @@ import 'package:modmove_mobile/features/onboarding/data/repositories/api_driver_
 import 'package:modmove_mobile/features/onboarding/data/repositories/demo_photo_repository.dart';
 import 'package:modmove_mobile/features/onboarding/data/repositories/device_photo_repository.dart';
 import 'package:modmove_mobile/features/onboarding/data/services/mock_driver_api.dart';
+import 'package:modmove_mobile/features/onboarding/data/services/profile_mock_store.dart';
 import 'package:modmove_mobile/features/onboarding/domain/entities/driver_application.dart';
 import 'package:modmove_mobile/features/onboarding/domain/repositories/driver_repository.dart';
 import 'package:modmove_mobile/features/onboarding/domain/usecases/driver_usecases.dart';
@@ -21,6 +23,17 @@ class TestPhotos implements DocumentPhotoRepository {
     'document.png',
     File('assets/images/demo-document.png').readAsBytesSync(),
   );
+}
+
+class PersistedProfileStore implements ProfileMockStore {
+  String? _saved;
+  @override
+  Future<Map<String, dynamic>?> read() async =>
+      _saved == null ? null : jsonDecode(_saved!) as Map<String, dynamic>;
+  @override
+  Future<void> write(Map<String, dynamic> value) async {
+    _saved = jsonEncode(value);
+  }
 }
 
 DriverController controller(
@@ -120,6 +133,65 @@ void main() {
       expect(await driver.submit(), isNull);
       expect(driver.version, 1);
       expect(driver.versions, hasLength(1));
+    },
+  );
+
+  testWidgets(
+    'pending and approved profiles survive restart and receive a trip',
+    (tester) async {
+      tester.view.physicalSize = const Size(390, 844);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.reset);
+      final store = PersistedProfileStore();
+      var api = MockDriverApi(
+        initial: MockDriverApi.freshApplication(complete: true),
+        store: store,
+        latency: Duration.zero,
+      );
+      var driver = controller(api);
+      await tester.pumpWidget(ModMoveApp(driverController: driver));
+      await tester.pumpAndSettle();
+      await click(tester, find.text('Đăng ký tài xế  →'));
+      await click(tester, find.text('Tiếp tục'));
+      await click(tester, find.text('Gửi hồ sơ xét duyệt'));
+      expect(find.text('Hồ sơ đang chờ duyệt'), findsOneWidget);
+      expect(tester.widget<Switch>(find.byType(Switch)).onChanged, isNull);
+
+      Future<void> restartAndOpenProfile() async {
+        await tester.pumpWidget(const SizedBox());
+        await tester.pumpAndSettle();
+        api = MockDriverApi(
+          restored: await store.read(),
+          store: store,
+          latency: Duration.zero,
+        );
+        driver = controller(api);
+        await tester.pumpWidget(ModMoveApp(driverController: driver));
+        await tester.pumpAndSettle();
+        await click(tester, find.text('Tài khoản'));
+      }
+
+      await restartAndOpenProfile();
+      expect(find.text('Hồ sơ đang chờ duyệt'), findsOneWidget);
+      expect(find.byKey(const Key('open-driver-home')), findsNothing);
+      await click(tester, find.text('Mô phỏng'));
+      await click(tester, find.byKey(const Key('demo-approve')));
+      await click(tester, find.byTooltip('Quay lại'));
+      expect(find.text('Hồ sơ đã duyệt'), findsOneWidget);
+      await restartAndOpenProfile();
+      expect(find.text('Hồ sơ đã duyệt'), findsOneWidget);
+      expect(driver.version, 1);
+      await click(tester, find.byKey(const Key('open-driver-home')));
+      expect(find.text('Bạn đang ngoại tuyến'), findsOneWidget);
+      await click(tester, find.byKey(const Key('driver-online')));
+      expect(find.text('Bạn đang trực tuyến'), findsOneWidget);
+      await tester.pump(const Duration(seconds: 7));
+      await tester.pumpAndSettle();
+      expect(find.text('Xem chi tiết'), findsOneWidget);
+      await click(tester, find.text('Xem chi tiết'));
+      await click(tester, find.byKey(const Key('accept-job')));
+      expect(find.text('Đến điểm lấy hàng'), findsOneWidget);
+      expect(tester.takeException(), isNull);
     },
   );
 
