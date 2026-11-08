@@ -2,7 +2,17 @@ import 'dart:typed_data';
 import '../entities/driver_application.dart';
 
 class ValidateDriverApplication {
-  const ValidateDriverApplication();
+  const ValidateDriverApplication({this.backendContract = false});
+  final bool backendContract;
+  List<DocumentKind> get requiredDocuments => backendContract
+      ? const [
+          DocumentKind.licenseFront,
+          DocumentKind.licenseBack,
+          DocumentKind.registration,
+          DocumentKind.inspection,
+          DocumentKind.vehicle,
+        ]
+      : DocumentKind.values;
 
   String? image(String name, Uint8List bytes) {
     if (bytes.length > 5 * 1024 * 1024) {
@@ -26,20 +36,33 @@ class ValidateDriverApplication {
   }
 
   Map<String, String> personal(Map<String, String> fields) => {
-    if (!RegExp(r'^\d{12}$').hasMatch((fields['citizenId'] ?? '').trim()))
-      'citizenId': 'CCCD cần đủ 12 chữ số.',
-    if (!RegExp(r'^\d{12}$').hasMatch((fields['license'] ?? '').trim()))
-      'license': 'GPLX cần đủ 12 chữ số.',
+    if (!RegExp(
+      backendContract ? r'^\d{9,12}$' : r'^\d{12}$',
+    ).hasMatch((fields['citizenId'] ?? '').trim()))
+      'citizenId': backendContract
+          ? 'CMND/CCCD cần 9–12 chữ số.'
+          : 'CCCD cần đủ 12 chữ số.',
+    if (!RegExp(
+      backendContract ? r'^[0-9A-Za-z]{8,20}$' : r'^\d{12}$',
+    ).hasMatch((fields['license'] ?? '').trim()))
+      'license': backendContract
+          ? 'GPLX cần 8–20 chữ cái hoặc chữ số.'
+          : 'GPLX cần đủ 12 chữ số.',
   };
 
   Map<String, String> vehicle(Map<String, String> fields) {
     final errors = <String, String>{};
     if (!RegExp(
-      r'^\d{2}[A-Z]{1,2}-?\d{3}\.?\d{2}$',
+      backendContract
+          ? r'^[0-9A-Z.\- ]{5,15}$'
+          : r'^\d{2}[A-Z]{1,2}-?\d{3}\.?\d{2}$',
     ).hasMatch((fields['plate'] ?? '').trim().toUpperCase())) {
       errors['plate'] = 'Kiểm tra biển số xe.';
     }
-    for (final field in ['payload', 'length', 'width', 'height']) {
+    for (final field
+        in backendContract
+            ? ['payload']
+            : ['payload', 'length', 'width', 'height']) {
       final value = double.tryParse((fields[field] ?? '').replaceAll(',', '.'));
       if (value == null || !value.isFinite || value <= 0) {
         errors[field] = 'Nhập số lớn hơn 0.';
@@ -51,7 +74,7 @@ class ValidateDriverApplication {
   List<DocumentKind> missingDocuments(
     DriverApplication application, {
     bool personalOnly = false,
-  }) => DocumentKind.values
+  }) => requiredDocuments
       .where((kind) => !personalOnly || kind.index < 4)
       .where(
         (kind) =>

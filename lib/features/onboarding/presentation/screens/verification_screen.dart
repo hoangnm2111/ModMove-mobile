@@ -212,7 +212,9 @@ class _VerificationScreenState extends State<VerificationScreen> {
                         onPressed: driver.canEdit && !driver.busy
                             ? _save
                             : null,
-                        child: const Text('Lưu nháp'),
+                        child: Text(
+                          driver.remote ? 'Lưu nháp trên máy' : 'Lưu nháp',
+                        ),
                       ),
                       if (driver.demoEnabled && widget.onDemo != null)
                         TextButton(
@@ -293,7 +295,11 @@ class _VerificationScreenState extends State<VerificationScreen> {
       TextFormField(
         key: ValueKey('field-$key'),
         initialValue: driver.fields[key],
-        readOnly: driver.status != ApprovalStatus.draft || driver.busy,
+        readOnly:
+            (driver.remote
+                ? !driver.canEdit
+                : driver.status != ApprovalStatus.draft) ||
+            driver.busy,
         keyboardType: keyboard,
         style: appText(size: 14),
         onChanged: (value) => driver.setField(key, value),
@@ -335,21 +341,23 @@ class _VerificationScreenState extends State<VerificationScreen> {
       keyboard: TextInputType.number,
     ),
     const SizedBox(height: 16),
-    const SectionTitle('Căn cước công dân', size: 16),
-    const SizedBox(height: 6),
-    Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Expanded(
-          child: _tile(driver, DocumentKind.citizenFront, 'Mặt trước', 136),
-        ),
-        const SizedBox(width: 12),
-        Expanded(
-          child: _tile(driver, DocumentKind.citizenBack, 'Mặt sau', 136),
-        ),
-      ],
-    ),
-    const SizedBox(height: 12),
+    if (!driver.remote) ...[
+      const SectionTitle('Căn cước công dân', size: 16),
+      const SizedBox(height: 6),
+      Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Expanded(
+            child: _tile(driver, DocumentKind.citizenFront, 'Mặt trước', 136),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: _tile(driver, DocumentKind.citizenBack, 'Mặt sau', 136),
+          ),
+        ],
+      ),
+      const SizedBox(height: 12),
+    ],
     const SectionTitle('Giấy phép lái xe', size: 16),
     const SizedBox(height: 6),
     Row(
@@ -377,17 +385,23 @@ class _VerificationScreenState extends State<VerificationScreen> {
     Text('Loại xe', style: appText(size: 13)),
     const SizedBox(height: 5),
     DropdownButtonFormField<String>(
-      initialValue: driver.fields['vehicleType'],
+      initialValue: driver.vehicleTypes.contains(driver.fields['vehicleType'])
+          ? driver.fields['vehicleType']
+          : null,
       style: appText(size: 14),
       isExpanded: true,
       icon: const AppIcon('chevron-down', size: 17, color: AppColors.secondary),
       decoration: const InputDecoration(
         contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 10),
       ),
-      items: ['Xe tải 1 tấn', 'Xe van 500 kg', 'Xe bán tải']
+      items: driver.vehicleTypes
           .map((value) => DropdownMenuItem(value: value, child: Text(value)))
           .toList(),
-      onChanged: driver.status == ApprovalStatus.draft && !driver.busy
+      onChanged:
+          (driver.remote
+                  ? driver.canEdit
+                  : driver.status == ApprovalStatus.draft) &&
+              !driver.busy
           ? (value) => driver.setField('vehicleType', value!)
           : null,
     ),
@@ -408,40 +422,42 @@ class _VerificationScreenState extends State<VerificationScreen> {
       ],
     ),
     const SizedBox(height: 14),
-    const SectionTitle('Kích thước thùng xe (m)', size: 14),
-    const SizedBox(height: 9),
-    Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Expanded(
-          child: _field(
-            driver,
-            'length',
-            'Dài',
-            keyboard: const TextInputType.numberWithOptions(decimal: true),
+    if (!driver.remote) ...[
+      const SectionTitle('Kích thước thùng xe (m)', size: 14),
+      const SizedBox(height: 9),
+      Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Expanded(
+            child: _field(
+              driver,
+              'length',
+              'Dài',
+              keyboard: const TextInputType.numberWithOptions(decimal: true),
+            ),
           ),
-        ),
-        const SizedBox(width: 12),
-        Expanded(
-          child: _field(
-            driver,
-            'width',
-            'Rộng',
-            keyboard: const TextInputType.numberWithOptions(decimal: true),
+          const SizedBox(width: 12),
+          Expanded(
+            child: _field(
+              driver,
+              'width',
+              'Rộng',
+              keyboard: const TextInputType.numberWithOptions(decimal: true),
+            ),
           ),
-        ),
-        const SizedBox(width: 12),
-        Expanded(
-          child: _field(
-            driver,
-            'height',
-            'Cao',
-            keyboard: const TextInputType.numberWithOptions(decimal: true),
+          const SizedBox(width: 12),
+          Expanded(
+            child: _field(
+              driver,
+              'height',
+              'Cao',
+              keyboard: const TextInputType.numberWithOptions(decimal: true),
+            ),
           ),
-        ),
-      ],
-    ),
-    const SizedBox(height: 14),
+        ],
+      ),
+      const SizedBox(height: 14),
+    ],
     const SectionTitle('Giấy tờ & ảnh xe', size: 18),
     const SizedBox(height: 5),
     Text(

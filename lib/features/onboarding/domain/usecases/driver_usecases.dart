@@ -31,8 +31,8 @@ class SubmitDriverApplication {
       );
     }
     if (requireUploadedDocuments &&
-        application.documents.values.any(
-          (item) => item.remoteReference == null,
+        validation.requiredDocuments.any(
+          (kind) => application.documents[kind]?.remoteReference == null,
         )) {
       throw const ApplicationFailure(
         'Một số ảnh chưa tải lên thành công. Vui lòng thử tải lại.',

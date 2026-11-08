@@ -16,11 +16,13 @@ class DriverProfileScreen extends StatefulWidget {
     required this.onUpdate,
     this.onDemo,
     this.onHistory,
+    this.onLogout,
+    this.onWallet,
   });
   final VoidCallback onHome;
   final VoidCallback onOrders;
   final ValueChanged<int> onUpdate;
-  final VoidCallback? onDemo, onHistory;
+  final VoidCallback? onDemo, onHistory, onLogout, onWallet;
   @override
   State<DriverProfileScreen> createState() => _DriverProfileScreenState();
 }
@@ -37,6 +39,12 @@ class _DriverProfileScreenState extends State<DriverProfileScreen> {
         'Hồ sơ tài xế',
         onBack: widget.onHome,
         actions: [
+          if (widget.onLogout != null)
+            IconButton(
+              tooltip: 'Đăng xuất',
+              onPressed: widget.onLogout,
+              icon: const Icon(Icons.logout),
+            ),
           if (driver.hasApi)
             IconButton(
               tooltip: 'Tải lại trạng thái',
@@ -52,6 +60,10 @@ class _DriverProfileScreenState extends State<DriverProfileScreen> {
           if (index == 0) widget.onHome();
           if (index == 1) widget.onOrders();
           if (index == 2) {
+            if (widget.onWallet != null) {
+              widget.onWallet!();
+              return;
+            }
             showInfoSheet(
               context,
               'Ví tài xế',
@@ -129,7 +141,7 @@ class _DriverProfileScreenState extends State<DriverProfileScreen> {
               icon: const Icon(Icons.refresh),
               label: const Text('Kiểm tra trạng thái mới nhất'),
             ),
-            if (widget.onHistory != null)
+            if (widget.onHistory != null && !driver.remote)
               TextButton.icon(
                 onPressed: driver.busy ? null : widget.onHistory,
                 icon: const Icon(Icons.history),
@@ -310,104 +322,120 @@ class _DriverProfileScreenState extends State<DriverProfileScreen> {
   ];
 
   List<Widget> _corrections(DriverController driver) => [
-    const SectionTitle('Mục cần cập nhật', size: 15),
-    const SizedBox(height: 8),
-    for (final entry in driver.documents.entries.where(
-      (entry) => entry.value.rejectionReason != null,
-    )) ...[
-      AppCard(
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-        color: entry.value.replaced
-            ? AppColors.greenBg
-            : const Color(0xFFFFF5F5),
-        borderColor: entry.value.replaced ? AppColors.green : AppColors.red,
-        radius: 6,
-        onTap: () =>
-            widget.onUpdate(entry.key == DocumentKind.inspection ? 1 : 0),
-        child: Row(
-          children: [
-            AppIcon(
-              entry.value.replaced ? 'check' : 'document',
-              size: 28,
-              color: entry.value.replaced ? AppColors.green : AppColors.red,
-            ),
-            const SizedBox(width: 15),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    entry.key.label,
-                    style: appText(size: 13, weight: FontWeight.w600),
-                  ),
-                  const SizedBox(height: 3),
-                  Text(
-                    entry.value.replaced
-                        ? 'Đã thay ảnh, sẵn sàng gửi lại.'
-                        : entry.value.rejectionReason!,
-                    style: appText(
-                      size: 11,
-                      color: entry.value.replaced
-                          ? AppColors.green
-                          : AppColors.red,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(width: 6),
-            const AppIcon('chevron-right', size: 15),
-          ],
-        ),
+    if (driver.remote) ...[
+      Notice(
+        driver.fields['rejectionReasons']?.isNotEmpty == true
+            ? driver.fields['rejectionReasons']!
+            : 'Vui lòng cập nhật hồ sơ theo yêu cầu xét duyệt.',
+        peach: true,
       ),
+      const SizedBox(height: 12),
+      PrimaryButton(
+        'Cập nhật và gửi lại hồ sơ',
+        onPressed: () => widget.onUpdate(0),
+      ),
+    ] else ...[
+      const SectionTitle('Mục cần cập nhật', size: 15),
       const SizedBox(height: 8),
-    ],
-    const SizedBox(height: 8),
-    const SectionTitle('Mục đã đạt', size: 15),
-    const SizedBox(height: 8),
-    AppCard(
-      radius: 5,
-      padding: const EdgeInsets.symmetric(horizontal: 12),
-      child: Column(
-        children: [
-          for (final kind in [
-            DocumentKind.citizenFront,
-            DocumentKind.licenseFront,
-            DocumentKind.registration,
-            DocumentKind.vehicle,
-          ]) ...[
-            InkWell(
-              onTap: () =>
-                  showDocumentPreview(context, kind, driver.documents[kind]!),
-              child: Padding(
-                padding: const EdgeInsets.symmetric(vertical: 9),
-                child: Row(
+      for (final entry in driver.documents.entries.where(
+        (entry) => entry.value.rejectionReason != null,
+      )) ...[
+        AppCard(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+          color: entry.value.replaced
+              ? AppColors.greenBg
+              : const Color(0xFFFFF5F5),
+          borderColor: entry.value.replaced ? AppColors.green : AppColors.red,
+          radius: 6,
+          onTap: () =>
+              widget.onUpdate(entry.key == DocumentKind.inspection ? 1 : 0),
+          child: Row(
+            children: [
+              AppIcon(
+                entry.value.replaced ? 'check' : 'document',
+                size: 28,
+                color: entry.value.replaced ? AppColors.green : AppColors.red,
+              ),
+              const SizedBox(width: 15),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const CheckBadge(size: 21),
-                    const SizedBox(width: 18),
-                    Expanded(
-                      child: Text(
-                        kind == DocumentKind.citizenFront ? 'CCCD' : kind.label,
-                        style: appText(size: 12.5),
+                    Text(
+                      entry.key.label,
+                      style: appText(size: 13, weight: FontWeight.w600),
+                    ),
+                    const SizedBox(height: 3),
+                    Text(
+                      entry.value.replaced
+                          ? 'Đã thay ảnh, sẵn sàng gửi lại.'
+                          : entry.value.rejectionReason!,
+                      style: appText(
+                        size: 11,
+                        color: entry.value.replaced
+                            ? AppColors.green
+                            : AppColors.red,
                       ),
                     ),
-                    const AppIcon('lock', size: 16, color: AppColors.muted),
                   ],
                 ),
               ),
-            ),
-            if (kind != DocumentKind.vehicle) const Divider(height: 1),
+              const SizedBox(width: 6),
+              const AppIcon('chevron-right', size: 15),
+            ],
+          ),
+        ),
+        const SizedBox(height: 8),
+      ],
+      const SizedBox(height: 8),
+      const SectionTitle('Mục đã đạt', size: 15),
+      const SizedBox(height: 8),
+      AppCard(
+        radius: 5,
+        padding: const EdgeInsets.symmetric(horizontal: 12),
+        child: Column(
+          children: [
+            for (final kind in [
+              DocumentKind.citizenFront,
+              DocumentKind.licenseFront,
+              DocumentKind.registration,
+              DocumentKind.vehicle,
+            ]) ...[
+              InkWell(
+                onTap: () =>
+                    showDocumentPreview(context, kind, driver.documents[kind]!),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 9),
+                  child: Row(
+                    children: [
+                      const CheckBadge(size: 21),
+                      const SizedBox(width: 18),
+                      Expanded(
+                        child: Text(
+                          kind == DocumentKind.citizenFront
+                              ? 'CCCD'
+                              : kind.label,
+                          style: appText(size: 12.5),
+                        ),
+                      ),
+                      const AppIcon('lock', size: 16, color: AppColors.muted),
+                    ],
+                  ),
+                ),
+              ),
+              if (kind != DocumentKind.vehicle) const Divider(height: 1),
+            ],
           ],
-        ],
+        ),
       ),
-    ),
-    const SizedBox(height: 6),
-    Text(
-      'Các mục đã đạt được giữ nguyên.',
-      style: appText(size: 11, color: AppColors.muted),
-    ),
-    const SizedBox(height: 9),
-    PrimaryButton('Cập nhật giấy tờ', onPressed: () => widget.onUpdate(0)),
+      const SizedBox(height: 6),
+      Text(
+        'Các mục đã đạt được giữ nguyên.',
+        style: appText(size: 11, color: AppColors.muted),
+      ),
+      const SizedBox(height: 9),
+      PrimaryButton('Cập nhật giấy tờ', onPressed: () => widget.onUpdate(0)),
+    ],
   ];
 
   Future<void> _showPersonalDocuments(DriverController driver) =>
@@ -421,7 +449,9 @@ class _DriverProfileScreenState extends State<DriverProfileScreen> {
             children: [
               const SectionTitle('Giấy tờ cá nhân'),
               const SizedBox(height: 12),
-              for (final kind in DocumentKind.values.take(4))
+              for (final kind in driver.validation.requiredDocuments.where(
+                (kind) => kind.index < 4,
+              ))
                 ListTile(
                   leading: const AppIcon('document'),
                   title: Text(kind.label),

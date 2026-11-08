@@ -23,7 +23,16 @@ class ProfileIdentity extends StatelessWidget {
           ),
         ),
         child: Text(
-          'MA',
+          driver.remote
+              ? driver.fields['fullName']!
+                    .trim()
+                    .split(RegExp(r'\s+'))
+                    .where((s) => s.isNotEmpty)
+                    .take(2)
+                    .map((s) => s[0])
+                    .join()
+                    .toUpperCase()
+              : 'MA',
           style: appText(
             size: 22,
             weight: FontWeight.w700,
