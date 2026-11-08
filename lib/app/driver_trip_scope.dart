@@ -7,6 +7,7 @@ import '../features/driver_trip/domain/entities/trip_models.dart';
 import '../features/driver_trip/domain/repositories/driver_trip_repository.dart';
 import '../features/driver_trip/domain/usecases/driver_trip_actions.dart';
 import '../features/driver_trip/presentation/bloc/driver_home_bloc.dart';
+import '../features/driver_trip/presentation/bloc/job_offer_bloc.dart';
 
 class DriverTripScope extends StatefulWidget {
   const DriverTripScope({super.key, required this.child, this.repository});
@@ -69,8 +70,15 @@ class _DriverTripScopeState extends State<DriverTripScope>
   Widget build(BuildContext context) =>
       RepositoryProvider<DriverTripRepository>.value(
         value: _repository,
-        child: BlocProvider(
-          create: (_) => DriverHomeBloc(DriverTripActions(_repository)),
+        child: MultiBlocProvider(
+          providers: [
+            BlocProvider(
+              create: (_) => DriverHomeBloc(DriverTripActions(_repository)),
+            ),
+            BlocProvider(
+              create: (_) => JobOfferBloc(DriverTripActions(_repository)),
+            ),
+          ],
           child: widget.child,
         ),
       );
