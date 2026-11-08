@@ -12,7 +12,7 @@ enum DocumentKind {
   vehicle,
 }
 
-enum PhotoSource { camera, gallery }
+enum PhotoSource { camera, gallery, sample }
 
 class SelectedPhoto {
   const SelectedPhoto(this.name, this.bytes);
@@ -42,6 +42,7 @@ class DriverApplication {
     required Map<DocumentKind, VerificationDocument> documents,
     this.version = 0,
     this.accountActive = true,
+    this.online = false,
     this.submittedAt,
     this.reviewedAt,
   }) : fields = Map.unmodifiable(fields),
@@ -51,6 +52,7 @@ class DriverApplication {
   final Map<DocumentKind, VerificationDocument> documents;
   final int version;
   final bool accountActive;
+  final bool online;
   final DateTime? submittedAt, reviewedAt;
   bool get canEdit =>
       status == ApprovalStatus.draft || status == ApprovalStatus.rejected;

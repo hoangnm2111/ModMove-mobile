@@ -12,7 +12,9 @@ class SubmitDriverApplication {
   const SubmitDriverApplication(
     this.repository, {
     this.validation = const ValidateDriverApplication(),
+    this.requireUploadedDocuments = false,
   });
+  final bool requireUploadedDocuments;
   final DriverRepository repository;
   final ValidateDriverApplication validation;
   Future<ApplicationReceipt> call(DriverApplication application) {
@@ -28,7 +30,34 @@ class SubmitDriverApplication {
         'Vui lòng bổ sung hoặc thay lại các ảnh được yêu cầu.',
       );
     }
+    if (requireUploadedDocuments &&
+        application.documents.values.any(
+          (item) => item.remoteReference == null,
+        )) {
+      throw const ApplicationFailure(
+        'Một số ảnh chưa tải lên thành công. Vui lòng thử tải lại.',
+      );
+    }
     return repository.submit(application);
+  }
+}
+
+class ManageDriverProfile {
+  const ManageDriverProfile(this.repository);
+  final DriverProfileRepository repository;
+  Future<DriverApplication> refresh() => repository.refresh();
+  Future<DriverApplication> saveDraft(DriverApplication application) =>
+      repository.saveDraft(application);
+  Future<List<DriverApplication>> history() => repository.history();
+  Future<DriverApplication> setAvailability(bool value) =>
+      repository.setAvailability(value);
+  Future<VerificationDocument> upload(DocumentKind kind, SelectedPhoto photo) {
+    final error = const ValidateDriverApplication().image(
+      photo.name,
+      photo.bytes,
+    );
+    if (error != null) throw ApplicationFailure(error);
+    return repository.upload(kind, photo);
   }
 }
 

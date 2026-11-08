@@ -11,7 +11,7 @@ Cross-platform mobile application built with **Flutter (Android)** supporting tw
 
 ## 🛠️ Technology Stack
 - **Framework:** Flutter 3.x / Dart (Target: Android SDK 34+)
-- **State Management:** BLoC / Provider pattern
+- **State Management:** BLoC / Cubit
 - **Real-Time GPS Streaming:** WebSocket / SignalR client (5-10s ping interval)
 - **Mapping & Routing:** Google Maps Flutter SDK + Directions API polyline
 - **Push Notifications:** Firebase Cloud Messaging (FCM)
@@ -32,7 +32,7 @@ Cross-platform mobile application built with **Flutter (Android)** supporting tw
 ## Run and review the mobile UI
 
 The Home, public fare, driver verification and profile screens are implemented
-using Flutter Material, Provider and feature-first Clean Architecture.
+using Flutter Material, BLoC and feature-first Clean Architecture.
 
 ```sh
 flutter pub get
@@ -43,3 +43,31 @@ See the [UI review guide](docs/mobile-ui-review.md) for the seven screen entry
 points, validation commands, APK location and current mock-data boundaries.
 See [architecture](docs/architecture.md) for source organization and dependency
 direction. Review screenshots are generated locally and excluded from Git.
+
+## Driver pickup (FE-19 to FE-23)
+
+Online/offline, mock GPS, 30-second job offers, job details/atomic acceptance,
+pickup navigation, cargo evidence uploads and customer approval are implemented
+with BLoC/Cubit. On an Android emulator, run:
+
+```sh
+flutter run --dart-define=SCREEN=driver-home
+```
+
+Read [the pickup walkthrough](docs/driver-pickup-mock.md) for demo scenarios,
+architecture, tests and optional Google Maps setup. The trip API, GPS, routing and
+uploads are mocked; the session resets on app restart. Screenshots stay ignored.
+
+## Driver profile mock API
+
+Driver onboarding now supports a complete interactive demo: register, upload
+documents, submit, simulate a rejection, replace rejected documents, resubmit,
+approve and toggle availability. The normal app persists the mock profile and
+version history locally. A separate **Mô phỏng** screen controls review outcomes
+and one-shot API failures; the driver screens expose loading, retry and draft save.
+
+Read [the Vietnamese walkthrough](docs/driver-profile-mock.md) for demo steps,
+the proposed mock HTTP contract and the exact source call order for submission.
+Presentation uses BLoC/Cubit, and the original profile mock API and persisted data
+remain compatible. The pickup flow is documented separately above; wallet and
+earnings operations remain planned.

@@ -1,0 +1,42 @@
+{
+  "mode": "built-in image_gen",
+  "use_case": "ui-mockup",
+  "reference_images": [
+    "../../../output/mobile-design-v1/01-home.png",
+    "../../../output/mobile-design-v1/02-driver-verification.png",
+    "../../../output/mobile-design-v1/03-driver-profile-status.png"
+  ],
+  "boards": [
+    {
+      "file": "04-driver-dispatch.png",
+      "tickets": ["FE-19", "FE-20", "FE-21"],
+      "screens": ["Driver Home online", "30-second Job Alert", "Job Details"]
+    },
+    {
+      "file": "05-pickup-and-inspection.png",
+      "tickets": ["FE-22", "FE-23"],
+      "screens": ["Pickup Navigation", "Cargo Inspection", "Waiting for Customer Approval"]
+    },
+    {
+      "file": "06-pod-and-trip-earnings.png",
+      "tickets": ["FE-25", "FE-26"],
+      "screens": ["POD and COD", "Delivery Completed", "Trip Earnings"]
+    },
+    {
+      "file": "07-driver-wallet.png",
+      "tickets": ["FE-28"],
+      "screens": ["Driver Wallet", "PayOS Deposit Top-up", "Earnings Withdrawal"]
+    },
+    {
+      "file": "08-revenue-summary.png",
+      "tickets": ["FE-29"],
+      "screens": ["Revenue Overview", "Monthly Revenue", "Trip Earnings Breakdown"]
+    }
+  ],
+  "shared_constraints": [
+    "Match the ModMove v1 boards: Inter-like typography, #D94B18 orange, #151B24 ink, white cards, soft gray dividers, green/amber/red status semantics.",
+    "Three realistic 390x844 Android phone screens on one clean presentation board.",
+    "All app copy is Vietnamese, large and legible; no lorem ipsum, watermark, unrelated logo, or decorative product concept art.",
+    "Use practical Flutter-implementable layouts, Material-style controls, the driver bottom navigation, and native safe areas."
+  ]
+}

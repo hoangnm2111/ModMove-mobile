@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:provider/provider.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:modmove_mobile/core/theme/app_theme.dart';
 import 'package:modmove_mobile/core/widgets/app_widgets.dart';
 import '../../domain/entities/driver_application.dart';
@@ -13,9 +13,12 @@ class DriverProfileScreen extends StatefulWidget {
     super.key,
     required this.onHome,
     required this.onUpdate,
+    this.onDemo,
+    this.onHistory,
   });
   final VoidCallback onHome;
   final ValueChanged<int> onUpdate;
+  final VoidCallback? onDemo, onHistory;
   @override
   State<DriverProfileScreen> createState() => _DriverProfileScreenState();
 }
@@ -28,7 +31,18 @@ class _DriverProfileScreenState extends State<DriverProfileScreen> {
     final driver = context.watch<DriverController>();
     final vehicle = _vehicle ?? driver.status == ApprovalStatus.pending;
     return Scaffold(
-      appBar: AppHeader('Hồ sơ tài xế', onBack: widget.onHome),
+      appBar: AppHeader(
+        'Hồ sơ tài xế',
+        onBack: widget.onHome,
+        actions: [
+          if (driver.hasApi)
+            IconButton(
+              tooltip: 'Tải lại trạng thái',
+              onPressed: driver.busy ? null : driver.refresh,
+              icon: const Icon(Icons.refresh),
+            ),
+        ],
+      ),
       bottomNavigationBar: AppBottomNav(
         driver: true,
         selected: 3,
@@ -50,6 +64,27 @@ class _DriverProfileScreenState extends State<DriverProfileScreen> {
         children: [
           ProfileIdentity(driver),
           const SizedBox(height: 14),
+          if (driver.demoEnabled) ...[
+            Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    'Dữ liệu mô phỏng • Phiên bản ${driver.version}',
+                    style: appText(size: 11, color: AppColors.secondary),
+                  ),
+                ),
+                TextButton(
+                  onPressed: driver.busy ? null : widget.onDemo,
+                  child: const Text('Mô phỏng'),
+                ),
+              ],
+            ),
+          ],
+          if (driver.syncing) const LinearProgressIndicator(),
+          if (driver.lastError != null) ...[
+            Notice(driver.lastError!, icon: 'warning', peach: true),
+            const SizedBox(height: 10),
+          ],
           ApprovalBanner(driver),
           const SizedBox(height: 10),
           DriverAvailability(driver),
@@ -75,6 +110,20 @@ class _DriverProfileScreenState extends State<DriverProfileScreen> {
               ..._vehicleDetails(driver)
             else
               ..._personalDetails(driver),
+          ],
+          if (driver.hasApi) ...[
+            const SizedBox(height: 16),
+            OutlinedButton.icon(
+              onPressed: driver.busy ? null : driver.refresh,
+              icon: const Icon(Icons.refresh),
+              label: const Text('Kiểm tra trạng thái mới nhất'),
+            ),
+            if (widget.onHistory != null)
+              TextButton.icon(
+                onPressed: driver.busy ? null : widget.onHistory,
+                icon: const Icon(Icons.history),
+                label: const Text('Lịch sử các lần gửi'),
+              ),
           ],
         ],
       ),
