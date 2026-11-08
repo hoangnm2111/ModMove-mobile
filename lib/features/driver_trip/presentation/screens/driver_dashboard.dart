@@ -1,14 +1,55 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../../core/widgets/app_widgets.dart';
+import '../bloc/job_offer_bloc.dart';
+import '../widgets/job_alert_sheet.dart';
 import 'driver_home_screen.dart';
 import 'driver_simulation_sheet.dart';
 
-class DriverDashboard extends StatelessWidget {
+class DriverDashboard extends StatefulWidget {
   const DriverDashboard({super.key});
   @override
-  Widget build(BuildContext context) => DriverHomeScreen(
-    onSimulation: () => showTripSimulation(context),
-    onJob: (job) =>
-        showInfoSheet(context, '#${job.id}', '${job.pickup}\n→ ${job.dropoff}'),
-  );
+  State<DriverDashboard> createState() => _DriverDashboardState();
+}
+
+class _DriverDashboardState extends State<DriverDashboard> {
+  bool _showing = false;
+  Future<void> _showOffer() async {
+    if (_showing || !(ModalRoute.of(context)?.isCurrent ?? false)) return;
+    _showing = true;
+    final details = await showModalBottomSheet<bool>(
+      context: context,
+      isScrollControlled: true,
+      showDragHandle: true,
+      backgroundColor: Colors.white,
+      builder: (_) => const JobAlertSheet(),
+    );
+    _showing = false;
+    if (details == true && mounted) {
+      final job = context.read<JobOfferBloc>().state.offer!.job;
+      showInfoSheet(context, '#${job.id}', '${job.pickup}\n→ ${job.dropoff}');
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) =>
+      BlocListener<JobOfferBloc, JobOfferState>(
+        listenWhen: (previous, next) =>
+            next.offer != null &&
+            next.status == OfferStatus.available &&
+            (previous.offer?.job.id != next.offer!.job.id ||
+                previous.status == OfferStatus.idle),
+        listener: (_, _) => _showOffer(),
+        child: DriverHomeScreen(
+          onSimulation: () => showTripSimulation(context),
+          onJob: (job) {
+            final bloc = context.read<JobOfferBloc>();
+            if (bloc.state.offer?.job.id == job.id) {
+              _showOffer();
+            } else {
+              bloc.add(OfferOpened(job.id));
+            }
+          },
+        ),
+      );
 }

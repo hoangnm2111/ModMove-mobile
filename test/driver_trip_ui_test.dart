@@ -43,6 +43,14 @@ void main() {
       expect(find.text('12 Nguyễn Văn Linh, Quận 7'), findsOneWidget);
       expect(tester.takeException(), isNull);
       await capture(tester, key, 'driver-home-$width');
+      await tester.tap(find.text('12 Nguyễn Văn Linh, Quận 7'));
+      await tester.pumpAndSettle();
+      expect(find.text('Có chuyến mới'), findsOneWidget);
+      expect(tester.takeException(), isNull);
+      await capture(tester, key, 'job-alert-$width');
+      await tester.tap(find.text('Từ chối'));
+      await tester.pumpAndSettle();
+      expect(find.text('Có chuyến mới'), findsNothing);
       await tester.tap(find.byKey(const Key('driver-online')));
       await tester.pumpAndSettle();
       expect(find.text('Bạn đang ngoại tuyến'), findsOneWidget);
