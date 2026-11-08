@@ -150,7 +150,14 @@ class PrimaryButton extends StatelessWidget {
 }
 
 class AppHeader extends StatelessWidget implements PreferredSizeWidget {
-  const AppHeader(this.title, {super.key, this.onBack, this.onHelp});
+  const AppHeader(
+    this.title, {
+    super.key,
+    this.onBack,
+    this.onHelp,
+    this.actions = const [],
+  });
+  final List<Widget> actions;
   final String title;
   final VoidCallback? onBack, onHelp;
   @override
@@ -165,6 +172,7 @@ class AppHeader extends StatelessWidget implements PreferredSizeWidget {
     ),
     title: Text(title),
     actions: [
+      ...actions,
       IconButton(
         tooltip: 'Hướng dẫn',
         onPressed:

@@ -1,10 +1,36 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:modmove_mobile/features/driver_trip/domain/repositories/driver_trip_repository.dart';
 import 'package:modmove_mobile/app/app.dart';
 import 'package:modmove_mobile/features/onboarding/presentation/screens/driver_profile_screen.dart';
 import 'package:modmove_mobile/features/onboarding/presentation/screens/verification_screen.dart';
 
 void main() {
+  testWidgets(
+    'profile toggle cannot bypass the active trip availability guard',
+    (tester) async {
+      await tester.pumpWidget(const ModMoveApp(screen: 'profile-approved'));
+      await tester.pumpAndSettle();
+      final context = tester.element(find.byType(DriverProfileScreen));
+      final repo = context.read<DriverTripRepository>();
+      await tester.runAsync(() async {
+        await repo.openOffer(repo.current.jobs.first.id);
+        await repo.acceptOffer(repo.current.offer!.job.id);
+      });
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const ValueKey('driver-online')));
+      await tester.pumpAndSettle();
+      expect(
+        tester
+            .widget<Switch>(find.byKey(const ValueKey('driver-online')))
+            .value,
+        isTrue,
+      );
+      expect(repo.current.online, isTrue);
+      expect(find.textContaining('Bạn đang có chuyến.'), findsOneWidget);
+    },
+  );
   for (final status in ['approved', 'pending', 'rejected']) {
     testWidgets('$status profile enforces online availability', (tester) async {
       tester.view.physicalSize = const Size(390, 844);
