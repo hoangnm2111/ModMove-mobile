@@ -1,6 +1,7 @@
 import 'dart:async';
 import '../../domain/entities/trip_models.dart';
 import '../../domain/repositories/driver_trip_repository.dart';
+import '../../domain/usecases/validate_cargo_photo.dart';
 
 /// In-process mock server. Validations run again after latency, immediately
 /// before each mutation, to model atomic server-side transitions.
@@ -299,6 +300,7 @@ class MockDriverTripRepository implements DriverTripRepository, TripSimulator {
     CargoPhoto photo,
     void Function(double) progress,
   ) async {
+    const ValidateCargoPhoto()(photo);
     final tripId = _requireTrip().job.id;
     if (!_trip!.editable) {
       throw const TripFailure('Chưa thể thay đổi ảnh ở trạng thái này.');
@@ -344,6 +346,13 @@ class MockDriverTripRepository implements DriverTripRepository, TripSimulator {
       if (_uploads[photo.reference] != (trip.job.id, photo.kind)) {
         throw const TripFailure('Ảnh chưa được tải lên cho chuyến này.');
       }
+    }
+    if (trip.review == EvidenceReview.rejected &&
+        evidence.any(
+          (photo) =>
+              trip.evidence.any((old) => old.reference == photo.reference),
+        )) {
+      throw const TripFailure('Chụp và tải lại ảnh theo yêu cầu của khách.');
     }
     if (trip.job.payment == PaymentMethod.cashSender && !cashCollected) {
       throw const TripFailure(

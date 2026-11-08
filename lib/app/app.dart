@@ -33,11 +33,13 @@ class ModMoveApp extends StatelessWidget {
     this.driverController,
     this.mockApi,
     this.tripRepository,
+    this.cargoPhotos,
   });
   final String screen;
   final DriverController? driverController;
   final MockDriverApi? mockApi;
   final DriverTripRepository? tripRepository;
+  final CargoPhotoRepository? cargoPhotos;
 
   DriverController _createDriver() {
     final fixture = DemoDriverRepository(
@@ -88,6 +90,7 @@ class ModMoveApp extends StatelessWidget {
       ],
       child: DriverTripScope(
         repository: tripRepository,
+        cargoPhotos: cargoPhotos,
         child: MaterialApp(
           title: 'ModMove',
           debugShowCheckedModeBanner: false,
