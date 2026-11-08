@@ -12,6 +12,7 @@ class DemoDriverRepository implements DriverRepository {
     _cached = DriverApplication(
       status: status,
       accountActive: accountActive,
+      online: status == ApprovalStatus.approved && accountActive,
       version: status == ApprovalStatus.draft ? 0 : 1,
       submittedAt: status == ApprovalStatus.draft
           ? null

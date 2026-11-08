@@ -8,9 +8,15 @@ import '../models/document_display.dart';
 import '../widgets/document_widgets.dart';
 
 class VerificationScreen extends StatefulWidget {
-  const VerificationScreen({super.key, this.initialStep = 0, this.onSubmitted});
+  const VerificationScreen({
+    super.key,
+    this.initialStep = 0,
+    this.onSubmitted,
+    this.onDemo,
+  });
   final int initialStep;
   final VoidCallback? onSubmitted;
+  final VoidCallback? onDemo;
   @override
   State<VerificationScreen> createState() => _VerificationScreenState();
 }
@@ -35,6 +41,7 @@ class _VerificationScreenState extends State<VerificationScreen> {
 
   Future<void> _choose(DocumentKind kind) async {
     final driver = context.read<DriverController>();
+    if (driver.busy) return;
     if (!driver.canEditDocument(kind)) {
       await showDocumentPreview(context, kind, driver.documents[kind]!);
       return;
@@ -62,6 +69,16 @@ class _VerificationScreenState extends State<VerificationScreen> {
               title: const Text('Chọn từ thư viện'),
               onTap: () => Navigator.pop(context, PhotoSource.gallery),
             ),
+            if (driver.demoEnabled)
+              ListTile(
+                key: const ValueKey('choose-sample-photo'),
+                leading: const AppIcon('document'),
+                title: const Text('Dùng ảnh mẫu mô phỏng'),
+                subtitle: const Text(
+                  'Thử luồng tải ảnh, không cần giấy tờ thật',
+                ),
+                onTap: () => Navigator.pop(context, PhotoSource.sample),
+              ),
             const Padding(
               padding: EdgeInsets.fromLTRB(20, 4, 20, 20),
               child: Text('JPG hoặc PNG · Tối đa 5 MB/ảnh'),
@@ -82,6 +99,7 @@ class _VerificationScreenState extends State<VerificationScreen> {
 
   Future<void> _continue() async {
     final driver = context.read<DriverController>();
+    if (driver.busy) return;
     if (!_form.currentState!.validate()) return;
     final missing = driver.missingDocuments(personalOnly: step == 0);
     if (missing.isNotEmpty) {
@@ -91,6 +109,14 @@ class _VerificationScreenState extends State<VerificationScreen> {
       return;
     }
     if (step == 0) {
+      if (driver.hasApi) {
+        final message = await driver.saveDraft();
+        if (!mounted) return;
+        if (message != null) {
+          _showError(message);
+          return;
+        }
+      }
       setState(() {
         step = 1;
         error = null;
@@ -116,71 +142,138 @@ class _VerificationScreenState extends State<VerificationScreen> {
     }
   }
 
+  Future<bool> _save() async {
+    final driver = context.read<DriverController>();
+    if (!driver.hasApi || !driver.canEdit) return true;
+    final message = await driver.saveDraft();
+    if (!mounted) return false;
+    if (message != null) {
+      _showError(message);
+      return false;
+    }
+    setState(() => error = null);
+    return true;
+  }
+
+  Future<void> _back() async {
+    if (context.read<DriverController>().busy) return;
+    if (step == 1) {
+      setState(() => step = 0);
+      _scroll.jumpTo(0);
+    } else if (await _save() && mounted) {
+      if (Navigator.canPop(context)) {
+        Navigator.pop(context);
+      } else {
+        Navigator.pushReplacementNamed(context, '/home');
+      }
+    }
+  }
+
+  Future<void> _openDemo() async {
+    if (await _save() && mounted) widget.onDemo?.call();
+  }
+
   @override
   Widget build(BuildContext context) {
     final driver = context.watch<DriverController>();
-    return Scaffold(
-      appBar: AppHeader(
-        'Xác minh tài xế',
-        onBack: () {
-          if (step == 1) {
-            setState(() => step = 0);
-            _scroll.jumpTo(0);
-          } else {
-            Navigator.maybePop(context);
-          }
-        },
-        onHelp: () => showInfoSheet(
-          context,
-          'Chuẩn bị hồ sơ',
-          'Dùng ảnh JPG hoặc PNG dưới 5 MB, rõ thông tin và đủ 4 góc. Giấy tờ cần còn hiệu lực. Các mục đã đạt được giữ nguyên khi bổ sung hồ sơ.',
-        ),
-      ),
-      bottomNavigationBar: SafeArea(
-        top: false,
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              PrimaryButton(
-                step == 0 ? 'Tiếp tục' : 'Gửi hồ sơ xét duyệt',
-                busy: driver.submitting,
-                onPressed: driver.canEdit ? _continue : null,
-              ),
-              if (step == 0) ...[
-                const SizedBox(height: 6),
-                Text(
-                  'Bước 1/2',
-                  style: appText(size: 11, color: AppColors.secondary),
-                ),
-              ],
-            ],
+    return PopScope<Object?>(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, _) {
+        if (!didPop) _back();
+      },
+      child: Scaffold(
+        appBar: AppHeader(
+          'Xác minh tài xế',
+          onBack: _back,
+          onHelp: () => showInfoSheet(
+            context,
+            'Chuẩn bị hồ sơ',
+            'Dùng ảnh JPG hoặc PNG dưới 5 MB, rõ thông tin và đủ 4 góc. Giấy tờ cần còn hiệu lực. Các mục đã đạt được giữ nguyên khi bổ sung hồ sơ.',
           ),
         ),
-      ),
-      body: Form(
-        key: _form,
-        child: ListView(
-          controller: _scroll,
-          padding: const EdgeInsets.fromLTRB(16, 0, 16, 6),
-          children: [
-            VerificationProgress(step),
-            const SizedBox(height: 6),
-            if (!driver.canEdit) ...[
-              const Notice('Hồ sơ đang được khóa để xét duyệt.', peach: true),
-              const SizedBox(height: 10),
-            ],
-            if (step == 0) ..._personal(driver) else ..._vehicle(driver),
-            if (error != null)
-              Padding(
-                padding: const EdgeInsets.only(top: 8),
-                child: Text(
-                  error!,
-                  style: appText(size: 12, color: AppColors.red),
+        bottomNavigationBar: SafeArea(
+          top: false,
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                PrimaryButton(
+                  step == 0 ? 'Tiếp tục' : 'Gửi hồ sơ xét duyệt',
+                  busy: driver.submitting || driver.syncing,
+                  onPressed: driver.canEdit && !driver.busy ? _continue : null,
                 ),
-              ),
-          ],
+                if (driver.hasApi)
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      TextButton(
+                        key: const ValueKey('save-driver-draft'),
+                        onPressed: driver.canEdit && !driver.busy
+                            ? _save
+                            : null,
+                        child: const Text('Lưu nháp'),
+                      ),
+                      if (driver.demoEnabled && widget.onDemo != null)
+                        TextButton(
+                          onPressed: driver.busy ? null : _openDemo,
+                          child: const Text('Mô phỏng'),
+                        ),
+                    ],
+                  ),
+                if (step == 0) ...[
+                  const SizedBox(height: 6),
+                  Text(
+                    'Bước 1/2',
+                    style: appText(size: 11, color: AppColors.secondary),
+                  ),
+                ],
+              ],
+            ),
+          ),
+        ),
+        body: KeyedSubtree(
+          key: ValueKey(driver.formRevision),
+          child: Form(
+            key: _form,
+            child: ListView(
+              controller: _scroll,
+              padding: const EdgeInsets.fromLTRB(16, 0, 16, 6),
+              children: [
+                if (driver.hasApi) ...[
+                  Text(
+                    driver.savedAt == null
+                        ? 'Bản demo • Có thể lưu nháp và tiếp tục sau'
+                        : 'Bản nháp đã lưu lúc ${formatStamp(driver.savedAt)}',
+                    style: appText(size: 11, color: AppColors.secondary),
+                  ),
+                  const SizedBox(height: 6),
+                ],
+                if (driver.picking) ...[
+                  const LinearProgressIndicator(),
+                  const Text('Đang chọn / tải ảnh…'),
+                ],
+                VerificationProgress(step),
+                const SizedBox(height: 6),
+                if (!driver.canEdit) ...[
+                  const Notice(
+                    'Hồ sơ đang được khóa để xét duyệt.',
+                    peach: true,
+                  ),
+                  const SizedBox(height: 10),
+                ],
+                if (step == 0) ..._personal(driver) else ..._vehicle(driver),
+                if (error != null)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 8),
+                    child: Text(
+                      error!,
+                      style: appText(size: 12, color: AppColors.red),
+                    ),
+                  ),
+              ],
+            ),
+          ),
         ),
       ),
     );
@@ -200,7 +293,7 @@ class _VerificationScreenState extends State<VerificationScreen> {
       TextFormField(
         key: ValueKey('field-$key'),
         initialValue: driver.fields[key],
-        readOnly: driver.status != ApprovalStatus.draft,
+        readOnly: driver.status != ApprovalStatus.draft || driver.busy,
         keyboardType: keyboard,
         style: appText(size: 14),
         onChanged: (value) => driver.setField(key, value),
@@ -294,7 +387,7 @@ class _VerificationScreenState extends State<VerificationScreen> {
       items: ['Xe tải 1 tấn', 'Xe van 500 kg', 'Xe bán tải']
           .map((value) => DropdownMenuItem(value: value, child: Text(value)))
           .toList(),
-      onChanged: driver.status == ApprovalStatus.draft
+      onChanged: driver.status == ApprovalStatus.draft && !driver.busy
           ? (value) => driver.setField('vehicleType', value!)
           : null,
     ),
@@ -380,6 +473,7 @@ class _VerificationScreenState extends State<VerificationScreen> {
     final locked = !driver.canEditDocument(kind);
     final needsUpdate = document.rejectionReason != null && !document.replaced;
     return AppCard(
+      key: ValueKey('document-${kind.name}'),
       padding: const EdgeInsets.all(11),
       borderColor: needsUpdate ? AppColors.red : AppColors.line,
       child: Column(
@@ -409,7 +503,8 @@ class _VerificationScreenState extends State<VerificationScreen> {
                     width: double.infinity,
                     height: height - 62,
                   ),
-                  if (!needsUpdate)
+                  if (!needsUpdate &&
+                      (!driver.hasApi || document.remoteReference != null))
                     const Positioned(right: 0, top: 0, child: CheckBadge()),
                 ],
               ),
@@ -475,6 +570,7 @@ class _VerificationScreenState extends State<VerificationScreen> {
                 style: appText(size: 10, color: AppColors.red),
               ),
             ),
+          _uploadFeedback(driver, kind),
         ],
       ),
     );
@@ -485,6 +581,7 @@ class _VerificationScreenState extends State<VerificationScreen> {
     final locked = !driver.canEditDocument(kind);
     final needsUpdate = document.rejectionReason != null && !document.replaced;
     return AppCard(
+      key: ValueKey('document-${kind.name}'),
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
       borderColor: needsUpdate ? AppColors.red : AppColors.line,
       child: Column(
@@ -510,7 +607,9 @@ class _VerificationScreenState extends State<VerificationScreen> {
                   style: appText(size: 12.5, weight: FontWeight.w600),
                 ),
               ),
-              if (document.hasImage && !needsUpdate) ...[
+              if (document.hasImage &&
+                  !needsUpdate &&
+                  (!driver.hasApi || document.remoteReference != null)) ...[
                 const CheckBadge(size: 16),
                 const SizedBox(width: 5),
                 Text(
@@ -555,8 +654,50 @@ class _VerificationScreenState extends State<VerificationScreen> {
                 style: appText(size: 11, color: AppColors.red),
               ),
             ),
+          _uploadFeedback(driver, kind),
         ],
       ),
+    );
+  }
+
+  Widget _uploadFeedback(DriverController driver, DocumentKind kind) {
+    if (!driver.hasApi) return const SizedBox.shrink();
+    if (driver.uploadingDocument == kind) {
+      return Padding(
+        padding: const EdgeInsets.only(top: 6),
+        child: Text(
+          'Đang tải ảnh…',
+          style: appText(size: 11, color: AppColors.orange),
+        ),
+      );
+    }
+    final document = driver.documents[kind]!;
+    if (document.bytes == null || document.remoteReference != null) {
+      return const SizedBox.shrink();
+    }
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'Chưa tải lên thành công',
+          style: appText(size: 11, color: AppColors.red),
+        ),
+        TextButton(
+          key: ValueKey('retry-${kind.name}'),
+          onPressed: driver.busy
+              ? null
+              : () async {
+                  final message = await driver.retryUpload(kind);
+                  if (!mounted) return;
+                  if (message != null) {
+                    _showError(message);
+                  } else {
+                    setState(() => error = null);
+                  }
+                },
+          child: const Text('Thử tải lại'),
+        ),
+      ],
     );
   }
 }
