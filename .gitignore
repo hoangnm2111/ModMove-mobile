@@ -24,6 +24,7 @@ AGENTS.override.md
 .pub-cache/
 coverage/
 screenshots/
+screenshots.*
 android/app/debug/
 android/app/profile/
 *.jks

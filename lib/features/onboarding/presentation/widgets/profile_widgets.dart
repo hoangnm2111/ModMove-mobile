@@ -173,12 +173,22 @@ class DriverAvailability extends StatelessWidget {
           ),
         ),
         const SizedBox(width: 8),
+        if (driver.changingAvailability) ...[
+          const SizedBox(
+            width: 18,
+            height: 18,
+            child: CircularProgressIndicator(strokeWidth: 2),
+          ),
+          const SizedBox(width: 8),
+        ],
         Semantics(
           label: 'Sẵn sàng nhận đơn',
           child: Switch(
             key: const ValueKey('driver-online'),
             value: driver.online,
-            onChanged: driver.canGoOnline ? driver.setOnline : null,
+            onChanged: driver.canGoOnline && !driver.busy
+                ? driver.setOnline
+                : null,
             padding: EdgeInsets.zero,
             materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
             activeTrackColor: AppColors.orange,

@@ -43,3 +43,16 @@ See the [UI review guide](docs/mobile-ui-review.md) for the seven screen entry
 points, validation commands, APK location and current mock-data boundaries.
 See [architecture](docs/architecture.md) for source organization and dependency
 direction. Review screenshots are generated locally and excluded from Git.
+
+## Driver profile mock API
+
+Driver onboarding now supports a complete interactive demo: register, upload
+documents, submit, simulate a rejection, replace rejected documents, resubmit,
+approve and toggle availability. The normal app persists the mock profile and
+version history locally. A separate **Mô phỏng** screen controls review outcomes
+and one-shot API failures; the driver screens expose loading, retry and draft save.
+
+Read [the Vietnamese walkthrough](docs/driver-profile-mock.md) for demo steps,
+the proposed mock HTTP contract and the exact source call order for submission.
+The implementation retains Provider/ChangeNotifier. Trip, wallet and earnings
+features and the planned Cubit migration remain outside this profile-only scope.

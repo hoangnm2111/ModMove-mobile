@@ -32,8 +32,20 @@ repository implementations and injects use cases/controllers. Domain imports
 neither Flutter, Provider, platform plugins nor data-layer classes. Widgets do
 not instantiate repositories. Data fixtures stay outside presentation/domain.
 
-Public fares and profile review currently use demo repositories. Real backend
-integration replaces those adapters while preserving domain contracts and UI.
-Photo selection is an injected adapter; file validation and approval/editing
-rules belong to domain use cases. The demo is not an authentication, payment,
-Cloudinary upload or server-side identity-review implementation.
+Public fares use a demo repository. Driver profiles use `ApiDriverRepository`,
+which maps domain entities to JSON and sends HTTP requests through an injected
+`http.Client`. The app currently injects `MockClient` from `MockDriverApi`: an
+in-process mock transport with latency, HTTP errors, serialized mutations,
+idempotent submission and persistent version history. The proposed contract is
+documented in [the profile walkthrough](driver-profile-mock.md).
+
+`DriverProfileRepository` extends the basic fixture contract with asynchronous
+load, draft save, upload, history and availability. `DriverReviewSimulator` is a
+separate contract for demo controls, not production driver permissions. Domain
+still imports neither Flutter nor transport/plugin APIs. `lib/app/` selects the
+adapters; `main.dart` opens the local file store for normal runs.
+
+Photo selection remains an injected adapter; the demo adds a labelled sample
+image option. File validation and editing rules live in domain, and mock server
+validation independently checks its authoritative version and document decisions.
+This is not authentication, payment, Cloudinary or a real review backend.

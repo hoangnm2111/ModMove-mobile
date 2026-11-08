@@ -113,16 +113,19 @@ been smoke-tested. All review captures remain in ignored `test/screenshots/`.
 
 ## Current boundaries
 
-Fares and driver applications use in-memory demo repositories. Selected photos
-remain in memory for the current session; restarting the app restores the
-fixture. No documents are uploaded to Cloudinary and no backend review occurs.
-Process-death recovery for a camera session is not implemented in this UI slice.
+Fares use an in-memory demo repository. Driver applications now use a JSON HTTP
+mock transport with local persistence, uploaded-image references, review history,
+retry and availability updates. See [driver-profile-mock.md](driver-profile-mock.md)
+for the updated workflow and source walkthrough. Normal Home and
+`SCREEN=driver-onboarding` runs restore saved data. The seven explicit design
+fixtures remain isolated from that persistent store. Native image-picker
+process-death recovery during capture remains unimplemented.
 
 Authentication, booking, real trip offers, wallet, maps, GPS streaming, push
 notifications and payments are outside these three tickets. Related entry points
 currently open explanatory sheets or the demo profile; they do not perform those
-operations. Replace the demo repository implementations and add persistence when
-the backend contracts are available.
+operations. Replace the profile mock transport after agreeing the real backend
+contract, authentication and upload format; local mock persistence is not a server.
 
 The seven screens were reconstructed from raster mockups. Inter is a visual font
 match; font metadata is unavailable in the reference PNGs. Artwork and document

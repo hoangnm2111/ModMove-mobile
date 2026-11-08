@@ -15,3 +15,10 @@
 
 These are separate assets used by native Flutter controls. App screens are not
 flattened images. All displayed vehicle specifications and fares are demo data.
+
+## Driver profile sample image
+
+`images/demo-document.png` is a raster rendering of the repository's existing
+`documents/identity.svg`, which is an abstract document labelled DEMO. The mock
+onboarding picker uses it to exercise upload/retry without real personal papers.
+It is not a photographed identity document.
