@@ -9,8 +9,9 @@ sealed class DriverHomeEvent {}
 class HomeRefreshed extends DriverHomeEvent {}
 
 class AvailabilityChanged extends DriverHomeEvent {
-  AvailabilityChanged(this.online);
+  AvailabilityChanged(this.online, [this.completion]);
   final bool online;
+  final Completer<bool>? completion;
 }
 
 class SessionReceived extends DriverHomeEvent {
@@ -35,6 +36,13 @@ class DriverHomeBloc extends Bloc<DriverHomeEvent, DriverHomeState> {
   }
   final DriverTripActions actions;
   late final StreamSubscription<DriverSession> _subscription;
+  Future<bool> changeAvailability(bool online) {
+    if (isClosed) return Future.value(false);
+    final completion = Completer<bool>();
+    add(AvailabilityChanged(online, completion));
+    return completion.future;
+  }
+
   Future<void> _handle(
     DriverHomeEvent event,
     Emitter<DriverHomeState> emit,
@@ -48,6 +56,7 @@ class DriverHomeBloc extends Bloc<DriverHomeEvent, DriverHomeState> {
       if (event is AvailabilityChanged) await actions.setOnline(event.online);
       if (event is HomeRefreshed) await actions.repository.refresh();
       emit(DriverHomeState(actions.repository.current));
+      if (event is AvailabilityChanged) event.completion?.complete(true);
     } catch (e) {
       emit(
         DriverHomeState(
@@ -57,6 +66,7 @@ class DriverHomeBloc extends Bloc<DriverHomeEvent, DriverHomeState> {
               : 'Chưa tải được dữ liệu. Thử lại.',
         ),
       );
+      if (event is AvailabilityChanged) event.completion?.complete(false);
     }
   }
 

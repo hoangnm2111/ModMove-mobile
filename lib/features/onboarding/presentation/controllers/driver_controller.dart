@@ -112,8 +112,30 @@ class DriverController extends Cubit<DriverPresentationState> {
     if (status == ApprovalStatus.draft && !busy) fields[key] = value;
   }
 
+  Future<bool> Function(bool)? availabilityDelegate;
   Future<bool> setOnline(bool value) async {
     if (!canGoOnline || busy) return false;
+    final delegate = availabilityDelegate;
+    if (delegate == null) return saveOnline(value);
+    changingAvailability = true;
+    _notify();
+    try {
+      return await delegate(value);
+    } finally {
+      changingAvailability = false;
+      _notify();
+    }
+  }
+
+  void reportAvailabilityError(String? message) {
+    lastError = message;
+    _notify();
+  }
+
+  /// The composition root shares the trip BLoC with the legacy profile toggle.
+  /// Its repository calls this gateway to persist the profile API value.
+  Future<bool> saveOnline(bool value) async {
+    if (!canGoOnline || submitting || picking || syncing) return false;
     changingAvailability = true;
     lastError = null;
     _notify();

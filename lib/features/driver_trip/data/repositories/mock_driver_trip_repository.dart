@@ -12,8 +12,13 @@ class MockDriverTripRepository implements DriverTripRepository, TripSimulator {
     DateTime Function()? clock,
     this.autoOffer = true,
     this.availabilityGateway,
+    bool initialOnline = false,
   }) : _clock = clock ?? DateTime.now {
     _seed();
+    if (initialOnline && _access.eligible) {
+      _online = true;
+      _startGps();
+    }
   }
   final Duration delay;
   final DateTime Function() _clock;
@@ -22,6 +27,7 @@ class MockDriverTripRepository implements DriverTripRepository, TripSimulator {
   final _updates = StreamController<DriverSession>.broadcast();
   final _ignored = <String>{};
   final _taken = <String>{};
+  final _deadlines = <String, DateTime>{};
   final _uploads = <String, (String, CargoPhotoKind)>{};
   final List<DeliveryJob> _jobs = [];
   DriverAccess _access;
@@ -47,6 +53,7 @@ class MockDriverTripRepository implements DriverTripRepository, TripSimulator {
       (_fix?.freshAt(now) ?? false) &&
       !_taken.contains(job.id) &&
       !_ignored.contains(job.id) &&
+      (!_deadlines.containsKey(job.id) || now.isBefore(_deadlines[job.id]!)) &&
       !job.expiredAt(now) &&
       _fix!.point.distanceTo(job.pickupPoint) <= 5000 &&
       job.weightKg <= 1000 &&
@@ -68,6 +75,12 @@ class MockDriverTripRepository implements DriverTripRepository, TripSimulator {
       offer: _offer,
       trip: _trip,
       deposit: _deposit,
+      earnings: 1280000,
+      shift: const ShiftSummary(
+        completed: 3,
+        income: 486000,
+        acceptanceRate: 92,
+      ),
       pings: _pings,
       jobs: jobs,
       notice: _notice,
@@ -168,10 +181,7 @@ class MockDriverTripRepository implements DriverTripRepository, TripSimulator {
     _offerTimer?.cancel();
     _offerTimer = Timer(const Duration(seconds: 6), () {
       if (current.jobs.isNotEmpty && _offer == null && _foreground) {
-        _offer = JobOffer(
-          current.jobs.first,
-          now.add(const Duration(seconds: 30)),
-        );
+        _offer = _makeOffer(current.jobs.first);
         _publish();
       }
     });
@@ -230,7 +240,7 @@ class MockDriverTripRepository implements DriverTripRepository, TripSimulator {
         'Đơn không còn khả dụng hoặc bạn chưa đủ điều kiện.',
       );
     }
-    _offer = JobOffer(job, now.add(const Duration(seconds: 30)));
+    _offer = _makeOffer(job);
     _publish();
   }
 
@@ -244,6 +254,11 @@ class MockDriverTripRepository implements DriverTripRepository, TripSimulator {
       _publish();
     }
   }
+
+  JobOffer _makeOffer(DeliveryJob job) => JobOffer(
+    job,
+    _deadlines.putIfAbsent(job.id, () => now.add(const Duration(seconds: 30))),
+  );
 
   @override
   Future<void> acceptOffer(String jobId) async {
