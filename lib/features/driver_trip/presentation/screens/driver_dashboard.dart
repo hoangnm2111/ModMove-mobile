@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import '../../../../core/widgets/app_widgets.dart';
 import '../bloc/job_offer_bloc.dart';
 import '../widgets/job_alert_sheet.dart';
 import 'driver_home_screen.dart';
@@ -26,8 +25,7 @@ class _DriverDashboardState extends State<DriverDashboard> {
     );
     _showing = false;
     if (details == true && mounted) {
-      final job = context.read<JobOfferBloc>().state.offer!.job;
-      showInfoSheet(context, '#${job.id}', '${job.pickup}\n→ ${job.dropoff}');
+      Navigator.pushNamed(context, '/job-details');
     }
   }
 

@@ -5,6 +5,7 @@ import 'package:flutter/rendering.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:modmove_mobile/app/app.dart';
 import 'package:modmove_mobile/features/driver_trip/data/repositories/mock_driver_trip_repository.dart';
+import 'package:modmove_mobile/features/driver_trip/domain/entities/trip_models.dart';
 
 Future<void> capture(WidgetTester tester, GlobalKey key, String name) async {
   if (!const bool.fromEnvironment('CAPTURE_SCREENSHOTS')) return;
@@ -21,6 +22,38 @@ Future<void> capture(WidgetTester tester, GlobalKey key, String name) async {
 }
 
 void main() {
+  testWidgets('open details and accept a trip through the UI', (tester) async {
+    tester.view.physicalSize = const Size(390, 844);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+    final repo = MockDriverTripRepository(
+      delay: Duration.zero,
+      autoOffer: false,
+    );
+    await tester.runAsync(() => repo.setOnline(true));
+    final key = GlobalKey();
+    await tester.pumpWidget(
+      RepaintBoundary(
+        key: key,
+        child: ModMoveApp(screen: 'driver-home', tripRepository: repo),
+      ),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('12 Nguyễn Văn Linh, Quận 7'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Xem chi tiết'));
+    await tester.pumpAndSettle();
+    expect(find.text('Chi tiết đơn'), findsOneWidget);
+    expect(find.text('Đã thanh toán'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+    await capture(tester, key, 'job-details');
+    await tester.tap(find.byKey(const Key('accept-job')));
+    await tester.pumpAndSettle();
+    expect(repo.current.trip!.stage, TripStage.accepted);
+    expect(find.text('Chuyến đang thực hiện'), findsOneWidget);
+    await tester.pumpWidget(const SizedBox());
+    await repo.close();
+  });
   for (final width in [390.0, 320.0]) {
     testWidgets('driver home online/offline at width $width', (tester) async {
       tester.view.physicalSize = Size(width, 844);

@@ -6,6 +6,79 @@ import 'package:modmove_mobile/features/driver_trip/domain/repositories/driver_t
 
 void main() {
   test(
+    'first accept wins atomically and a second active job is forbidden',
+    () async {
+      final repo = MockDriverTripRepository(
+        delay: Duration.zero,
+        autoOffer: false,
+      );
+      addTearDown(repo.close);
+      await repo.setOnline(true);
+      final jobs = repo.current.jobs;
+      await repo.openOffer(jobs.first.id);
+      final results = await Future.wait(
+        List.generate(2, (_) async {
+          try {
+            await repo.acceptOffer(jobs.first.id);
+            return true;
+          } on TripFailure {
+            return false;
+          }
+        }),
+      );
+      expect(results.where((won) => won).length, 1);
+      expect(repo.current.trip!.job.id, jobs.first.id);
+      expect(repo.current.jobs, isEmpty);
+      await expectLater(
+        repo.openOffer(jobs.last.id),
+        throwsA(isA<TripFailure>()),
+      );
+      await expectLater(repo.setOnline(false), throwsA(isA<TripFailure>()));
+    },
+  );
+  test('accept revalidates race, expiry and account eligibility', () async {
+    var now = DateTime(2026, 11, 8, 9);
+    final repo = MockDriverTripRepository(
+      delay: Duration.zero,
+      autoOffer: false,
+      clock: () => now,
+    );
+    addTearDown(repo.close);
+    await repo.setOnline(true);
+    await repo.openOffer(repo.current.jobs.first.id);
+    final id = repo.current.offer!.job.id;
+    await repo.simulate(TripSimulation.acceptElsewhere);
+    await expectLater(repo.acceptOffer(id), throwsA(isA<TripFailure>()));
+    expect(repo.current.trip, isNull);
+    await repo.simulate(TripSimulation.newOffer);
+    final secondId = repo.current.offer!.job.id;
+    now = now.add(const Duration(seconds: 30));
+    await expectLater(repo.acceptOffer(secondId), throwsA(isA<TripFailure>()));
+    expect(repo.current.trip, isNull);
+    await repo.simulate(TripSimulation.newOffer);
+    final thirdId = repo.current.offer!.job.id;
+    repo.updateAccess(const DriverAccess(approved: true, active: false));
+    await expectLater(repo.acceptOffer(thirdId), throwsA(isA<TripFailure>()));
+  });
+  test(
+    'network failure rolls acceptance back and retry succeeds once',
+    () async {
+      final repo = MockDriverTripRepository(
+        delay: Duration.zero,
+        autoOffer: false,
+      );
+      addTearDown(repo.close);
+      await repo.setOnline(true);
+      await repo.openOffer(repo.current.jobs.first.id);
+      final id = repo.current.offer!.job.id;
+      await repo.simulate(TripSimulation.requestFailure);
+      await expectLater(repo.acceptOffer(id), throwsA(isA<TripFailure>()));
+      expect(repo.current.trip, isNull);
+      await repo.acceptOffer(id);
+      expect(repo.current.trip!.stage, TripStage.accepted);
+    },
+  );
+  test(
     'only approved active drivers can go online and see matching jobs',
     () async {
       final repo = MockDriverTripRepository(
