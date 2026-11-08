@@ -29,6 +29,11 @@ void main() {
       );
       expect(repo.current.online, isTrue);
       expect(find.textContaining('Bạn đang có chuyến.'), findsOneWidget);
+      final tripId = repo.current.trip!.job.id;
+      await tester.tap(find.text('Đơn hàng'));
+      await tester.pumpAndSettle();
+      expect(find.text('Đến điểm lấy hàng'), findsOneWidget);
+      expect(repo.current.trip!.job.id, tripId);
     },
   );
   for (final status in ['approved', 'pending', 'rejected']) {
@@ -42,9 +47,19 @@ void main() {
       final control = tester.widget<Switch>(toggle);
       expect(control.onChanged != null, status == 'approved');
       expect(control.value, status == 'approved');
+      expect(
+        find.byKey(const Key('open-driver-home')),
+        status == 'approved' ? findsOneWidget : findsNothing,
+      );
       await tester.tap(toggle);
       await tester.pumpAndSettle();
       expect(tester.widget<Switch>(toggle).value, isFalse);
+      if (status != 'approved') {
+        await tester.tap(find.text('Đơn hàng'));
+        await tester.pumpAndSettle();
+        expect(find.text('Chưa thể nhận đơn'), findsOneWidget);
+        expect(find.text('Trang chủ tài xế'), findsNothing);
+      }
       expect(tester.takeException(), isNull);
     });
   }

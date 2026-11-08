@@ -6,15 +6,41 @@ Mở máy ảo trong Android Studio, tại `ModMove-mobile` chạy:
 
 ```powershell
 flutter pub get
+flutter run
+```
+
+Chạy trên nhánh đã có FE-19–FE-23 (`feature/tunm`, hoặc `develop` đã pull sau khi
+PR được merge). Không cần đổi `SCREEN` giữa các bước.
+
+## Luồng liên kết đăng ký và nhận đơn
+
+FE-43 và FE-27 đều dành cho **tài xế**, dùng chung hồ sơ với FE-19–FE-23:
+
+1. **Home → Đăng ký tài xế** mở FE-43: nhập thông tin, tải giấy tờ cá nhân và xe.
+2. **Gửi hồ sơ xét duyệt** chuyển đến FE-27: hồ sơ, phương tiện, trạng thái duyệt.
+   Khi chờ duyệt hoặc bị từ chối, tài xế chưa thể bật nhận đơn.
+3. Vì chưa có backend, tại hồ sơ chọn **Mô phỏng → Mô phỏng: duyệt hồ sơ**, rồi
+   quay lại. Đây là giả lập kết quả của quản trị viên, không phải quyền của tài xế.
+4. Bấm **Vào trang chủ tài xế** để mở FE-19, bật công tắc nhận đơn và tiếp tục
+   FE-20 → FE-21 → FE-22 → FE-23 theo hướng dẫn dưới.
+5. Từ trang chủ tài xế, **Tài khoản** luôn mở lại FE-27 của cùng tài xế. Tại hồ sơ,
+   **Đơn hàng** mở chuyến đang thực hiện, hoặc về trang chủ nhận đơn nếu chưa có chuyến.
+
+Hồ sơ mock được lưu trên máy. Lần sau chạy `flutter run`, vào **Tài khoản →
+Vào trang chủ tài xế** nếu hồ sơ đã duyệt. Có thể dùng ảnh mẫu trong mỗi ô tải ảnh,
+hoặc **Mô phỏng → Tạo hồ sơ mẫu đầy đủ** để điền nhanh trước khi gửi xét duyệt.
+
+Nếu chỉ muốn thử riêng nhận đơn với hồ sơ đã duyệt và đang online có sẵn:
+
+```powershell
 flutter run --dart-define=SCREEN=driver-home
 ```
 
-Màn này dùng hồ sơ đã duyệt để demo. `flutter run` vẫn mở Home cũ, khôi phục
-hồ sơ mock đã lưu; sau khi hồ sơ được duyệt, vào Tài khoản → Trang chủ để nhận đơn.
+Lệnh tắt này bỏ qua đăng ký/xét duyệt, không dùng hồ sơ đã lưu của luồng mặc định.
 
 ## Luồng thử
 
-1. Màn demo bắt đầu trực tuyến, có hai đơn phù hợp. Chọn một đơn để mở popup.
+1. Bật trực tuyến ở trang chủ tài xế, có hai đơn phù hợp. Chọn một đơn để mở popup.
    Có thể tắt rồi bật công tắc để thử trạng thái hoạt động; 6 giây sau khi bật lại
    sẽ có popup đơn mới.
 2. Bấm **Xem chi tiết → Nhận chuyến** trong 30 giây. Có thể bấm một đơn ở danh sách
