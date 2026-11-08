@@ -104,7 +104,9 @@ thu tiền người gửi, tối đa 5 lần gửi và chờ khách duyệt trư
 - Bản đồ dùng Google Maps SDK, kéo/zoom/xoay trực tiếp. Vùng nhận đơn 5 km có vòng
   sóng khi online, cùng bán kính với mock matching; dừng khi offline hoặc có chuyến.
   Key đọc từ `android/secrets.properties` (Git ignore) hoặc biến `MAPS_API_KEY`.
-  Không dùng ảnh/vector giả thay thế khi thiếu key. Xem [cấu hình và test](google-maps-android.md).
+  Khi chưa có key, app tự dùng map mô phỏng cũ, có kéo/zoom và vòng sóng minh họa.
+  Khi đã thêm key và bật Billing, rebuild app để tự chuyển sang Google Maps.
+  Xem [cấu hình và test](google-maps-android.md).
 - Tọa độ và đường nét đứt đến điểm lấy vẫn mô phỏng; chưa gọi Directions/Routes API.
   Nhấn thẻ ETA để mở Google Maps ngoài app và tìm đường thật.
 - Nút gọi khách mở dialer, không tự gọi điện. Yêu cầu sự cố chỉ tạo biên nhận mock,
@@ -130,11 +132,12 @@ flutter test --dart-define=CAPTURE_SCREENSHOTS=true test/driver_trip_ui_test.dar
 Ảnh ở `test/screenshots/iteration2/` được Git bỏ qua. Không commit screenshots,
 file nén screenshots, APK, coverage hoặc cấu hình agent.
 
-Kết quả xác minh ngày 2026-11-08: analyzer không có vấn đề, toàn bộ **76 tests**
+Kết quả xác minh ngày 2026-11-08: analyzer không có vấn đề, toàn bộ **77 tests**
 qua với coverage; build debug APK thành công. Trên AVD Android 36 đã kiểm tra
 gửi hồ sơ mẫu → chờ duyệt → đóng/mở lại app vẫn chờ duyệt → mô phỏng duyệt →
 trang chủ tài xế → online → popup tự phát → chi tiết → nhận chuyến → đến điểm lấy.
-Khi chưa có key, app hiển thị trạng thái Google Maps chưa được cấu hình.
+Theo yêu cầu dùng tạm khi chưa có Billing, bản mới fallback sang map mô phỏng
+khi chưa có key; vẫn test được cùng luồng nhận đơn.
 
 Tests mới còn kiểm tra hồ sơ đã duyệt sau restart, camera commands/gestures gửi
 đến SDK, circle theo tọa độ/mét, pulse/lifecycle/reduced motion. Google Maps tiles

@@ -11,8 +11,9 @@ import '../../../../core/widgets/app_widgets.dart';
 import '../../domain/entities/driver_matching_policy.dart';
 import '../../domain/entities/trip_models.dart';
 import 'driver_map_marker.dart';
+import 'mock_driver_map.dart';
 
-/// Native Google Maps. Trip/GPS data still comes from the trip repository.
+/// Uses Google Maps when configured, or the temporary labelled demo map.
 class DriverMap extends StatefulWidget {
   const DriverMap({
     super.key,
@@ -89,7 +90,7 @@ class _DriverMapState extends State<DriverMap>
 
   void _syncPulse() {
     final animate =
-        _configured == true &&
+        _configured != null &&
         widget.available &&
         _coverageVisible &&
         _foreground &&
@@ -206,14 +207,22 @@ class _DriverMapState extends State<DriverMap>
 
   @override
   Widget build(BuildContext context) {
-    if (!widget.available || _configured == false) {
-      return _UnavailableMap(
-        configured: _configured == true,
-        onRetry: _loadConfiguration,
-      );
+    if (!widget.available) {
+      return _UnavailableMap(onRetry: _loadConfiguration);
     }
     if (_configured == null) {
       return const Center(child: CircularProgressIndicator(strokeWidth: 2));
+    }
+    if (_configured == false) {
+      return MockDriverMap(
+        route: widget.route,
+        searching: _coverageVisible,
+        phase: _pulse.value,
+        animate: _pulse.isAnimating,
+        searchRadiusMeters: widget.searchRadiusMeters,
+        position: widget.position,
+        destination: widget.destination,
+      );
     }
     return Column(
       children: [
@@ -345,8 +354,7 @@ class _MapControl extends StatelessWidget {
 }
 
 class _UnavailableMap extends StatelessWidget {
-  const _UnavailableMap({required this.configured, required this.onRetry});
-  final bool configured;
+  const _UnavailableMap({required this.onRetry});
   final VoidCallback onRetry;
   @override
   Widget build(BuildContext context) => ColoredBox(
@@ -359,12 +367,7 @@ class _UnavailableMap extends StatelessWidget {
           children: [
             const AppIcon('map', size: 30, color: AppColors.muted),
             const SizedBox(height: 6),
-            Text(
-              configured
-                  ? 'Chưa tải được Google Maps'
-                  : 'Google Maps chưa được cấu hình',
-              textAlign: TextAlign.center,
-            ),
+            const Text('Chưa tải được bản đồ', textAlign: TextAlign.center),
             const Text(
               'Bạn vẫn có thể xem địa chỉ và thông tin chuyến.',
               textAlign: TextAlign.center,

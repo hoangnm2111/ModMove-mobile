@@ -8,6 +8,7 @@ import 'package:modmove_mobile/features/driver_trip/domain/entities/driver_match
 import 'package:modmove_mobile/features/driver_trip/domain/entities/trip_models.dart';
 import 'package:modmove_mobile/features/driver_trip/presentation/widgets/driver_map.dart';
 import 'package:modmove_mobile/features/driver_trip/presentation/widgets/driver_map_marker.dart';
+import 'package:modmove_mobile/features/driver_trip/presentation/widgets/mock_driver_map.dart';
 import 'helpers/recording_maps_platform.dart';
 
 const configurationChannel = MethodChannel('vn.modmove/maps_configuration');
@@ -145,22 +146,72 @@ void main() {
   );
 
   testWidgets(
-    'missing configuration is explicit and never renders a substitute map',
+    'missing key uses interactive mock map and configured restart uses Google',
     (tester) async {
       configured = false;
-      await mount(tester);
+      await mount(tester, reduceMotion: true);
       await tester.pumpAndSettle();
       expect(find.byType(GoogleMap), findsNothing);
-      expect(find.text('Google Maps chưa được cấu hình'), findsOneWidget);
+      expect(find.text('Bản đồ mô phỏng · Tìm đơn 5 km'), findsOneWidget);
+      expect(find.byType(MockDriverMap), findsOneWidget);
       expect(platform.createdIds, isEmpty);
-      configured = true;
-      await tester.tap(find.text('Thử lại bản đồ'));
+      final viewer = tester.widget<InteractiveViewer>(
+        find.byType(InteractiveViewer),
+      );
+      final transform = viewer.transformationController!;
+      await tester.tap(find.byTooltip('Phóng to'));
+      await tester.pumpAndSettle();
+      expect(transform.value.getMaxScaleOnAxis(), closeTo(1.35, .001));
+      final beforePan = transform.value.clone();
+      await tester.drag(find.byType(InteractiveViewer), const Offset(30, 15));
+      await tester.pumpAndSettle();
+      expect(transform.value, isNot(beforePan));
+      await tester.tap(find.byTooltip('Về vị trí tài xế'));
+      await tester.pumpAndSettle();
+      expect(transform.value, Matrix4.identity());
+      await tester.pumpWidget(const SizedBox());
       await tester.pump();
-      await tester.pump(const Duration(milliseconds: 100));
+      configured = true;
+      await mount(tester, reduceMotion: true);
+      await tester.pumpAndSettle();
       expect(find.byType(GoogleMap), findsOneWidget);
+      expect(find.byType(MockDriverMap), findsNothing);
       await tester.pumpWidget(const SizedBox());
       await tester.pump();
       expect(tester.takeException(), isNull);
     },
   );
+
+  testWidgets('fallback pulse pauses in background and stops offline', (
+    tester,
+  ) async {
+    configured = false;
+    await mount(tester);
+    double phase() =>
+        tester.widget<MockDriverMap>(find.byType(MockDriverMap)).phase;
+    final first = phase();
+    await tester.pump(const Duration(milliseconds: 500));
+    expect(phase(), isNot(first));
+    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.paused);
+    await tester.pump();
+    final paused = phase();
+    await tester.pump(const Duration(milliseconds: 500));
+    expect(phase(), paused);
+    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
+    await mount(tester, reduceMotion: true);
+    await tester.pumpAndSettle();
+    expect(
+      tester.widget<MockDriverMap>(find.byType(MockDriverMap)).animate,
+      isFalse,
+    );
+    await mount(tester, searching: false);
+    await tester.pumpAndSettle();
+    expect(
+      tester.widget<MockDriverMap>(find.byType(MockDriverMap)).searching,
+      isFalse,
+    );
+    expect(find.text('Bản đồ mô phỏng'), findsOneWidget);
+    expect(platform.createdIds, isEmpty);
+    expect(tester.takeException(), isNull);
+  });
 }
