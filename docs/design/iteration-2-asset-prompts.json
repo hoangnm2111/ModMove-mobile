@@ -1,0 +1,38 @@
+{
+  "mode": "built-in image_gen",
+  "purpose": "Production-ready Iteration 2 visual assets; not flattened app screens",
+  "raster_assets": [
+    {
+      "file": "assets/images/mock-cargo-overall.png",
+      "use_case": "photorealistic-natural",
+      "prompt": "A realistic horizontal smartphone evidence photo of exactly eight sealed plain cardboard boxes on two wooden pallets in a clean logistics loading bay. Entire shipment visible, bright neutral daylight. No people, vehicle, text, labels, barcode, logo, watermark, personal data or UI."
+    },
+    {
+      "file": "assets/images/mock-cargo-secured.png",
+      "use_case": "photorealistic-natural",
+      "prompt": "A realistic horizontal smartphone evidence photo through the open rear doors of a white box truck: exactly eight plain cardboard boxes on two pallets, firmly secured by two orange ratchet straps. No people, text, labels, barcode, logo, watermark, license plate or UI."
+    },
+    {
+      "file": "assets/images/mock-delivery-proof.png",
+      "use_case": "photorealistic-natural",
+      "prompt": "A realistic horizontal smartphone proof-of-delivery photo of four sealed plain cardboard boxes stacked safely at a clean urban building entrance, with a dark door and a small green plant. No people, address, house number, text, labels, logo, watermark, personal data or UI."
+    }
+  ],
+  "svg_icons": [
+    "bell", "map-pin", "route", "navigation", "target", "speaker",
+    "phone", "turn-right", "fragile", "clipboard-check", "cash", "coins",
+    "credit-card", "chart-bar", "trend-up", "calendar", "qr-code", "copy",
+    "bank", "wallet-plus", "withdraw", "receipt", "refresh", "location-off",
+    "map"
+  ],
+  "svg_illustrations": [
+    "waiting-customer", "delivery-success", "empty-jobs", "empty-revenue"
+  ],
+  "dynamic_assets": {
+    "google_map": "Render through Google Maps Flutter at runtime; do not ship a screenshot tile.",
+    "route_polyline": "Render from mock/real route coordinates.",
+    "payos_qr": "Generate from the mock/real checkout payload; do not ship a fixed payment QR.",
+    "countdown": "Render as a Flutter timer/progress ring so accessibility and state remain correct."
+  },
+  "icon_style": "Original 24-unit SVGs, 1.8-unit rounded stroke, no embedded color dependency beyond the base #20252B for Flutter color filtering."
+}
