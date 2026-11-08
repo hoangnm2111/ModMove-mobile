@@ -256,11 +256,23 @@ class DriverHomeScreen extends StatelessWidget {
                           const SizedBox(height: 9),
                           Row(
                             children: [
-                              _summary('route', '3', 'chuyến'),
+                              _summary(
+                                'route',
+                                '${session.shift.completed}',
+                                'chuyến',
+                              ),
                               const SizedBox(width: 5),
-                              _summary('coins', '486.000đ', 'Thu nhập'),
+                              _summary(
+                                'coins',
+                                vnd(session.shift.income),
+                                'Thu nhập',
+                              ),
                               const SizedBox(width: 5),
-                              _summary('chart-bar', '92%', 'Tỷ lệ nhận'),
+                              _summary(
+                                'chart-bar',
+                                '${session.shift.acceptanceRate}%',
+                                'Tỷ lệ nhận',
+                              ),
                             ],
                           ),
                         ],

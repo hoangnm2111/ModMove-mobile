@@ -30,12 +30,15 @@ class DriverTripScope extends StatefulWidget {
 class _DriverTripScopeState extends State<DriverTripScope>
     with WidgetsBindingObserver {
   late final DriverTripRepository _repository;
+  late final DriverHomeBloc _homeBloc;
+  late final DriverController _driver;
   late final StreamSubscription<DriverPresentationState> _profileSubscription;
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
     final driver = context.read<DriverController>();
+    _driver = driver;
     _repository =
         widget.repository ??
         MockDriverTripRepository(
@@ -43,8 +46,15 @@ class _DriverTripScopeState extends State<DriverTripScope>
             approved: driver.canGoOnline,
             active: driver.accountActive,
           ),
-          availabilityGateway: driver.setOnline,
+          availabilityGateway: driver.saveOnline,
+          initialOnline: driver.online,
         );
+    _homeBloc = DriverHomeBloc(DriverTripActions(_repository));
+    driver.availabilityDelegate = (value) async {
+      final success = await _homeBloc.changeAvailability(value);
+      if (!success) driver.reportAvailabilityError(_homeBloc.state.error);
+      return success;
+    };
     _profileSubscription = driver.stream.listen((state) {
       final profile = state.application;
       if (profile != null) {
@@ -69,6 +79,8 @@ class _DriverTripScopeState extends State<DriverTripScope>
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
+    _driver.availabilityDelegate = null;
+    unawaited(_homeBloc.close());
     unawaited(_profileSubscription.cancel());
     if (widget.repository == null) {
       unawaited((_repository as MockDriverTripRepository).close());
@@ -88,9 +100,7 @@ class _DriverTripScopeState extends State<DriverTripScope>
                 widget.cargoPhotos ?? DeviceCargoPhotoRepository(),
               ),
             ),
-            BlocProvider(
-              create: (_) => DriverHomeBloc(DriverTripActions(_repository)),
-            ),
+            BlocProvider.value(value: _homeBloc),
             BlocProvider(
               create: (_) => JobOfferBloc(DriverTripActions(_repository)),
             ),

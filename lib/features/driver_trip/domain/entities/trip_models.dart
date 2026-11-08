@@ -153,6 +153,15 @@ class ActiveTrip {
   );
 }
 
+class ShiftSummary {
+  const ShiftSummary({
+    this.completed = 0,
+    this.income = 0,
+    this.acceptanceRate = 0,
+  });
+  final int completed, income, acceptanceRate;
+}
+
 class DriverSession {
   DriverSession({
     this.online = false,
@@ -161,8 +170,9 @@ class DriverSession {
     this.fix,
     this.offer,
     this.trip,
-    this.deposit = 350000,
-    this.earnings = 1280000,
+    this.deposit = 0,
+    this.earnings = 0,
+    this.shift = const ShiftSummary(),
     this.pings = 0,
     List<DeliveryJob> jobs = const [],
     this.notice,
@@ -172,6 +182,7 @@ class DriverSession {
   final JobOffer? offer;
   final ActiveTrip? trip;
   final int deposit, earnings, pings;
+  final ShiftSummary shift;
   final List<DeliveryJob> jobs;
   final String? notice;
 }

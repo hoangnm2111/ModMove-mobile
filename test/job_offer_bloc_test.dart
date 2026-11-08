@@ -22,8 +22,14 @@ void main() {
         async.elapse(Duration.zero);
         expect(bloc.state.seconds, 30);
         final deadline = bloc.state.offer!.deadline;
+        final firstId = bloc.state.offer!.job.id;
         async.elapse(const Duration(seconds: 7));
         expect(bloc.state.seconds, 23);
+        bloc.add(OfferOpened(repo.current.jobs.last.id));
+        async.elapse(Duration.zero);
+        bloc.add(OfferOpened(firstId));
+        async.elapse(Duration.zero);
+        expect(bloc.state.offer!.deadline, deadline);
         bloc.add(OfferOpened(bloc.state.offer!.job.id));
         async.elapse(Duration.zero);
         expect(bloc.state.offer!.deadline, deadline);

@@ -97,6 +97,10 @@ class JobOfferBloc extends Bloc<JobOfferEvent, JobOfferState> {
         );
       } else if (session.offer != null) {
         final offer = session.offer!;
+        if (offer.remainingAt(actions.repository.now) == 0) {
+          publish(JobOfferState(offer: offer, status: OfferStatus.expired));
+          return;
+        }
         if (!session.jobs.any((job) => job.id == offer.job.id)) {
           publish(
             JobOfferState(
