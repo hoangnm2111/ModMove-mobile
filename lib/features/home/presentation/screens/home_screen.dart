@@ -10,8 +10,12 @@ class HomeScreen extends StatelessWidget {
     super.key,
     required this.onRegister,
     required this.onAccount,
+    this.onDeliver,
   });
   final VoidCallback onRegister, onAccount;
+
+  /// "Giao hàng ngay": đăng nhập khách rồi đặt xe. Không truyền → mở bảng giá như cũ.
+  final VoidCallback? onDeliver;
 
   void _fare(
     BuildContext context, [
@@ -129,7 +133,7 @@ class HomeScreen extends StatelessWidget {
               'Giao hàng ngay',
               icon: 'box',
               trailing: true,
-              onPressed: () => _fare(context),
+              onPressed: onDeliver ?? () => _fare(context),
             ),
             const SizedBox(height: 21),
             const SectionTitle('Chọn xe phù hợp'),
