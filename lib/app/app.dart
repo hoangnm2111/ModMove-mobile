@@ -1,6 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:http/http.dart' as http;
+import '../core/network/api_client.dart';
+import '../core/session/session_store.dart';
+import '../features/auth/data/auth_api.dart';
+import '../features/auth/presentation/auth_cubit.dart';
+import '../features/auth/presentation/login_screen.dart';
+import '../features/customer/data/customer_api.dart';
+import '../features/customer/presentation/customer_shell.dart';
 import 'driver_trip_scope.dart';
 import '../features/driver_trip/domain/repositories/driver_trip_repository.dart';
 import '../features/driver_trip/presentation/screens/driver_dashboard.dart';
@@ -34,12 +42,23 @@ class ModMoveApp extends StatelessWidget {
     this.mockApi,
     this.tripRepository,
     this.cargoPhotos,
+    this.sessions,
+    this.httpClient,
   });
   final String screen;
   final DriverController? driverController;
   final MockDriverApi? mockApi;
   final DriverTripRepository? tripRepository;
   final CargoPhotoRepository? cargoPhotos;
+
+  /// Phiên đăng nhập (main.dart mở từ file; test dùng bộ nhớ).
+  final SessionStore? sessions;
+
+  /// Cho test chèn MockClient.
+  final http.Client? httpClient;
+
+  /// Điều hướng gốc – dùng khi phiên hết hạn để quay về trang chủ.
+  static final navigatorKey = GlobalKey<NavigatorState>();
 
   DriverController _createDriver() {
     final fixture = DemoDriverRepository(
@@ -80,18 +99,52 @@ class ModMoveApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return MultiBlocProvider(
+    return MultiRepositoryProvider(
       providers: [
-        BlocProvider(
-          create: (_) =>
-              HomeController(const GetPublicFares(DemoFareRepository())),
+        RepositoryProvider<ApiClient>(
+          create: (_) => ApiClient(
+            sessions: sessions ?? MemorySessionStore(),
+            client: httpClient,
+          ),
+          dispose: (api) => api.close(),
         ),
-        BlocProvider(create: (_) => driverController ?? _createDriver()),
+        RepositoryProvider<AuthApi>(create: (c) => AuthApi(c.read<ApiClient>())),
+        RepositoryProvider<CustomerApi>(
+          create: (c) => CustomerApi(c.read<ApiClient>()),
+        ),
       ],
+      child: MultiBlocProvider(
+        providers: [
+          BlocProvider(
+            create: (c) {
+              final api = c.read<ApiClient>();
+              final auth = AuthCubit(api: c.read<AuthApi>(), sessions: api.sessions);
+              api.onSessionExpired = auth.expire;
+              return auth;
+            },
+          ),
+          BlocProvider(
+            create: (_) =>
+                HomeController(const GetPublicFares(DemoFareRepository())),
+          ),
+          BlocProvider(create: (_) => driverController ?? _createDriver()),
+        ],
+        child: _app(context),
+      ),
+    );
+  }
+
+  Widget _app(BuildContext context) {
+    return BlocListener<AuthCubit, Session?>(
+      listenWhen: (prev, next) => prev != null && next == null,
+      // Đăng xuất / phiên hết hạn → đóng các màn đang mở, về trang gốc
+      listener: (_, _) =>
+          navigatorKey.currentState?.popUntil((route) => route.isFirst),
       child: DriverTripScope(
         repository: tripRepository,
         cargoPhotos: cargoPhotos,
         child: MaterialApp(
+          navigatorKey: navigatorKey,
           title: 'ModMove',
           debugShowCheckedModeBanner: false,
           theme: buildAppTheme(),
@@ -113,7 +166,7 @@ class ModMoveApp extends StatelessWidget {
                   )
                 : screen.startsWith('profile')
                 ? _profile(context)
-                : _home(context),
+                : _gate(context),
           ),
           onGenerateRoute: (settings) {
             if (settings.name == '/active-trip') {
@@ -169,7 +222,7 @@ class ModMoveApp extends StatelessWidget {
             if (settings.name == '/home') {
               return MaterialPageRoute<void>(
                 settings: settings,
-                builder: _home,
+                builder: _gate,
               );
             }
             if (settings.name == '/pricing') {
@@ -189,6 +242,24 @@ class ModMoveApp extends StatelessWidget {
     );
   }
 
+  /// Khách đã đăng nhập → app khách; còn lại → trang chủ công khai.
+  Widget _gate(BuildContext context) => BlocBuilder<AuthCubit, Session?>(
+    builder: (context, session) =>
+        session?.isCustomer == true ? const CustomerShell() : _home(context),
+  );
+
+  /// Đăng nhập; tài xế vào luồng hồ sơ/nhận đơn hiện có, khách tự vào app khách.
+  Future<Session?> _login(BuildContext context) async {
+    final session = await Navigator.push<Session>(
+      context,
+      MaterialPageRoute(builder: (_) => const LoginScreen()),
+    );
+    if (session != null && session.isDriver && context.mounted) {
+      Navigator.pushNamed(context, '/profile');
+    }
+    return session;
+  }
+
   Widget _home(BuildContext context) => HomeScreen(
     onRegister: () => Navigator.pushNamed(
       context,
@@ -196,7 +267,8 @@ class ModMoveApp extends StatelessWidget {
           ? '/verification'
           : '/profile',
     ),
-    onAccount: () => Navigator.pushNamed(context, '/profile'),
+    onAccount: () => _login(context),
+    onDeliver: () => _login(context),
   );
 
   Widget _profile(BuildContext context) => DriverProfileScreen(

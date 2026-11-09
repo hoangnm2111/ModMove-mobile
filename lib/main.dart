@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'dart:io';
 import 'package:path_provider/path_provider.dart';
 import 'app/app.dart';
+import 'core/session/session_store.dart';
 import 'features/onboarding/data/services/mock_driver_api.dart';
 import 'features/onboarding/data/services/profile_mock_store.dart';
 
@@ -16,6 +17,7 @@ Future<void> main() async {
       systemNavigationBarIconBrightness: Brightness.dark,
     ),
   );
+  final sessions = await _openSessions();
   const screen = String.fromEnvironment('SCREEN', defaultValue: 'home');
   // Reference fixtures remain isolated; the ordinary app restores its mock data.
   if (screen != 'home' && screen != 'driver-onboarding') {
@@ -28,7 +30,7 @@ Future<void> main() async {
       File('${directory.path}/driver-profile-mock-v1.json'),
     );
     final api = MockDriverApi(store: store, restored: await store.read());
-    runApp(ModMoveApp(mockApi: api));
+    runApp(ModMoveApp(mockApi: api, sessions: sessions));
   } catch (_) {
     runApp(
       MaterialApp(
@@ -55,5 +57,15 @@ Future<void> main() async {
         ),
       ),
     );
+  }
+}
+
+/// Phiên đăng nhập lưu trong thư mục riêng của app; lỗi thì dùng phiên tạm trong bộ nhớ.
+Future<SessionStore> _openSessions() async {
+  try {
+    final directory = await getApplicationSupportDirectory();
+    return await FileSessionStore.open(File('${directory.path}/session-v1.json'));
+  } catch (_) {
+    return MemorySessionStore();
   }
 }
