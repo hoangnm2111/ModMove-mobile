@@ -12,11 +12,13 @@ class DriverProfileScreen extends StatefulWidget {
   const DriverProfileScreen({
     super.key,
     required this.onHome,
+    required this.onOrders,
     required this.onUpdate,
     this.onDemo,
     this.onHistory,
   });
   final VoidCallback onHome;
+  final VoidCallback onOrders;
   final ValueChanged<int> onUpdate;
   final VoidCallback? onDemo, onHistory;
   @override
@@ -48,13 +50,12 @@ class _DriverProfileScreenState extends State<DriverProfileScreen> {
         selected: 3,
         onSelect: (index) {
           if (index == 0) widget.onHome();
-          if (index == 1 || index == 2) {
+          if (index == 1) widget.onOrders();
+          if (index == 2) {
             showInfoSheet(
               context,
-              index == 1 ? 'Đơn hàng' : 'Ví tài xế',
-              index == 1
-                  ? 'Các chuyến giao hàng sẽ hiển thị tại đây khi bạn bắt đầu nhận đơn.'
-                  : 'Theo dõi thu nhập và số dư từ những chuyến giao hàng của bạn.',
+              'Ví tài xế',
+              'Theo dõi thu nhập và số dư từ những chuyến giao hàng của bạn.',
             );
           }
         },
@@ -89,6 +90,16 @@ class _DriverProfileScreenState extends State<DriverProfileScreen> {
           const SizedBox(height: 10),
           DriverAvailability(driver),
           const SizedBox(height: 12),
+          if (driver.canGoOnline) ...[
+            PrimaryButton(
+              'Vào trang chủ tài xế',
+              key: const ValueKey('open-driver-home'),
+              icon: 'arrow-right',
+              trailing: true,
+              onPressed: driver.busy ? null : widget.onHome,
+            ),
+            const SizedBox(height: 12),
+          ],
           if (driver.status == ApprovalStatus.rejected)
             ..._corrections(driver)
           else if (driver.status == ApprovalStatus.draft) ...[

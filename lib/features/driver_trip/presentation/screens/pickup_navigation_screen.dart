@@ -30,7 +30,6 @@ class PickupNavigationScreen extends StatelessWidget {
                     Positioned.fill(
                       child: DriverMap(
                         route: true,
-                        near: state.distance <= 500,
                         available: state.session.mapAvailable,
                         position: state.session.fix?.point,
                         destination: trip.job.pickupPoint,
