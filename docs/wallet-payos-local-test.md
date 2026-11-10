@@ -11,7 +11,8 @@ source, commit hoặc tài liệu. Người dùng đã khởi động lại back
 - Return App: `modmove://orders/success`.
 - Cancel App: `modmove://orders/cancel`.
 - Webhook cấu hình: `https://reviving-ambitious-disabled.ngrok-free.dev/api/webhooks/payos`.
-- **Firebase tạm tắt**, theo lựa chọn người dùng vì chưa có service account.
+- **Firebase tạm tắt ở lần test ví này**, theo lựa chọn người dùng vì chưa có service account.
+  Cập nhật sau đó: [FE-20 đã nối push notification thật](firebase-push.md).
   Để trống cả `Firebase:CredentialsPath` khi chưa có file. Đặt đường dẫn tới
   file không tồn tại làm backend hiện tại lỗi lúc khởi động.
 - Không thay đổi mã nguồn backend hoặc tạo commit backend.

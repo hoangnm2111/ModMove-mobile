@@ -46,6 +46,7 @@ class ModMoveApp extends StatelessWidget {
     this.revenueBuilder,
     this.incidentRepository,
     this.navigatorKey,
+    this.notificationSettingsBuilder,
   });
   final String screen;
   final DriverController? driverController;
@@ -57,6 +58,7 @@ class ModMoveApp extends StatelessWidget {
   final WidgetBuilder? revenueBuilder;
   final DriverIncidentRepository? incidentRepository;
   final GlobalKey<NavigatorState>? navigatorKey;
+  final WidgetBuilder? notificationSettingsBuilder;
 
   DriverController _createDriver() {
     final fixture = DemoDriverRepository(
@@ -119,7 +121,11 @@ class ModMoveApp extends StatelessWidget {
           localizationsDelegates: GlobalMaterialLocalizations.delegates,
           home: Builder(
             builder: (context) => screen == 'driver-home'
-                ? const DriverDashboard()
+                ? DriverDashboard(
+                    onNotifications: notificationSettingsBuilder == null
+                        ? null
+                        : () => Navigator.pushNamed(context, '/notifications'),
+                  )
                 : screen == 'pricing'
                 ? const PricingScreen()
                 : screen.startsWith('verification') ||
@@ -135,6 +141,13 @@ class ModMoveApp extends StatelessWidget {
                 : _home(context),
           ),
           onGenerateRoute: (settings) {
+            if (settings.name == '/notifications' &&
+                notificationSettingsBuilder != null) {
+              return MaterialPageRoute<void>(
+                settings: settings,
+                builder: notificationSettingsBuilder!,
+              );
+            }
             if (incidentRepository != null) {
               final incidentPage = switch (settings.name) {
                 '/incidents' => IncidentListScreen(
@@ -198,7 +211,11 @@ class ModMoveApp extends StatelessWidget {
             if (settings.name == '/driver-home') {
               return MaterialPageRoute<void>(
                 settings: settings,
-                builder: (_) => const DriverDashboard(),
+                builder: (context) => DriverDashboard(
+                  onNotifications: notificationSettingsBuilder == null
+                      ? null
+                      : () => Navigator.pushNamed(context, '/notifications'),
+                ),
               );
             }
             if (settings.name == '/driver-demo') {
@@ -266,6 +283,9 @@ class ModMoveApp extends StatelessWidget {
         );
 
   Widget _profile(BuildContext context) => DriverProfileScreen(
+    onNotifications: notificationSettingsBuilder == null
+        ? null
+        : () => Navigator.pushNamed(context, '/notifications'),
     onIncidents: incidentRepository == null
         ? null
         : () => Navigator.pushNamed(context, '/incidents'),

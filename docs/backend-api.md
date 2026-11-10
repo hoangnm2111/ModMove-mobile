@@ -132,7 +132,8 @@ thông số xe đăng ký từ hồ sơ, không thay bằng kích thước danh 
 ### Khi nút rút tiền bị khóa hoặc không tạo được mã PayOS
 
 **Cập nhật 11/11/2026:** đã cấu hình PayOS local theo key người dùng cấp và
-tạo được QR 50.000đ bằng API thật trên Android. Firebase tạm tắt; webhook
+tạo được QR 50.000đ bằng API thật trên Android. Firebase tạm tắt ở lần test ví này
+(đã bật ở [FE-20](firebase-push.md)); webhook
 ngrok còn offline. Xem [kết quả kiểm thử mới](wallet-payos-local-test.md).
 Phần chẩn đoán thiếu key bên dưới ghi nhận tình trạng trước lần cấu hình này.
 
@@ -204,7 +205,8 @@ Phần chẩn đoán thiếu key bên dưới ghi nhận tình trạng trước 
   [thiết lập Maps](google-maps-android.md). Chưa có Directions API cho mobile;
   chỉ đường từng chặng mở Google Maps bên ngoài.
 - GPS/SignalR hoạt động khi app ở foreground. Chưa có background location
-  service/FCM trong đợt này; backend coi GPS quá 5 phút là cũ.
+  service; backend coi GPS quá 5 phút là cũ. Push FCM đã được nối riêng ở
+  [FE-20](firebase-push.md), không thay thế dịch vụ GPS nền.
 
 Muốn xem bản demo cũ: `flutter run --dart-define=USE_MOCK_API=true`.
 `SCREEN=...` chỉ có hiệu lực trong chế độ mock. Quy trình thật ở trên không

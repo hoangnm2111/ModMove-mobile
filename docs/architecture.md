@@ -101,7 +101,16 @@ See [Google Maps setup](google-maps-android.md).
 Location sent to the API always comes from the device in real mode, including
 when the map is illustrative. SignalR sends location about every 5 seconds while
 foreground, with REST fallback. Turn-by-turn routing opens Google Maps externally.
-Background location/FCM and an in-app Directions route are not implemented here.
+Background location and an in-app Directions route are not implemented here.
+
+## Push notifications
+
+`notifications/domain` defines device/token contracts and validates notification
+destinations. Firebase and HTTP adapters live in `data`; `PushCubit` owns permission,
+registration, token refresh, retries and pending taps. The composition root waits
+for authentication and driver loading before opening routes. Foreground messages
+use an Android notification channel; background messages use FCM display. Logout
+drains registration and clears this device's token. See [Firebase setup and tests](firebase-push.md).
 
 ## Optional legacy demo and validation
 

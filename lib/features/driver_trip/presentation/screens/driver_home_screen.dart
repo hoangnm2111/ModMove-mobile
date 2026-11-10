@@ -15,9 +15,10 @@ class DriverHomeScreen extends StatelessWidget {
     this.onJob,
     this.onActiveTrip,
     this.onSimulation,
+    this.onNotifications,
   });
   final ValueChanged<DeliveryJob>? onJob;
-  final VoidCallback? onActiveTrip, onSimulation;
+  final VoidCallback? onActiveTrip, onSimulation, onNotifications;
   @override
   Widget build(
     BuildContext context,
@@ -31,11 +32,13 @@ class DriverHomeScreen extends StatelessWidget {
           actions: [
             IconButton(
               tooltip: 'Thông báo',
-              onPressed: () => showInfoSheet(
-                context,
-                'Thông báo',
-                session.notice ?? 'Bạn chưa có thông báo mới.',
-              ),
+              onPressed:
+                  onNotifications ??
+                  () => showInfoSheet(
+                    context,
+                    'Thông báo',
+                    session.notice ?? 'Bạn chưa có thông báo mới.',
+                  ),
               icon: const AppIcon('bell'),
             ),
           ],

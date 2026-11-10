@@ -2,8 +2,9 @@ import '../../../core/network/api_client.dart';
 import '../domain/auth_repository.dart';
 
 class RemoteAuthRepository implements AuthRepository {
-  RemoteAuthRepository(this.api);
+  RemoteAuthRepository(this.api, {this.detachPush});
   final ApiClient api;
+  final Future<String?> Function()? detachPush;
   Future<T> _guard<T>(Future<T> Function() call) async {
     try {
       return await call();
@@ -74,7 +75,12 @@ class RemoteAuthRepository implements AuthRepository {
   Future<void> logout() => _guard(() async {
     // An offline logout must still remove credentials from this device.
     try {
-      await api.request('POST', '/api/account/logout', body: {});
+      final fcmToken = await detachPush?.call();
+      await api.request(
+        'POST',
+        '/api/account/logout',
+        body: {'fcmToken': ?fcmToken},
+      );
     } finally {
       await api.clearSession();
     }

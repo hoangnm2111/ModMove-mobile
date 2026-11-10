@@ -7,7 +7,8 @@ import 'driver_simulation_sheet.dart';
 import '../../domain/repositories/driver_trip_repository.dart';
 
 class DriverDashboard extends StatefulWidget {
-  const DriverDashboard({super.key});
+  const DriverDashboard({super.key, this.onNotifications});
+  final VoidCallback? onNotifications;
   @override
   State<DriverDashboard> createState() => _DriverDashboardState();
 }
@@ -40,6 +41,7 @@ class _DriverDashboardState extends State<DriverDashboard> {
                 previous.status == OfferStatus.idle),
         listener: (_, _) => _showOffer(),
         child: DriverHomeScreen(
+          onNotifications: widget.onNotifications,
           onActiveTrip: () => Navigator.pushNamed(context, '/active-trip'),
           onSimulation: context.read<DriverTripRepository>() is TripSimulator
               ? () => showTripSimulation(context)

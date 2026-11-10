@@ -27,6 +27,16 @@ class MainActivity : FlutterActivity() {
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
+        MethodChannel(flutterEngine.dartExecutor.binaryMessenger, "vn.modmove/notifications")
+            .setMethodCallHandler { call, result ->
+                if (call.method == "openSettings") {
+                    startActivity(Intent(android.provider.Settings.ACTION_APP_NOTIFICATION_SETTINGS)
+                        .putExtra(android.provider.Settings.EXTRA_APP_PACKAGE, packageName))
+                    result.success(null)
+                } else {
+                    result.notImplemented()
+                }
+            }
         paymentChannel = MethodChannel(flutterEngine.dartExecutor.binaryMessenger, "vn.modmove/payment_return")
         paymentChannel?.setMethodCallHandler { call, result ->
             if (call.method == "initialReturn") {
