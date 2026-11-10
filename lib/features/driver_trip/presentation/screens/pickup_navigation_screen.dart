@@ -35,7 +35,7 @@ class PickupNavigationScreen extends StatelessWidget {
                         route: true,
                         available: state.session.mapAvailable,
                         position: state.session.fix?.point,
-                        destination: trip.job.pickupPoint,
+                        destination: trip.job.collectionPoint,
                       ),
                     ),
                     Positioned(
@@ -55,7 +55,9 @@ class PickupNavigationScreen extends StatelessWidget {
                                 const SizedBox(width: 10),
                                 Expanded(
                                   child: Text(
-                                    state.fresh
+                                    state.fresh && !demo
+                                        ? 'Cách điểm lấy ${km(state.distance)}'
+                                        : state.fresh
                                         ? 'Còn ${km(state.distance)} · ${(state.distance / 260).ceil().clamp(1, 60)} phút'
                                         : 'Đang chờ vị trí GPS',
                                     style: appText(
@@ -159,7 +161,9 @@ class PickupNavigationScreen extends StatelessWidget {
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               Text(
-                                trip.job.pickup,
+                                trip.job.handoverPoint == null
+                                    ? trip.job.pickup
+                                    : 'Điểm bàn giao từ tài xế trước',
                                 style: appText(
                                   size: 15,
                                   weight: FontWeight.w700,
@@ -198,10 +202,8 @@ class PickupNavigationScreen extends StatelessWidget {
                         'Yêu cầu ${state.receipt} đã được gửi đến điều phối.',
                         icon: 'check',
                       ),
-                    Notice(
-                      demo
-                          ? 'Chỉ xác nhận khi cách điểm lấy hàng không quá 500 m.'
-                          : 'Đã nhận đơn trên server. Chức năng xác nhận đến nơi đang chờ API chuyến đi.',
+                    const Notice(
+                      'Chỉ xác nhận khi cách điểm lấy hoặc bàn giao không quá 500 m.',
                       icon: 'warning',
                       peach: true,
                     ),
@@ -210,14 +212,14 @@ class PickupNavigationScreen extends StatelessWidget {
                       'Đã đến điểm lấy hàng',
                       key: const Key('arrive-pickup'),
                       busy: state.busy,
-                      onPressed: state.canArrive && demo
+                      onPressed: state.canArrive
                           ? () => context.read<ActiveTripBloc>().add(
                               ArrivalRequested(),
                             )
                           : null,
                     ),
                     TextButton(
-                      onPressed: state.busy || !demo
+                      onPressed: state.busy
                           ? null
                           : () => showTripIncident(context),
                       child: const Text('Báo sự cố'),

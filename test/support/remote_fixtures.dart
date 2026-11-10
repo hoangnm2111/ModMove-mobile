@@ -82,3 +82,75 @@ Map<String, dynamic> nearbyOrder(DateTime now) => {
   'cargoPhotoUrls': [],
   'createdAt': now.toUtc().toIso8601String(),
 };
+
+Map<String, dynamic> tripDetail(
+  DateTime now, {
+  int id = 42,
+  String stage = 'Accepted',
+  String proofStatus = 'Pending',
+  int attempts = 0,
+  bool paid = false,
+}) => {
+  'id': id,
+  'orderCode': 'MM00$id',
+  'orderStatus': stage,
+  'pickupAddress': '12 Nguyễn Văn Linh',
+  'pickupLatitude': 10.7348,
+  'pickupLongitude': 106.7057,
+  'dropoffAddress': '85 Điện Biên Phủ',
+  'dropoffLatitude': 10.8001,
+  'dropoffLongitude': 106.7102,
+  'handoverPoint': null,
+  'vehicleTypeName': 'Xe tải 1 tấn',
+  'estimatedDistanceKm': 8.4,
+  'estimatedDurationMin': 35,
+  'hasLoadingService': false,
+  'customerName': 'Người gửi',
+  'customerPhone': '0901234567',
+  'receiverName': 'Người nhận',
+  'receiverPhone': '0981234567',
+  'distanceFee': 220000,
+  'serviceFee': 40000,
+  'discountAmount': 20000,
+  'totalFee': 240000,
+  'commissionRate': .15,
+  'commissionAmount': 36000,
+  'driverEarning': 204000,
+  'paymentMethod': 'Cash',
+  'payerRole': 'Receiver',
+  'paymentStatus': paid ? 'Paid' : 'Unpaid',
+  'cashToCollect': paid ? 0 : 240000,
+  'createdAt': now.toIso8601String(),
+  'deliveredAt': ['Delivered', 'Completed'].contains(stage)
+      ? now.toIso8601String()
+      : null,
+  'completedAt': stage == 'Completed' ? now.toIso8601String() : null,
+  'cargo': {
+    'cargoType': 'Furniture',
+    'quantity': 8,
+    'weightKg': 250,
+    'lengthCm': 80,
+    'widthCm': 60,
+    'heightCm': 50,
+    'photoUrls': <String>[],
+  },
+  'proof': attempts == 0
+      ? null
+      : {
+          'proofStatus': proofStatus,
+          'pickupSubmissionCount': attempts,
+          'remainingPickupSubmissions': 5 - attempts,
+          'pickupPhotoUrls': [
+            'https://images.test/a.png',
+            'https://images.test/b.png',
+          ],
+          'rejectionReason': proofStatus == 'Rejected'
+              ? 'Chụp rõ nhãn hàng'
+              : null,
+          'deliveryPhotoUrl': ['Delivered', 'Completed'].contains(stage)
+              ? 'https://images.test/pod.png'
+              : null,
+        },
+  'statusHistories': [],
+  'incidents': [],
+};

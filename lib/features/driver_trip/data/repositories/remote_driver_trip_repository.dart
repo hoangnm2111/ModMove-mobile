@@ -1,12 +1,20 @@
 import 'dart:async';
 import 'dart:convert';
 import '../../../../core/network/api_client.dart';
+import '../../../../core/domain/result_page.dart';
 import '../../domain/entities/trip_models.dart';
 import '../../domain/repositories/driver_location_gateway.dart';
 import '../../domain/repositories/driver_trip_repository.dart';
+import '../../domain/repositories/trip_history_repository.dart';
+import '../../domain/usecases/validate_cargo_photo.dart';
+import '../models/driver_trip_dto.dart';
 import '../services/driver_tracking_connection.dart';
 
-class RemoteDriverTripRepository implements DriverTripRepository {
+class RemoteDriverTripRepository
+    implements
+        DriverTripRepository,
+        DriverDeliveryRepository,
+        TripHistoryRepository {
   RemoteDriverTripRepository(
     this.api,
     this.location,
@@ -56,6 +64,7 @@ class RemoteDriverTripRepository implements DriverTripRepository {
     int? deposit,
     int? earnings,
     int? pings,
+    ShiftSummary? shift,
     String? notice,
   }) => DriverSession(
     online: online ?? current.online,
@@ -67,6 +76,7 @@ class RemoteDriverTripRepository implements DriverTripRepository {
     deposit: deposit ?? current.deposit,
     earnings: earnings ?? current.earnings,
     pings: pings ?? current.pings,
+    shift: shift ?? current.shift,
     notice: notice,
   );
 
@@ -115,30 +125,18 @@ class RemoteDriverTripRepository implements DriverTripRepository {
     final activeId = status['activeOrderId']?.toString();
     ActiveTrip? trip;
     if (activeId != null) {
-      final cached = _accepted;
-      trip = ActiveTrip(
-        job: cached != null && '${cached['orderId']}' == activeId
-            ? _job(cached)
-            : DeliveryJob(
-                id: activeId,
-                pickup: '',
-                dropoff: '',
-                pickupPoint: const GeoPoint(0, 0),
-                dropoffPoint: const GeoPoint(0, 0),
-                createdAt: now,
-                customerName: '',
-                customerPhone: '',
-                vehicle: '',
-                fare: 0,
-                commission: 0,
-                boxes: 0,
-                weightKg: 0,
-                minutes: 0,
-                distanceKm: 0,
-                fragile: false,
-                detailsAvailable: false,
-              ),
-      );
+      trip = await detail(activeId);
+    } else if (current.trip != null) {
+      // Delivered trips leave /active; retain their server-confirmed receipt until
+      // another trip starts. A reassignment may remove read access to the old trip.
+      try {
+        trip = DriverTripDto.parse(
+          await api.request('GET', '/api/driver/trips/${current.trip!.job.id}')
+              as Map,
+        );
+      } on ApiFailure catch (e) {
+        if (![403, 404, 422].contains(e.status)) rethrow;
+      }
     } else if (_accepted != null) {
       _accepted = null;
       await api.store.delete(_tripKey);
@@ -152,7 +150,7 @@ class RemoteDriverTripRepository implements DriverTripRepository {
         earnings: (status['earningsBalance'] as num).round(),
       ),
     );
-    if (_foreground && (current.online || trip != null)) {
+    if (_foreground && (current.online || (trip?.ongoing ?? false))) {
       try {
         final fix = await location.current();
         if (!_foreground || _closed) return;
@@ -170,7 +168,10 @@ class RemoteDriverTripRepository implements DriverTripRepository {
         return;
       }
     }
-    if (!current.online || trip != null || !_access.eligible || !_foreground) {
+    if (!current.online ||
+        (trip?.ongoing ?? false) ||
+        !_access.eligible ||
+        !_foreground) {
       _emit(_copy(jobs: [], clearOffer: true));
       return;
     }
@@ -179,6 +180,8 @@ class RemoteDriverTripRepository implements DriverTripRepository {
     final jobs = rows
         .map((e) => _job(Map<String, dynamic>.from(e as Map)))
         .toList();
+    _dismissed.removeWhere((id) => !jobs.any((job) => job.id == id));
+    _deadlines.removeWhere((id, _) => !jobs.any((job) => job.id == id));
     _rows = {
       for (final row in rows)
         '${row['orderId']}': Map<String, dynamic>.from(row as Map),
@@ -325,6 +328,12 @@ class RemoteDriverTripRepository implements DriverTripRepository {
           jobs: [],
         ),
       );
+      // Reload assigned contacts, proof and stage; offers deliberately omit contacts.
+      try {
+        await refresh();
+      } on TripFailure {
+        _emit(_copy(notice: 'Đã nhận đơn. Đang tải lại chi tiết chuyến.'));
+      }
     } on ApiFailure catch (e) {
       _dismissed.add(jobId);
       _emit(
@@ -347,26 +356,206 @@ class RemoteDriverTripRepository implements DriverTripRepository {
       _mutating = false;
     }
   });
-  static const _unavailable = TripFailure(
-    'Backend chưa có API thực hiện chuyến đi. Trạng thái đơn được giữ nguyên.',
-  );
   @override
-  Future<void> arrive() async => throw _unavailable;
+  Future<void> arrive() => _mutateTrip((trip) async {
+    final fix = await location.current(requestPermission: true);
+    if (!fix.freshAt(now) ||
+        fix.point.distanceTo(trip.job.collectionPoint) > 500) {
+      throw const TripFailure(
+        'Chỉ xác nhận khi cách điểm lấy hoặc bàn giao không quá 500 m.',
+      );
+    }
+    await tracking.send(fix);
+    await api.request('POST', '/api/driver/trips/${trip.job.id}/arrive');
+  }, confirmed: (trip) => trip.stage != TripStage.accepted);
   @override
   Future<UploadedEvidence> upload(
     CargoPhoto photo,
     void Function(double) progress,
-  ) async => throw _unavailable;
+  ) => _guard(() async {
+    const ValidateCargoPhoto()(photo);
+    progress(0);
+    final data =
+        await api.upload('/api/driver/uploads', photo.name, photo.bytes) as Map;
+    progress(1);
+    return UploadedEvidence(photo.kind, data['url'] as String);
+  });
   @override
   Future<void> submitInspection({
     required List<UploadedEvidence> evidence,
     required List<bool> checklist,
     required String note,
     required bool cashCollected,
-  }) async => throw _unavailable;
+  }) => _mutateTrip(
+    (trip) async {
+      if (!trip.editable ||
+          evidence.length < 2 ||
+          evidence.length > 5 ||
+          evidence.map((e) => e.reference).toSet().length != evidence.length) {
+        throw const TripFailure(
+          'Cần 2–5 ảnh khác nhau và chuyến đang cho phép kiểm hàng.',
+        );
+      }
+      if (trip.job.payment == PaymentMethod.cashSender && !trip.cashCollected) {
+        if (!cashCollected)
+          throw const TripFailure(
+            'Xác nhận đã thu tiền từ người gửi trước khi gửi ảnh.',
+          );
+        await api.request(
+          'POST',
+          '/api/driver/trips/${trip.job.id}/collect-cash',
+        );
+      }
+      await api.request(
+        'POST',
+        '/api/driver/trips/${trip.job.id}/pickup',
+        body: {'photoUrls': evidence.map((e) => e.reference).toList()},
+      );
+    },
+    confirmed: (trip) =>
+        trip.stage == TripStage.inTransit ||
+        trip.stage == TripStage.pickedUp &&
+            trip.review == EvidenceReview.pending,
+  );
+
   @override
-  Future<String> reportIncident(String message) async =>
-      throw const TripFailure('Backend chưa có API báo sự cố dành cho tài xế.');
+  Future<void> arriveDropoff() => _mutateTrip((trip) async {
+    await api.request(
+      'POST',
+      '/api/driver/trips/${trip.job.id}/arrive-dropoff',
+    );
+  });
+
+  @override
+  Future<void> deliver({
+    required String photoUrl,
+    required bool cashCollected,
+  }) => _mutateTrip(
+    (trip) async {
+      if (trip.stage != TripStage.inTransit || photoUrl.isEmpty) {
+        throw const TripFailure('Cần ảnh giao hàng và chuyến đang giao.');
+      }
+      if (trip.job.cash &&
+          !trip.cashCollected &&
+          !cashCollected &&
+          trip.job.fare > 0) {
+        throw const TripFailure(
+          'Xác nhận đã thu tiền trước khi hoàn tất giao hàng.',
+        );
+      }
+      await api.request(
+        'POST',
+        '/api/driver/trips/${trip.job.id}/deliver',
+        body: {'deliveryPhotoUrl': photoUrl, 'cashCollected': cashCollected},
+      );
+    },
+    confirmed: (trip) =>
+        [TripStage.delivered, TripStage.completed].contains(trip.stage),
+  );
+
+  Future<void> _mutateTrip(
+    Future<void> Function(ActiveTrip) action, {
+    bool Function(ActiveTrip)? confirmed,
+  }) => _guard(() async {
+    if (_mutating) throw const TripFailure('Đang xử lý yêu cầu.');
+    _mutating = true;
+    try {
+      if (_refreshing != null) await _refreshing;
+      final id = current.trip?.job.id;
+      if (id == null) throw const TripFailure('Chưa có chuyến đang thực hiện.');
+      final before = await detail(id);
+      _emit(_copy(trip: before));
+      if (confirmed?.call(before) == true) return;
+      try {
+        await action(before);
+      } on ApiFailure {
+        // A POST may have committed before the response was lost. Never replay it.
+        try {
+          final after = await detail(id);
+          _emit(_copy(trip: after));
+          if (confirmed?.call(after) == true) return;
+        } catch (_) {
+          /* keep the last known state and let the user refresh */
+        }
+        rethrow;
+      }
+      try {
+        _emit(_copy(trip: await detail(id)));
+      } on TripFailure {
+        _emit(
+          _copy(
+            notice:
+                'Yêu cầu đã được server nhận. Hãy tải lại trạng thái chuyến.',
+          ),
+        );
+        throw const TripFailure(
+          'Đã gửi yêu cầu. Chưa tải lại được kết quả; hãy làm mới trước khi thao tác tiếp.',
+        );
+      }
+    } finally {
+      _mutating = false;
+    }
+  });
+
+  @override
+  Future<ActiveTrip> detail(String id) => _guard(
+    () async => DriverTripDto.parse(
+      await api.request('GET', '/api/driver/trips/$id') as Map,
+    ),
+  );
+
+  @override
+  Future<ResultPage<TripSummary>> history({
+    int page = 1,
+    String view = 'All',
+  }) => _guard(() async {
+    final data =
+        await api.request(
+              'GET',
+              '/api/driver/trips?page=$page&pageSize=20&view=${Uri.encodeQueryComponent(view)}',
+            )
+            as Map;
+    return ResultPage(
+      [
+        for (final row in data['items'] as List)
+          TripSummary(
+            id: '${row['id']}',
+            code: '${row['orderCode']}',
+            status: '${row['orderStatus']}',
+            pickup: '${row['pickupAddress']}',
+            dropoff: '${row['dropoffAddress']}',
+            fare: (row['totalFee'] as num).round(),
+            earning: (row['driverEarning'] as num).round(),
+            createdAt: DateTime.parse('${row['createdAt']}'),
+          ),
+      ],
+      (data['pageNumber'] as num).toInt(),
+      (data['totalCount'] as num).toInt(),
+      data['hasNextPage'] == true,
+    );
+  });
+  @override
+  Future<String> reportIncident(String message) => _guard(() async {
+    final trip = current.trip;
+    if (trip == null || !trip.ongoing)
+      throw const TripFailure('Chỉ báo sự cố khi đang có chuyến.');
+    final result =
+        await api.request(
+              'POST',
+              '/api/driver/incidents',
+              body: {
+                'orderId': int.parse(trip.job.id),
+                'incidentType': 'Other',
+                'description': message.trim(),
+                if (current.fix?.freshAt(now) == true) ...{
+                  'latitude': current.fix!.point.latitude,
+                  'longitude': current.fix!.point.longitude,
+                },
+              },
+            )
+            as Map;
+    return '${result['incidentId']}';
+  });
   Future<void> close() async {
     _closed = true;
     _timer?.cancel();

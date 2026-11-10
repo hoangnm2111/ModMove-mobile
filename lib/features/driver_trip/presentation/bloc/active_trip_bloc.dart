@@ -20,7 +20,7 @@ class ActiveTripState {
   bool get fresh => session.gpsEnabled && (session.fix?.freshAt(now) ?? false);
   double get distance => session.trip == null || session.fix == null
       ? double.infinity
-      : session.fix!.point.distanceTo(session.trip!.job.pickupPoint);
+      : session.fix!.point.distanceTo(session.trip!.job.collectionPoint);
   bool get canArrive =>
       fresh &&
       distance <= 500 &&
@@ -97,7 +97,7 @@ class ActiveTripBloc extends Bloc<ActiveTripEvent, ActiveTripState> {
           !await contact.openNavigation(
             trip.stage == TripStage.inTransit
                 ? trip.job.dropoffPoint
-                : trip.job.pickupPoint,
+                : trip.job.collectionPoint,
           )) {
         throw const TripFailure(
           'Không mở được Google Maps. Hãy dùng địa chỉ điểm lấy hàng.',

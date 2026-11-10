@@ -1,7 +1,15 @@
 import 'dart:math' as math;
 import 'dart:typed_data';
 
-enum TripStage { accepted, arrived, pickedUp, inTransit, cancelled }
+enum TripStage {
+  accepted,
+  arrived,
+  pickedUp,
+  inTransit,
+  delivered,
+  completed,
+  cancelled,
+}
 
 enum EvidenceReview { none, pending, approved, rejected }
 
@@ -72,6 +80,13 @@ class DeliveryJob {
     this.notes = '',
     this.photoUrls = const [],
     this.loadingService = false,
+    this.receiverName = '',
+    this.receiverPhone = '',
+    this.distanceFee = 0,
+    this.serviceFee = 0,
+    this.discount = 0,
+    this.commissionRate = 0,
+    this.handoverPoint,
   });
   final String id, pickup, dropoff, vehicle, customerName, customerPhone;
   final GeoPoint pickupPoint, dropoffPoint;
@@ -84,6 +99,11 @@ class DeliveryJob {
   final String orderCode, cargoDescription, notes;
   final List<String> photoUrls;
   final bool loadingService;
+  final String receiverName, receiverPhone;
+  final int distanceFee, serviceFee, discount;
+  final double commissionRate;
+  final GeoPoint? handoverPoint;
+  GeoPoint get collectionPoint => handoverPoint ?? pickupPoint;
   String get displayCode => orderCode.isEmpty ? id : orderCode;
   int get net => fare - commission;
   bool get cash => payment != PaymentMethod.payos;
@@ -124,6 +144,10 @@ class ActiveTrip {
     this.submittedAt,
     this.cashCollected = false,
     this.note = '',
+    this.deliveryPhotoUrl,
+    this.deliveredAt,
+    this.completedAt,
+    this.incidents = const [],
     List<UploadedEvidence> evidence = const [],
   }) : evidence = List.unmodifiable(evidence);
   final DeliveryJob job;
@@ -135,11 +159,18 @@ class ActiveTrip {
   final DateTime? arrivedAt, submittedAt;
   final bool cashCollected;
   final List<UploadedEvidence> evidence;
+  final String? deliveryPhotoUrl;
+  final DateTime? deliveredAt, completedAt;
+  final List<TripIncident> incidents;
   bool get editable =>
       (stage == TripStage.arrived ||
           stage == TripStage.pickedUp && review == EvidenceReview.rejected) &&
       attempts < 5;
-  bool get ongoing => stage != TripStage.cancelled;
+  bool get ongoing => ![
+    TripStage.cancelled,
+    TripStage.delivered,
+    TripStage.completed,
+  ].contains(stage);
   ActiveTrip copyWith({
     TripStage? stage,
     EvidenceReview? review,
@@ -150,6 +181,9 @@ class ActiveTrip {
     bool? cashCollected,
     String? note,
     List<UploadedEvidence>? evidence,
+    String? deliveryPhotoUrl,
+    DateTime? deliveredAt,
+    DateTime? completedAt,
   }) => ActiveTrip(
     job: job,
     stage: stage ?? this.stage,
@@ -161,7 +195,17 @@ class ActiveTrip {
     cashCollected: cashCollected ?? this.cashCollected,
     note: note ?? this.note,
     evidence: evidence ?? this.evidence,
+    deliveryPhotoUrl: deliveryPhotoUrl ?? this.deliveryPhotoUrl,
+    deliveredAt: deliveredAt ?? this.deliveredAt,
+    completedAt: completedAt ?? this.completedAt,
+    incidents: incidents,
   );
+}
+
+class TripIncident {
+  const TripIncident(this.id, this.description, this.status, this.resolution);
+  final String id, description, status;
+  final String? resolution;
 }
 
 class ShiftSummary {

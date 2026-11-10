@@ -1,4 +1,6 @@
 import 'dart:async';
+import 'dart:convert';
+import 'dart:typed_data';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
@@ -16,7 +18,7 @@ class TestLocation implements DriverLocationGateway {
   @override
   Future<GpsFix> current({bool requestPermission = false}) async {
     if (denied) throw const TripFailure('Cần quyền GPS');
-    return GpsFix(const GeoPoint(10.724, 106.7057), clock());
+    return GpsFix(const GeoPoint(10.7348, 106.7057), clock());
   }
 }
 
@@ -48,6 +50,9 @@ void main() {
   bool online = true;
   int? activeId;
   int acceptCode = 204, accepts = 0, patches = 0;
+  String stage = 'Accepted', proof = 'Pending';
+  int attempts = 0, writes = 0;
+  bool paid = false, loseWriteResponse = false;
   setUp(() async {
     now = DateTime.utc(2026, 11, 8);
     online = true;
@@ -55,12 +60,59 @@ void main() {
     acceptCode = 204;
     accepts = 0;
     patches = 0;
+    stage = 'Accepted';
+    proof = 'Pending';
+    attempts = 0;
+    writes = 0;
+    paid = false;
+    loseWriteResponse = false;
     location = TestLocation(() => now);
     tracking = TestTracking();
     api = ApiClient(
       store: MemorySessionStore(),
       client: MockClient((r) async {
+        if (r.url.path.startsWith('/api/driver/trips/') && r.method == 'GET') {
+          return jsonResponse(
+            tripDetail(
+              now,
+              id: int.parse(r.url.path.split('/').last),
+              stage: stage,
+              proofStatus: proof,
+              attempts: attempts,
+              paid: paid,
+            ),
+          );
+        }
         switch (r.url.path) {
+          case '/api/driver/trips/42/arrive':
+            writes++;
+            stage = 'Arrived';
+            if (loseWriteResponse) throw http.ClientException('response lost');
+            return http.Response('', 204);
+          case '/api/driver/trips/42/pickup':
+            expect(jsonDecode(r.body)['photoUrls'], hasLength(2));
+            writes++;
+            stage = 'PickedUp';
+            proof = 'Pending';
+            attempts++;
+            return http.Response('', 204);
+          case '/api/driver/trips/42/deliver':
+            expect(
+              jsonDecode(r.body)['deliveryPhotoUrl'],
+              'https://images.test/pod.png',
+            );
+            writes++;
+            stage = 'Delivered';
+            paid = true;
+            activeId = null;
+            if (loseWriteResponse) throw http.ClientException('response lost');
+            return http.Response('', 204);
+          case '/api/driver/uploads':
+            expect(
+              r.headers['content-type'],
+              startsWith('multipart/form-data'),
+            );
+            return jsonResponse({'url': 'https://images.test/pod.png'});
           case '/api/driver/status':
             return jsonResponse(
               driverStatus(online: online, orderId: activeId),
@@ -131,12 +183,13 @@ void main() {
     expect(accepts, 1);
   });
   test(
-    'successful accept persists details; unavailable trip API never advances it',
+    'accepted trip loads server contacts and restores actual stage after restart',
     () async {
       await repo.acceptOffer('42');
       expect(repo.current.trip!.stage, TripStage.accepted);
-      await expectLater(repo.arrive(), throwsA(isA<TripFailure>()));
-      expect(repo.current.trip!.stage, TripStage.accepted);
+      expect(repo.current.trip!.job.customerPhone, '0901234567');
+      await repo.arrive();
+      expect(repo.current.trip!.stage, TripStage.arrived);
       await repo.close();
       tracking = TestTracking();
       repo = RemoteDriverTripRepository(
@@ -146,6 +199,7 @@ void main() {
         clock: () => now,
       );
       await repo.initialize();
+      expect(repo.current.trip!.stage, TripStage.arrived);
       expect(repo.current.trip!.job.pickup, '12 Nguyễn Văn Linh');
       expect(repo.current.jobs, isEmpty);
     },
@@ -174,14 +228,89 @@ void main() {
     },
   );
   test(
-    'server active order without cached details is represented without fake addresses',
+    'server active order is recovered on a new device without a local cache',
     () async {
       activeId = 100;
       await repo.refresh();
       expect(repo.current.trip!.job.id, '100');
-      expect(repo.current.trip!.job.detailsAvailable, false);
-      expect(repo.current.trip!.job.pickup, isEmpty);
+      expect(repo.current.trip!.job.detailsAvailable, true);
+      expect(repo.current.trip!.job.pickup, '12 Nguyễn Văn Linh');
       expect(repo.current.jobs, isEmpty);
     },
   );
+  test(
+    'pickup resubmission follows server review and stops after five attempts',
+    () async {
+      await repo.acceptOffer('42');
+      await repo.arrive();
+      Future<void> submit() => repo.submitInspection(
+        evidence: const [
+          UploadedEvidence(CargoPhotoKind.overall, 'https://images.test/a.png'),
+          UploadedEvidence(CargoPhotoKind.secured, 'https://images.test/b.png'),
+        ],
+        checklist: [true, true, true, true],
+        note: '',
+        cashCollected: false,
+      );
+      await submit();
+      expect(repo.current.trip!.review, EvidenceReview.pending);
+      expect(repo.current.trip!.attempts, 1);
+      proof = 'Rejected';
+      await repo.refresh();
+      expect(repo.current.trip!.editable, true);
+      await submit();
+      expect(attempts, 2);
+      attempts = 5;
+      proof = 'Rejected';
+      await repo.refresh();
+      expect(repo.current.trip!.editable, false);
+      await expectLater(submit(), throwsA(isA<TripFailure>()));
+      stage = 'InTransit';
+      proof = 'Verified';
+      await repo.refresh();
+      expect(repo.current.trip!.stage, TripStage.inTransit);
+    },
+  );
+  test(
+    'delivery requires uploaded POD and COD; lost response is reconciled without replay',
+    () async {
+      await repo.acceptOffer('42');
+      stage = 'InTransit';
+      attempts = 1;
+      proof = 'Verified';
+      await repo.refresh();
+      await expectLater(
+        repo.deliver(
+          photoUrl: 'https://images.test/pod.png',
+          cashCollected: false,
+        ),
+        throwsA(isA<TripFailure>()),
+      );
+      expect(writes, 0);
+      final photo = CargoPhoto(
+        kind: CargoPhotoKind.overall,
+        name: 'pod.png',
+        bytes: Uint8List.fromList([137, 80, 78, 71, 13, 10, 26, 10]),
+      );
+      final uploaded = await repo.upload(photo, (_) {});
+      loseWriteResponse = true;
+      await repo.deliver(photoUrl: uploaded.reference, cashCollected: true);
+      expect(repo.current.trip!.stage, TripStage.delivered);
+      expect(repo.current.trip!.ongoing, false);
+      expect(
+        repo.current.earnings,
+        120000,
+      ); // never credit predicted earnings locally
+      expect(writes, 1);
+      await repo.refresh();
+      expect(repo.current.trip!.stage, TripStage.delivered);
+    },
+  );
+  test('lost arrival response does not repeat the POST', () async {
+    await repo.acceptOffer('42');
+    loseWriteResponse = true;
+    await repo.arrive();
+    expect(repo.current.trip!.stage, TripStage.arrived);
+    expect(writes, 1);
+  });
 }
