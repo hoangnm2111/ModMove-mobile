@@ -129,6 +129,33 @@ thông số xe đăng ký từ hồ sơ, không thay bằng kích thước danh 
 
 ## Phạm vi đã kiểm tra và phần cần cấu hình
 
+### Khi nút rút tiền bị khóa hoặc không tạo được mã PayOS
+
+- Rút tiền nhận **số nguyên VND lớn hơn 0**, tức từ **1đ** đến số có thể rút
+  do server trả về. Mức **50.000đ áp dụng cho nạp cọc**, không áp dụng cho rút.
+- Tại lần kiểm tra này, `driver@modmove.local` có 89.000đ có thể rút nhưng đã
+  có yêu cầu rút 100.000đ đang chờ. `hasPendingWithdrawal=true` chặn yêu cầu
+  mới dù số tiền nhập hợp lệ. Nhờ Admin xử lý yêu cầu hiện tại qua web hoặc
+  `/api/admin/withdrawals`; sau đó bấm **Kiểm tra trạng thái** trong mobile.
+  Driver không thể tự duyệt/hủy yêu cầu và mobile không bỏ qua giới hạn này.
+- Form ngân hàng mở thành bottom sheet nền trắng, giữ dữ liệu và lỗi khi lưu
+  thất bại; chỉ đóng sau khi server xác nhận lưu và tải lại ví thành công.
+- Kiểm tra trực tiếp `POST /api/driver/wallet/topup` với 100.000đ và
+  `platform: "App"` trả HTTP 500 / `SERVER_ERROR`. File cấu hình Development
+  local hiện thiếu `PayOS:ClientId`, `PayOS:ApiKey`, `PayOS:ChecksumKey`.
+  Backend có `NotConfiguredPaymentGateway`, ném lỗi khi thiếu cấu hình.
+  Nhờ bên backend bổ sung ba giá trị thật và khởi động lại backend; không đặt
+  các secret này vào Flutter. URL return/cancel cho App cũng phải hợp lệ.
+- Để nhận kết quả thanh toán, backend còn cần webhook PayOS truy cập được từ
+  bên ngoài qua HTTPS, trỏ tới `/api/webhooks/payos`. Webhook có chữ ký mới
+  xác nhận giao dịch và cập nhật ví. Không chỉ mở checkout rồi tự cộng tiền.
+- Mobile hiển thị lỗi dịch vụ nạp tiền cùng **mã hỗ trợ** từ `traceId` để bên
+  backend tra log; không suy đoán nguyên nhân mọi HTTP 500 đều là thiếu key.
+  Nếu tạo mã mới thất bại, QR cũ được ẩn để tránh thanh toán nhầm phiên/số tiền.
+  Lần gọi kiểm tra lỗi không làm thay đổi số dư ví.
+
+### Kết quả và giới hạn
+
 - Kiểm tra trực tiếp backend local bằng các repository mobile: hồ sơ, ví,
   giao dịch/rút tiền, doanh thu ngày/tuần/tháng, trạng thái và 11 chi tiết
   chuyến seed ở các trạng thái Accepted/Arrived/PickedUp/InTransit/Delivered/
@@ -166,5 +193,8 @@ flutter build apk --debug
 APK: `build/app/outputs/flutter-apk/app-debug.apk`.
 Screenshots kiểm tra nằm trong thư mục bị Git ignore, không đưa vào commit.
 
-Kết quả local ngày 10/11/2026: 120 tests passed, analyzer không có lỗi và build
-APK debug thành công. Đây là kiểm tra local, không thay thế CI/peer review của PR.
+Kết quả local ngày 10/11/2026 sau bản sửa phản hồi ví: 128 tests passed,
+analyzer không có lỗi. Các test bổ sung kiểm tra
+form ngân hàng khi mở bàn phím/cỡ chữ lớn, giữ dữ liệu khi lưu lỗi, giới hạn rút,
+khóa/mở lại theo trạng thái server và lỗi PayOS không giữ QR cũ.
+Đây là kiểm tra local, không thay thế CI/peer review của PR.

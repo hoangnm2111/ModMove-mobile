@@ -8,6 +8,7 @@ import '../domain/driver_wallet_repository.dart';
 import 'wallet_cubit.dart';
 import 'wallet_screen.dart';
 import 'wallet_transactions_screen.dart';
+import 'bank_account_sheet.dart';
 
 class WithdrawalScreen extends StatefulWidget {
   const WithdrawalScreen({super.key});
@@ -17,6 +18,7 @@ class WithdrawalScreen extends StatefulWidget {
 
 class _WithdrawalScreenState extends State<WithdrawalScreen> {
   final _amount = TextEditingController();
+  final _form = GlobalKey<FormState>();
   @override
   void dispose() {
     _amount.dispose();
@@ -28,8 +30,18 @@ class _WithdrawalScreenState extends State<WithdrawalScreen> {
     builder: (context, state) {
       final balance = state.balance;
       final cubit = context.read<WalletCubit>();
+      final block = _withdrawalBlock(state);
       return Scaffold(
-        appBar: const AppHeader('Rút thu nhập'),
+        appBar: AppHeader(
+          'Rút thu nhập',
+          actions: [
+            IconButton(
+              tooltip: 'Tải lại trạng thái rút tiền',
+              onPressed: state.busy ? null : cubit.refresh,
+              icon: const Icon(Icons.refresh),
+            ),
+          ],
+        ),
         body: RefreshIndicator(
           onRefresh: cubit.refresh,
           child: ListView(
@@ -73,23 +85,40 @@ class _WithdrawalScreenState extends State<WithdrawalScreen> {
               Row(
                 children: [
                   Expanded(
-                    child: TextField(
-                      key: const Key('withdraw-amount'),
-                      controller: _amount,
-                      keyboardType: TextInputType.number,
-                      inputFormatters: [
-                        FilteringTextInputFormatter.digitsOnly,
-                        LengthLimitingTextInputFormatter(12),
-                      ],
-                      decoration: const InputDecoration(
-                        hintText: 'Nhập số tiền',
-                        suffixText: 'đ',
+                    child: Form(
+                      key: _form,
+                      child: TextFormField(
+                        key: const Key('withdraw-amount'),
+                        controller: _amount,
+                        enabled: !state.busy,
+                        autovalidateMode: AutovalidateMode.onUserInteraction,
+                        validator: (value) {
+                          final amount = int.tryParse(value ?? '') ?? 0;
+                          if (amount < 1) return 'Nhập số tiền từ 1đ.';
+                          if (balance != null &&
+                              amount > balance.withdrawable) {
+                            return 'Tối đa ${formatVnd(balance.withdrawable)}.';
+                          }
+                          return null;
+                        },
+                        keyboardType: TextInputType.number,
+                        inputFormatters: [
+                          FilteringTextInputFormatter.digitsOnly,
+                          LengthLimitingTextInputFormatter(12),
+                        ],
+                        decoration: const InputDecoration(
+                          hintText: 'Nhập số tiền',
+                          suffixText: 'đ',
+                        ),
                       ),
                     ),
                   ),
                   const SizedBox(width: 10),
                   TextButton(
-                    onPressed: balance == null
+                    onPressed:
+                        balance == null ||
+                            state.busy ||
+                            balance.withdrawable < 1
                         ? null
                         : () => _amount.text = '${balance.withdrawable}',
                     child: const Text('Toàn bộ'),
@@ -98,24 +127,22 @@ class _WithdrawalScreenState extends State<WithdrawalScreen> {
               ),
               const SizedBox(height: 6),
               Text(
-                'Không có mức rút tối thiểu. Không vượt số tiền có thể rút.',
-                style: appText(size: 11, color: AppColors.secondary),
+                balance == null
+                    ? 'Rút từ 1đ. Số tiền phải là số nguyên VND.'
+                    : balance.withdrawable > 0
+                    ? 'Rút từ 1đ đến ${formatVnd(balance.withdrawable)}.'
+                    : 'Rút từ 1đ. Hiện chưa có thu nhập có thể rút.',
+                style: appText(
+                  size: 12,
+                  weight: FontWeight.w600,
+                  color: AppColors.secondary,
+                ),
               ),
               const SizedBox(height: 22),
               const SectionTitle('Nhận tiền về tài khoản', size: 16),
               const SizedBox(height: 10),
               AppCard(
-                onTap: state.busy
-                    ? null
-                    : () async {
-                        final bank = await showDialog<DriverBankAccount>(
-                          context: context,
-                          builder: (_) => _BankDialog(balance?.bank),
-                        );
-                        if (bank != null && context.mounted) {
-                          await cubit.saveBank(bank);
-                        }
-                      },
+                onTap: state.busy ? null : () => showBankAccountSheet(context),
                 child: Row(
                   children: [
                     const AppIcon('bank', size: 30, color: AppColors.green),
@@ -148,30 +175,32 @@ class _WithdrawalScreenState extends State<WithdrawalScreen> {
                 ),
               ),
               const SizedBox(height: 14),
-              const Notice(
-                'Yêu cầu được quản trị viên xử lý',
-                detail:
-                    'Tiền được chuyển thủ công vào tài khoản ngân hàng sau khi yêu cầu được duyệt. Chỉ có một yêu cầu đang chờ.',
-                peach: true,
-              ),
+              if (block == null)
+                const Notice(
+                  'Yêu cầu được quản trị viên xử lý',
+                  detail:
+                      'Tiền được chuyển thủ công vào tài khoản ngân hàng sau khi yêu cầu được duyệt. Chỉ có một yêu cầu đang chờ.',
+                  peach: true,
+                ),
               if (state.error != null) ...[
                 const SizedBox(height: 12),
                 Notice(state.error!, peach: true),
               ],
               if (state.notice != null) ...[
                 const SizedBox(height: 12),
-                Notice(state.notice!, icon: 'check'),
+                Notice(state.notice!, icon: 'check', success: true),
               ],
-              if (state.withdrawalUncertain) ...[
+              if (block != null) ...[
                 const SizedBox(height: 12),
-                const Notice(
-                  'Cần kiểm tra lại kết quả',
-                  detail: 'Tải lại ví trước khi gửi thêm yêu cầu.',
+                Notice(
+                  block.title,
+                  detail: block.detail,
+                  icon: balance?.pendingWithdrawal == true ? 'clock' : 'info',
                   peach: true,
                 ),
                 TextButton(
                   onPressed: state.busy ? null : cubit.refresh,
-                  child: const Text('Tải lại ví'),
+                  child: const Text('Kiểm tra trạng thái'),
                 ),
               ],
               const SizedBox(height: 16),
@@ -179,31 +208,25 @@ class _WithdrawalScreenState extends State<WithdrawalScreen> {
                 'Gửi yêu cầu rút tiền',
                 key: const Key('request-withdrawal'),
                 busy: state.busy,
-                onPressed:
-                    state.busy ||
-                        state.withdrawalUncertain ||
-                        balance == null ||
-                        !balance.active ||
-                        balance.pendingWithdrawal
+                onPressed: state.busy || block != null
                     ? null
                     : () async {
                         final amount = int.tryParse(_amount.text) ?? 0;
-                        if (amount <= 0 || amount > balance.withdrawable) {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(
-                              content: Text(
-                                'Nhập số tiền hợp lệ, không vượt số tiền có thể rút.',
-                              ),
-                            ),
-                          );
+                        _form.currentState?.validate();
+                        if (amount < 1 || amount > balance!.withdrawable) {
                           return;
                         }
                         final confirmed = await showDialog<bool>(
                           context: context,
                           builder: (context) => AlertDialog(
+                            backgroundColor: Colors.white,
+                            surfaceTintColor: Colors.transparent,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(16),
+                            ),
                             title: const Text('Xác nhận rút thu nhập'),
                             content: Text(
-                              'Rút ${formatVnd(amount)} về ${balance.bank?.name ?? 'tài khoản ngân hàng'} ${balance.bank?.masked ?? ''}?',
+                              'Rút ${formatVnd(amount)} về ${balance.bank!.name} ${balance.bank!.masked}?',
                             ),
                             actions: [
                               TextButton(
@@ -259,83 +282,45 @@ class _WithdrawalScreenState extends State<WithdrawalScreen> {
   );
 }
 
-class _BankDialog extends StatefulWidget {
-  const _BankDialog(this.bank);
-  final DriverBankAccount? bank;
-  @override
-  State<_BankDialog> createState() => _BankDialogState();
-}
-
-class _BankDialogState extends State<_BankDialog> {
-  final _form = GlobalKey<FormState>();
-  late final _name = TextEditingController(text: widget.bank?.name);
-  late final _number = TextEditingController(text: widget.bank?.number);
-  late final _holder = TextEditingController(text: widget.bank?.holder);
-  @override
-  void dispose() {
-    _name.dispose();
-    _number.dispose();
-    _holder.dispose();
-    super.dispose();
+({String title, String detail})? _withdrawalBlock(WalletState state) {
+  final balance = state.balance;
+  if (balance == null) {
+    return (
+      title: 'Chưa tải được số dư',
+      detail: 'Tải lại ví để kiểm tra điều kiện rút tiền.',
+    );
   }
-
-  @override
-  Widget build(BuildContext context) => AlertDialog(
-    title: const Text('Tài khoản ngân hàng'),
-    content: SingleChildScrollView(
-      child: Form(
-        key: _form,
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            TextFormField(
-              controller: _name,
-              maxLength: 100,
-              decoration: const InputDecoration(labelText: 'Tên ngân hàng'),
-              validator: (v) =>
-                  v?.trim().isNotEmpty == true ? null : 'Nhập tên ngân hàng',
-            ),
-            TextFormField(
-              controller: _number,
-              maxLength: 30,
-              decoration: const InputDecoration(labelText: 'Số tài khoản'),
-              validator: (v) =>
-                  RegExp(r'^[0-9A-Za-z]{6,30}$').hasMatch(v?.trim() ?? '')
-                  ? null
-                  : 'Nhập 6–30 chữ hoặc số',
-            ),
-            TextFormField(
-              controller: _holder,
-              maxLength: 100,
-              decoration: const InputDecoration(labelText: 'Tên chủ tài khoản'),
-              validator: (v) => v?.trim().isNotEmpty == true
-                  ? null
-                  : 'Nhập tên chủ tài khoản',
-            ),
-          ],
-        ),
-      ),
-    ),
-    actions: [
-      TextButton(
-        onPressed: () => Navigator.pop(context),
-        child: const Text('Đóng'),
-      ),
-      FilledButton(
-        onPressed: () {
-          if (_form.currentState!.validate()) {
-            Navigator.pop(
-              context,
-              DriverBankAccount(
-                _name.text.trim(),
-                _number.text.trim(),
-                _holder.text.trim(),
-              ),
-            );
-          }
-        },
-        child: const Text('Lưu tài khoản'),
-      ),
-    ],
-  );
+  if (state.withdrawalUncertain) {
+    return (
+      title: 'Cần kiểm tra kết quả yêu cầu trước',
+      detail: 'Tải lại trạng thái trước khi gửi thêm yêu cầu.',
+    );
+  }
+  if (!balance.active) {
+    return (
+      title: 'Ví đang bị khóa',
+      detail: 'Liên hệ hỗ trợ để kiểm tra trạng thái ví.',
+    );
+  }
+  if (balance.pendingWithdrawal) {
+    return (
+      title: 'Đang chờ xử lý ${formatVnd(balance.pendingAmount)}',
+      detail:
+          'Bạn chỉ có thể gửi yêu cầu mới sau khi quản trị viên duyệt hoặc từ chối yêu cầu hiện tại.',
+    );
+  }
+  if (balance.bank == null) {
+    return (
+      title: 'Chưa có tài khoản nhận tiền',
+      detail: 'Thêm tài khoản ngân hàng ở trên để gửi yêu cầu rút.',
+    );
+  }
+  if (balance.withdrawable < 1) {
+    return (
+      title: 'Chưa đủ số dư để rút',
+      detail:
+          'Bạn cần ít nhất 1đ thu nhập khả dụng sau khi trừ nợ phí nền tảng.',
+    );
+  }
+  return null;
 }
