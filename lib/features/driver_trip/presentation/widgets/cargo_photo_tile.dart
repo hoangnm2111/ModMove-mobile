@@ -3,6 +3,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/widgets/app_widgets.dart';
 import '../../domain/entities/trip_models.dart';
+import '../../domain/repositories/driver_trip_repository.dart';
 import '../bloc/evidence_cubit.dart';
 
 class CargoPhotoTile extends StatelessWidget {
@@ -27,11 +28,12 @@ class CargoPhotoTile extends StatelessWidget {
               title: const Text('Chọn từ thư viện'),
               onTap: () => Navigator.pop(context, CargoPhotoSource.gallery),
             ),
-            ListTile(
-              leading: const AppIcon('box'),
-              title: const Text('Dùng ảnh mẫu mô phỏng'),
-              onTap: () => Navigator.pop(context, CargoPhotoSource.sample),
-            ),
+            if (context.read<DriverTripRepository>() is TripSimulator)
+              ListTile(
+                leading: const AppIcon('box'),
+                title: const Text('Dùng ảnh mẫu mô phỏng'),
+                onTap: () => Navigator.pop(context, CargoPhotoSource.sample),
+              ),
           ],
         ),
       ),
