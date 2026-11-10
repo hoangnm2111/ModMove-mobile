@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../core/theme/app_theme.dart';
+import '../../../core/widgets/app_logo.dart';
 import 'auth_cubit.dart';
 
 class AuthScreen extends StatefulWidget {
@@ -49,7 +50,22 @@ class _AuthScreenState extends State<AuthScreen> {
       final register = state.stage == AuthStage.register,
           verify = state.stage == AuthStage.verify;
       if (state.stage == AuthStage.restoring) {
-        return const Scaffold(body: Center(child: CircularProgressIndicator()));
+        return const Scaffold(
+          body: Center(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                AppLogo(),
+                SizedBox(height: 24),
+                SizedBox(
+                  width: 24,
+                  height: 24,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                ),
+              ],
+            ),
+          ),
+        );
       }
       final title = verify
           ? 'Xác minh email'
@@ -68,11 +84,7 @@ class _AuthScreenState extends State<AuthScreen> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
-                      const Icon(
-                        Icons.local_shipping_outlined,
-                        size: 64,
-                        color: AppColors.orange,
-                      ),
+                      const Center(child: AppLogo()),
                       const SizedBox(height: 12),
                       Text(
                         'ModMove',

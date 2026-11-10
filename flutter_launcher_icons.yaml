@@ -1,0 +1,10 @@
+# Approved delivery M-truck. Keep the original PNG for legacy and in-app use.
+flutter_launcher_icons:
+  android: true
+  ios: false
+  image_path: assets/images/modmove-app-icon.png
+  min_sdk_android: 29
+  adaptive_icon_background: '#CE450C'
+  adaptive_icon_foreground: assets/branding/modmove-mark-mask.png
+  adaptive_icon_monochrome: assets/branding/modmove-mark-mask.png
+  adaptive_icon_foreground_inset: 6
