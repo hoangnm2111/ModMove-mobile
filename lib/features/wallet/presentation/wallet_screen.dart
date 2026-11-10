@@ -90,7 +90,7 @@ class _WalletScreenState extends State<WalletScreen>
                       child: _balance(
                         'Ví thu nhập',
                         balance?.earnings,
-                        'Thu nhập đã ghi nhận',
+                        'Đơn PayOS đã hoàn tất',
                       ),
                     ),
                     Container(
@@ -103,7 +103,7 @@ class _WalletScreenState extends State<WalletScreen>
                       child: _balance(
                         'Ký quỹ',
                         balance?.deposit,
-                        'Dùng để nhận đơn',
+                        'Không thể rút',
                       ),
                     ),
                   ],
@@ -150,6 +150,9 @@ class _WalletScreenState extends State<WalletScreen>
                         'withdraw',
                         'Rút thu nhập',
                         () => openWalletPage(context, const WithdrawalScreen()),
+                        hint: balance == null
+                            ? 'Đang tải hạn mức'
+                            : 'Tối đa ${formatVnd(balance.withdrawable)}',
                       ),
                     ),
                     const SizedBox(width: 8),
@@ -162,6 +165,11 @@ class _WalletScreenState extends State<WalletScreen>
                     ),
                   ],
                 ),
+              ),
+              const SizedBox(height: 10),
+              Text(
+                'Chỉ rút từ ví thu nhập. Ký quỹ dùng để nhận đơn và trừ hoa hồng đơn tiền mặt.',
+                style: appText(size: 11, color: AppColors.secondary),
               ),
               if (state.error != null) ...[
                 const SizedBox(height: 12),
@@ -229,7 +237,12 @@ class _WalletScreenState extends State<WalletScreen>
       Text(hint, style: appText(size: 10, color: Colors.white)),
     ],
   );
-  Widget _action(String icon, String label, VoidCallback onTap) => AppCard(
+  Widget _action(
+    String icon,
+    String label,
+    VoidCallback onTap, {
+    String? hint,
+  }) => AppCard(
     onTap: onTap,
     padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 16),
     child: Column(
@@ -241,6 +254,14 @@ class _WalletScreenState extends State<WalletScreen>
           textAlign: TextAlign.center,
           style: appText(size: 12, weight: FontWeight.w600),
         ),
+        if (hint != null) ...[
+          const SizedBox(height: 6),
+          Text(
+            hint,
+            textAlign: TextAlign.center,
+            style: appText(size: 11, color: AppColors.secondary),
+          ),
+        ],
       ],
     ),
   );

@@ -11,6 +11,7 @@ import 'package:modmove_mobile/features/wallet/domain/driver_wallet_repository.d
 import 'package:modmove_mobile/features/wallet/presentation/bank_account_sheet.dart';
 import 'package:modmove_mobile/features/wallet/presentation/deposit_screen.dart';
 import 'package:modmove_mobile/features/wallet/presentation/wallet_cubit.dart';
+import 'package:modmove_mobile/features/wallet/presentation/wallet_screen.dart';
 import 'package:modmove_mobile/features/wallet/presentation/withdrawal_screen.dart';
 
 Future<void> mountWallet(
@@ -57,6 +58,111 @@ Future<void> snapshot(WidgetTester tester, GlobalKey key, String name) async {
 }
 
 void main() {
+  for (final rule in [
+    (deposit: 500000, earnings: 0, debt: 0, maximum: 0, label: 'Tối đa 0đ'),
+    (
+      deposit: -20000,
+      earnings: 120000,
+      debt: 20000,
+      maximum: 100000,
+      label: 'Tối đa 100.000đ',
+    ),
+    (
+      deposit: -20000,
+      earnings: 10000,
+      debt: 20000,
+      maximum: 0,
+      label: 'Tối đa 0đ',
+    ),
+  ]) {
+    testWidgets(
+      'wallet overview uses server withdrawal limit with deposit ${rule.deposit} and income ${rule.earnings}',
+      (tester) async {
+        tester.view.physicalSize = const Size(320, 640);
+        tester.view.devicePixelRatio = 1;
+        addTearDown(tester.view.reset);
+        final repo = RuleWallet(
+          WalletBalance(
+            rule.deposit,
+            rule.earnings,
+            debt: rule.debt,
+            withdrawable: rule.maximum,
+            bank: const DriverBankAccount(
+              'Vietcombank',
+              '0123456789',
+              'TAI XE DEMO',
+            ),
+          ),
+        );
+        final cubit = WalletCubit(repo);
+        addTearDown(cubit.close);
+        await mountWallet(
+          tester,
+          cubit,
+          page: const WalletScreen(),
+          scale: 1.3,
+        );
+        await tester.scrollUntilVisible(
+          find.text('Rút thu nhập'),
+          200,
+          scrollable: find.byType(Scrollable).first,
+        );
+        expect(find.text(rule.label), findsOneWidget);
+        expect(find.text('Không thể rút'), findsOneWidget);
+        expect(tester.takeException(), isNull);
+        await tester.tap(find.text('Rút thu nhập'));
+        await tester.pumpAndSettle();
+        await tester.scrollUntilVisible(
+          find.byKey(const Key('request-withdrawal')),
+          220,
+          scrollable: find.byType(Scrollable).first,
+        );
+        final submit = tester.widget<PrimaryButton>(
+          find.byKey(const Key('request-withdrawal')),
+        );
+        expect(submit.onPressed != null, rule.maximum > 0);
+        expect(repo.withdrawn, isNull);
+        expect(tester.takeException(), isNull);
+        await tester.pumpWidget(const SizedBox.shrink());
+      },
+    );
+  }
+  testWidgets('debt is disclosed separately from the requested bank payout', (
+    tester,
+  ) async {
+    final repo = RuleWallet(
+      const WalletBalance(
+        -20000,
+        120000,
+        debt: 20000,
+        withdrawable: 100000,
+        bank: DriverBankAccount('Vietcombank', '0123456789', 'TAI XE DEMO'),
+      ),
+    );
+    final cubit = WalletCubit(repo);
+    addTearDown(cubit.close);
+    await mountWallet(tester, cubit);
+    await tester.enterText(find.byKey(const Key('withdraw-amount')), '50000');
+    tester.testTextInput.hide();
+    FocusManager.instance.primaryFocus?.unfocus();
+    await tester.scrollUntilVisible(
+      find.byKey(const Key('request-withdrawal')),
+      250,
+      scrollable: find.byType(Scrollable).first,
+    );
+    await tester.tap(find.byKey(const Key('request-withdrawal')));
+    await tester.pumpAndSettle();
+    expect(find.textContaining('Trả nợ hoa hồng: 20.000đ'), findsOneWidget);
+    expect(
+      find.textContaining('Tổng trừ từ ví thu nhập: 70.000đ'),
+      findsOneWidget,
+    );
+    expect(repo.withdrawn, isNull);
+    await tester.tap(find.text('Quay lại'));
+    await tester.pumpAndSettle();
+    expect(repo.withdrawn, isNull);
+    await tester.pumpWidget(const SizedBox.shrink());
+  });
   for (final width in [390.0, 320.0]) {
     testWidgets('bank sheet fits $width with keyboard and large text', (
       tester,
@@ -246,4 +352,11 @@ class FeedbackWallet implements DriverWalletRepository {
   @override
   Future<ResultPage<WalletTransaction>> withdrawals({int page = 1}) async =>
       const ResultPage([], 1, 0, false);
+}
+
+class RuleWallet extends FeedbackWallet {
+  RuleWallet(this.serverBalance);
+  final WalletBalance serverBalance;
+  @override
+  Future<WalletBalance> balance() async => serverBalance;
 }

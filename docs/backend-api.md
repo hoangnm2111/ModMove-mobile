@@ -154,7 +154,30 @@ thông số xe đăng ký từ hồ sơ, không thay bằng kích thước danh 
   Nếu tạo mã mới thất bại, QR cũ được ẩn để tránh thanh toán nhầm phiên/số tiền.
   Lần gọi kiểm tra lỗi không làm thay đổi số dư ví.
 
-### Kết quả và giới hạn
+### Quy tắc rút thu nhập trên app — đối chiếu 11/11/2026
+
+- **Ví → Rút thu nhập** hiển thị `Tối đa …đ` từ trường
+  `maxWithdrawableAmount` của `GET /api/driver/wallet`. Với ví Active, BE tính
+  `max(0, earningsBalance - max(0, -depositBalance))`; ví bị khóa có hạn mức 0.
+- Chỉ rút thu nhập. **Ký quỹ không thể rút**; nạp PayOS tăng ký quỹ, không
+  tăng thu nhập có thể rút. Đơn PayOS hoàn tất ghi nhận thu nhập ròng;
+  đơn tiền mặt trừ hoa hồng vào ký quỹ.
+- Khi ký quỹ âm, backend trừ toàn bộ nợ hoa hồng từ thu nhập trước, đưa ký quỹ
+  về 0 rồi giữ khoản yêu cầu rút. Dialog xác nhận hiển thị riêng số tiền về
+  ngân hàng, nợ phải trả và tổng trừ từ thu nhập. Ví dụ: thu nhập 120.000đ,
+  ký quỹ −20.000đ → tối đa 100.000đ; yêu cầu 50.000đ sẽ trừ tổng 70.000đ.
+- Không áp dụng mức rút tối thiểu 50.000đ; app nhập số nguyên VND lớn hơn 0.
+  Cần có ngân hàng, ví hoạt động và không có yêu cầu chờ duyệt. Server được
+  đọc lại ngay trước POST; Admin duyệt và chuyển tiền thủ công.
+- Kiểm tra GET local: `driver2@modmove.local` có ký quỹ 500.000đ nhưng thu nhập
+  **0đ**, nên mức rút tối đa **0đ**. Muốn thử rút cần hoàn tất đơn PayOS để có
+  thu nhập; không sửa số dư giả trên app. `driver@modmove.local` có 89.000đ
+  có thể rút nhưng vẫn có yêu cầu đang chờ nên chưa được gửi yêu cầu mới.
+- Không tạo thêm yêu cầu rút tiền khi kiểm tra live này. Test tự động kiểm
+  tra hạn mức 0 dù có ký quỹ, nợ âm làm giảm hạn mức, nợ vượt thu nhập,
+  xác nhận tổng khấu trừ, ngân hàng và yêu cầu đang chờ.
+
+### Giới hạn kiểm thử các dịch vụ
 
 - Kiểm tra trực tiếp backend local bằng các repository mobile: hồ sơ, ví,
   giao dịch/rút tiền, doanh thu ngày/tuần/tháng, trạng thái và 11 chi tiết
@@ -202,3 +225,8 @@ analyzer không có lỗi. Các test bổ sung kiểm tra
 form ngân hàng khi mở bàn phím/cỡ chữ lớn, giữ dữ liệu khi lưu lỗi, giới hạn rút,
 khóa/mở lại theo trạng thái server và lỗi PayOS không giữ QR cũ.
 Đây là kiểm tra local, không thay thế CI/peer review của PR.
+
+Cập nhật ngày 11/11/2026 sau FE-32 và bổ sung quy tắc ví: **166 tests passed**,
+analyzer không có lỗi/cảnh báo và debug APK build thành công. Tham khảo
+[kiểm thử Incidents](driver-incidents.md) để phân biệt phần đã gọi API local
+với phần upload ảnh chưa kiểm thử dịch vụ thật.

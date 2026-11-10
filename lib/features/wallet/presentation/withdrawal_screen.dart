@@ -64,7 +64,7 @@ class _WithdrawalScreenState extends State<WithdrawalScreen> {
                     ),
                     const SizedBox(height: 6),
                     Text(
-                      'Số tiền khả dụng sau khi trừ nợ phí nền tảng.',
+                      'Chỉ rút thu nhập sau khi trừ nợ hoa hồng. Không rút được ký quỹ.',
                       style: appText(size: 12, color: AppColors.secondary),
                     ),
                   ],
@@ -73,9 +73,9 @@ class _WithdrawalScreenState extends State<WithdrawalScreen> {
               if (balance != null && balance.debt > 0) ...[
                 const SizedBox(height: 10),
                 Notice(
-                  'Nợ phí nền tảng: ${formatVnd(balance.debt)}',
+                  'Nợ hoa hồng: ${formatVnd(balance.debt)}',
                   detail:
-                      'Khoản nợ được trừ từ thu nhập khi gửi yêu cầu rút thành công.',
+                      'Ký quỹ đang âm. Toàn bộ khoản nợ được trừ từ thu nhập trước khi giữ số tiền bạn yêu cầu rút.',
                   peach: true,
                 ),
               ],
@@ -226,7 +226,9 @@ class _WithdrawalScreenState extends State<WithdrawalScreen> {
                             ),
                             title: const Text('Xác nhận rút thu nhập'),
                             content: Text(
-                              'Rút ${formatVnd(amount)} về ${balance.bank!.name} ${balance.bank!.masked}?',
+                              'Rút ${formatVnd(amount)} về ${balance.bank!.name} ${balance.bank!.masked}?'
+                              '${balance.debt > 0 ? '\n\nTrả nợ hoa hồng: ${formatVnd(balance.debt)}. Tổng trừ từ ví thu nhập: ${formatVnd(amount + balance.debt)}.' : ''}'
+                              '\n\nQuản trị viên duyệt và chuyển khoản thủ công.',
                             ),
                             actions: [
                               TextButton(
@@ -319,7 +321,7 @@ class _WithdrawalScreenState extends State<WithdrawalScreen> {
     return (
       title: 'Chưa đủ số dư để rút',
       detail:
-          'Bạn cần ít nhất 1đ thu nhập khả dụng sau khi trừ nợ phí nền tảng.',
+          'Chỉ rút thu nhập khả dụng sau khi trừ nợ hoa hồng. Hoàn tất đơn PayOS để ghi nhận thu nhập; nạp ký quỹ không làm tăng số có thể rút.',
     );
   }
   return null;
