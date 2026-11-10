@@ -22,6 +22,7 @@ lib/
     driver_trip/                    FE-19..23, FE-25 and FE-26
     wallet/                         FE-28
     earnings/                       FE-29
+    incidents/                      FE-32: report, history, dispatcher response
       domain/                       Pure Dart entities and repository contracts
       data/                         Remote implementations / DTO mapping
       presentation/                 Cubits, screens and feature widgets
@@ -48,6 +49,13 @@ The remote trip repository also implements `TripHistoryRepository` and
 `TripHistoryCubit` and `TripDetailCubit` share that same authoritative trip
 repository. Wallet and revenue routes inject `RemoteWalletRepository` /
 `WalletCubit` and `RemoteEarningsRepository` / `RevenueCubit`.
+
+Incidents injects `RemoteDriverIncidentRepository` with the same authenticated
+API client. Route-scoped `IncidentReportCubit`, `IncidentListCubit` and
+`IncidentDetailCubit` handle uploads, paginated filters, resolution updates
+and reconciliation after uncertain submissions. Reports bind to a specific
+active order and never switch silently when the assigned trip changes.
+See [the Incidents walkthrough](driver-incidents.md).
 
 ## Trip consistency
 

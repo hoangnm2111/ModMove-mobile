@@ -184,6 +184,10 @@ có nút mô phỏng duyệt hồ sơ/duyệt ảnh hay nạp/rút tiền giả.
 
 ## Kiểm tra và bản build
 
+Luồng **FE-32 Incidents** (tạo báo cáo, lịch sử, ảnh minh chứng và phản hồi
+điều phối) có [hướng dẫn riêng](driver-incidents.md), gồm hợp đồng ba API,
+kiểm thử live và những phần chưa xác minh với dịch vụ ảnh thật.
+
 ```powershell
 flutter analyze --no-fatal-infos
 flutter test --coverage
