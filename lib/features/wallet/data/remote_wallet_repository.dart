@@ -9,7 +9,7 @@ class RemoteWalletRepository implements DriverWalletRepository {
     try {
       return await call();
     } on ApiFailure catch (e) {
-      throw WalletFailure(e.message);
+      throw WalletFailure(e.message, reference: e.traceId);
     }
   }
 
@@ -41,13 +41,24 @@ class RemoteWalletRepository implements DriverWalletRepository {
     if (amount < 50000) {
       throw const WalletFailure('Số tiền nạp tối thiểu là 50.000đ.');
     }
-    final data =
-        await api.request(
-              'POST',
-              '/api/driver/wallet/topup',
-              body: {'amount': amount, 'platform': 'App'},
-            )
-            as Map;
+    Map data;
+    try {
+      data =
+          await api.request(
+                'POST',
+                '/api/driver/wallet/topup',
+                body: {'amount': amount, 'platform': 'App'},
+              )
+              as Map;
+    } on ApiFailure catch (e) {
+      if (e.status >= 500) {
+        throw WalletFailure(
+          'Dịch vụ nạp tiền hiện không khả dụng. Vui lòng thử lại sau hoặc liên hệ hỗ trợ.',
+          reference: e.traceId,
+        );
+      }
+      rethrow;
+    }
     final url = Uri.parse(data['checkoutUrl'] as String);
     if (url.scheme != 'https' || !url.hasAuthority) {
       throw const WalletFailure('Đường dẫn thanh toán không hợp lệ.');

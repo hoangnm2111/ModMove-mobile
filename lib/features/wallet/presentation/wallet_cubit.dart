@@ -8,6 +8,7 @@ class WalletState {
     this.payment,
     this.busy = false,
     this.error,
+    this.errorReference,
     this.transactions,
     this.withdrawals,
     this.paymentConfirmed = false,
@@ -18,28 +19,32 @@ class WalletState {
   final DepositPayment? payment;
   final bool busy;
   final String? error;
+  final String? errorReference;
   final ResultPage<WalletTransaction>? transactions, withdrawals;
   final bool paymentConfirmed, withdrawalUncertain;
   final String? notice;
   WalletState copyWith({
     WalletBalance? balance,
     DepositPayment? payment,
+    bool clearPayment = false,
     ResultPage<WalletTransaction>? transactions,
     ResultPage<WalletTransaction>? withdrawals,
     bool? busy,
     bool? paymentConfirmed,
     bool? withdrawalUncertain,
     String? error,
+    String? errorReference,
     String? notice,
   }) => WalletState(
     balance: balance ?? this.balance,
-    payment: payment ?? this.payment,
+    payment: clearPayment ? null : payment ?? this.payment,
     transactions: transactions ?? this.transactions,
     withdrawals: withdrawals ?? this.withdrawals,
     busy: busy ?? this.busy,
     paymentConfirmed: paymentConfirmed ?? this.paymentConfirmed,
     withdrawalUncertain: withdrawalUncertain ?? this.withdrawalUncertain,
     error: error,
+    errorReference: errorReference,
     notice: notice,
   );
 }
@@ -72,16 +77,25 @@ class WalletCubit extends Cubit<WalletState> {
 
   Future<void> refresh() => _run(_reload);
   Future<void> topUp(int amount) => _run(() async {
+    // Do not leave an earlier QR visible if creating its replacement fails.
+    emit(state.copyWith(clearPayment: true, paymentConfirmed: false));
     final payment = await repository.topUp(amount);
     if (!isClosed) {
       emit(state.copyWith(payment: payment, paymentConfirmed: false));
     }
   });
-  Future<void> saveBank(DriverBankAccount bank) => _run(() async {
-    await repository.saveBank(bank);
-    await _reload();
-    if (!isClosed) emit(state.copyWith(notice: 'Đã lưu tài khoản ngân hàng.'));
-  });
+  Future<bool> saveBank(DriverBankAccount bank) async {
+    if (state.busy || isClosed) return false;
+    await _run(() async {
+      await repository.saveBank(bank);
+      await _reload();
+      if (!isClosed) {
+        emit(state.copyWith(notice: 'Đã lưu tài khoản ngân hàng.'));
+      }
+    });
+    return !isClosed && state.error == null;
+  }
+
   Future<void> withdraw(int amount) => _run(() async {
     // Recheck the server immediately before a financial request.
     final balance = await repository.balance();
@@ -160,6 +174,7 @@ class WalletCubit extends Cubit<WalletState> {
             error: e is WalletFailure
                 ? e.message
                 : 'Chưa xử lý được giao dịch. Vui lòng kiểm tra lại.',
+            errorReference: e is WalletFailure ? e.reference : null,
           ),
         );
       }

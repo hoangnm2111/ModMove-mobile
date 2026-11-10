@@ -67,8 +67,9 @@ class DepositPayment {
 }
 
 class WalletFailure implements Exception {
-  const WalletFailure(this.message);
+  const WalletFailure(this.message, {this.reference});
   final String message;
+  final String? reference;
   @override
   String toString() => message;
 }

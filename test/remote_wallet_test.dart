@@ -10,6 +10,74 @@ import 'support/remote_fixtures.dart';
 
 void main() {
   test(
+    'PayOS service error keeps its support reference and removes the older QR',
+    () async {
+      var unavailable = false;
+      final api = ApiClient(
+        store: MemorySessionStore(),
+        client: MockClient((request) async {
+          expect(request.url.path, '/api/driver/wallet/topup');
+          if (unavailable) {
+            return jsonResponse({
+              'code': 'SERVER_ERROR',
+              'detail': 'An unexpected error occurred.',
+              'traceId': '0HND123:00000001',
+            }, 500);
+          }
+          return jsonResponse({
+            'transactionId': 8,
+            'amount': 100000,
+            'checkoutUrl': 'https://pay.payos.vn/previous',
+            'expiresAt': DateTime.now()
+                .add(const Duration(minutes: 10))
+                .toIso8601String(),
+            'qrCode': 'previous-qr',
+          });
+        }),
+      );
+      addTearDown(api.close);
+      await api.saveSession(tokens());
+      final cubit = WalletCubit(RemoteWalletRepository(api));
+      addTearDown(cubit.close);
+      await cubit.topUp(100000);
+      expect(cubit.state.payment, isNotNull);
+      unavailable = true;
+      await cubit.topUp(200000);
+      expect(cubit.state.payment, isNull);
+      expect(cubit.state.paymentConfirmed, false);
+      expect(
+        cubit.state.error,
+        contains('Dịch vụ nạp tiền hiện không khả dụng'),
+      );
+      expect(cubit.state.errorReference, '0HND123:00000001');
+    },
+  );
+
+  test(
+    'PayOS validation failure is not mislabeled as a service outage',
+    () async {
+      final api = ApiClient(
+        store: MemorySessionStore(),
+        client: MockClient(
+          (_) async => jsonResponse({'code': 'VALIDATION'}, 400),
+        ),
+      );
+      addTearDown(api.close);
+      await api.saveSession(tokens());
+      await expectLater(
+        RemoteWalletRepository(api).topUp(100000),
+        throwsA(
+          isA<WalletFailure>().having(
+            (e) => e.message,
+            'message',
+            contains('Thông tin chưa hợp lệ'),
+          ),
+        ),
+      );
+    },
+  );
+
+  test(
     'creating a top-up never credits the balance; only subsequent server read changes it',
     () async {
       var deposit = 250000, posts = 0;

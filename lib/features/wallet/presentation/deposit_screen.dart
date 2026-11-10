@@ -100,7 +100,19 @@ class _DepositScreenState extends State<DepositScreen>
             ),
             if (state.error != null) ...[
               const SizedBox(height: 12),
-              Notice(state.error!, peach: true),
+              Notice(
+                'Chưa xử lý được thanh toán',
+                detail: state.error!,
+                icon: 'warning',
+                peach: true,
+              ),
+              if (state.errorReference != null) ...[
+                const SizedBox(height: 8),
+                SelectableText(
+                  'Mã hỗ trợ: ${state.errorReference}',
+                  style: appText(size: 11, color: AppColors.secondary),
+                ),
+              ],
             ],
             if (payment != null) ...[
               const SizedBox(height: 18),

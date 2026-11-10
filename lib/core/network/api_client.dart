@@ -4,8 +4,14 @@ import 'dart:typed_data';
 import 'package:http/http.dart' as http;
 
 class ApiFailure implements Exception {
-  const ApiFailure(this.message, {this.status = 0, this.code = ''});
+  const ApiFailure(
+    this.message, {
+    this.status = 0,
+    this.code = '',
+    this.traceId,
+  });
   final String message, code;
+  final String? traceId;
   final int status;
   @override
   String toString() => message;
@@ -239,10 +245,14 @@ class ApiClient {
       if (response.statusCode < 200 || response.statusCode >= 300) {
         final problem = json is Map ? json : const {};
         final code = problem['code']?.toString() ?? '';
+        final trace = problem['traceId']?.toString() ?? '';
         throw ApiFailure(
           _message(response.statusCode, code),
           status: response.statusCode,
           code: code,
+          traceId: RegExp(r'^[a-zA-Z0-9:._-]{1,80}$').hasMatch(trace)
+              ? trace
+              : null,
         );
       }
       if (response.statusCode != 204 && json == null) {
