@@ -19,6 +19,9 @@ import 'app.dart';
 import '../features/wallet/data/remote_wallet_repository.dart';
 import '../features/wallet/presentation/wallet_cubit.dart';
 import '../features/wallet/presentation/wallet_screen.dart';
+import '../features/earnings/data/remote_earnings_repository.dart';
+import '../features/earnings/presentation/revenue_cubit.dart';
+import '../features/earnings/presentation/revenue_screen.dart';
 
 class RemoteApp extends StatefulWidget {
   const RemoteApp({super.key});
@@ -135,6 +138,10 @@ class _DriverSessionAppState extends State<_DriverSessionApp> {
           walletBuilder: (_) => BlocProvider(
             create: (_) => WalletCubit(RemoteWalletRepository(widget.api)),
             child: const WalletScreen(),
+          ),
+          revenueBuilder: (_) => BlocProvider(
+            create: (_) => RevenueCubit(RemoteEarningsRepository(widget.api)),
+            child: const RevenueScreen(),
           ),
           screen: _driver!.status == ApprovalStatus.approved
               ? 'driver-home'
