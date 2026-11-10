@@ -46,8 +46,9 @@ class _DriverProfileScreenState extends State<DriverProfileScreen>
   void _refresh() {
     if (!mounted ||
         !(ModalRoute.of(context)?.isCurrent ?? false) ||
-        WidgetsBinding.instance.lifecycleState == AppLifecycleState.paused)
+        WidgetsBinding.instance.lifecycleState == AppLifecycleState.paused) {
       return;
+    }
     final driver = context.read<DriverController>();
     if (driver.remote && !driver.busy && !driver.syncing) driver.refresh();
   }

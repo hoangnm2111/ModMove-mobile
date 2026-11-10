@@ -9,6 +9,9 @@ Future<void> testExecutable(FutureOr<void> Function() testMain) async {
     loader.addFont(rootBundle.load('assets/fonts/Inter-$weight.ttf'));
   }
   await loader.load();
+  final materialIcons = FontLoader('MaterialIcons')
+    ..addFont(rootBundle.load('fonts/MaterialIcons-Regular.otf'));
+  await materialIcons.load();
   // Widget tests don't run MainActivity. Map-specific tests install a recording
   // platform; other UI tests use the fallback with reduced motion so settling
   // is bounded. Animation tests explicitly opt into motion in their MediaQuery.

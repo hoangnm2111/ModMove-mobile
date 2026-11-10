@@ -109,7 +109,7 @@ class _AuthScreenState extends State<AuthScreen> {
                         const Padding(
                           padding: EdgeInsets.only(bottom: 16),
                           child: Text(
-                    'Mật khẩu 8–100 ký tự, gồm ít nhất một chữ cái và một chữ số.',
+                            'Mật khẩu 8–100 ký tự, gồm ít nhất một chữ cái và một chữ số.',
                           ),
                         ),
                       if (verify)
