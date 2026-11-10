@@ -48,14 +48,29 @@ direction. Review screenshots are generated locally and excluded from Git.
 
 Online/offline, mock GPS, 30-second job offers, job details/atomic acceptance,
 pickup navigation, cargo evidence uploads and customer approval are implemented
-with BLoC/Cubit. On an Android emulator, run:
+with BLoC/Cubit. To test the connected driver flow on an Android emulator, run:
 
 ```sh
-flutter run --dart-define=SCREEN=driver-home
+flutter run
 ```
 
+Follow **Đăng ký tài xế (FE-43) → Gửi hồ sơ xét duyệt → Hồ sơ tài xế (FE-27)**.
+Use **Mô phỏng** to simulate approval, return to the profile, then select
+**Vào trang chủ tài xế (FE-19)** and go online. **Tài khoản** returns to the same
+profile; its **Đơn hàng** tab opens the active trip. Pending/rejected profiles
+cannot go online. The separate `--dart-define=SCREEN=driver-home` shortcut seeds
+an approved demo driver and skips onboarding; it is only for isolated trip tests.
+
+Configure the Android key once using [Google Maps setup and sequential UI tests](docs/google-maps-android.md).
+Maps use the native Google Maps SDK, with pan/pinch/rotate, zoom/recenter controls
+and an animated 5 km dispatch area while searching. `android/secrets.properties`
+stays ignored. No extra `GOOGLE_MAPS_ENABLED` flag is needed.
+Until a key is configured, the app automatically uses the labelled original mock
+map with pan/zoom and animated search waves. Run `flutter run` now to test the
+full driver flow; after key/Billing setup, rebuild to switch to Google Maps.
+
 Read [the pickup walkthrough](docs/driver-pickup-mock.md) for demo scenarios,
-architecture, tests and optional Google Maps setup. The trip API, GPS, routing and
+architecture and tests. The trip API, GPS, routing and
 uploads are mocked; the session resets on app restart. Screenshots stay ignored.
 
 ## Driver profile mock API

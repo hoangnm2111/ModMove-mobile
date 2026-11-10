@@ -4,6 +4,7 @@ import 'package:flutter_svg/flutter_svg.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/widgets/app_widgets.dart';
 import '../../domain/entities/trip_models.dart';
+import '../../domain/entities/driver_matching_policy.dart';
 import '../bloc/driver_home_bloc.dart';
 import '../widgets/driver_map.dart';
 import '../widgets/trip_components.dart';
@@ -152,8 +153,16 @@ class DriverHomeScreen extends StatelessWidget {
                   ),
                 ),
               SizedBox(
-                height: 165,
-                child: DriverMap(available: session.mapAvailable),
+                height: 220,
+                child: DriverMap(
+                  available: session.mapAvailable,
+                  position: session.fix?.point,
+                  searching:
+                      session.online &&
+                      session.gpsEnabled &&
+                      !(session.trip?.ongoing ?? false),
+                  searchRadiusMeters: DriverMatchingPolicy.searchRadiusMeters,
+                ),
               ),
               Padding(
                 padding: const EdgeInsets.fromLTRB(14, 10, 14, 0),

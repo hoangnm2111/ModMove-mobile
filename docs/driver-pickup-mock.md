@@ -4,17 +4,46 @@
 
 Mở máy ảo trong Android Studio, tại `ModMove-mobile` chạy:
 
+Cấu hình Google Maps một lần theo [hướng dẫn bản đồ Android](google-maps-android.md)
+để xem và thao tác trên đường phố thật.
+
 ```powershell
 flutter pub get
+flutter run
+```
+
+Chạy trên nhánh đã có FE-19–FE-23 (`feature/tunm`, hoặc `develop` đã pull sau khi
+PR được merge). Không cần đổi `SCREEN` giữa các bước.
+
+## Luồng liên kết đăng ký và nhận đơn
+
+FE-43 và FE-27 đều dành cho **tài xế**, dùng chung hồ sơ với FE-19–FE-23:
+
+1. **Home → Đăng ký tài xế** mở FE-43: nhập thông tin, tải giấy tờ cá nhân và xe.
+2. **Gửi hồ sơ xét duyệt** chuyển đến FE-27: hồ sơ, phương tiện, trạng thái duyệt.
+   Khi chờ duyệt hoặc bị từ chối, tài xế chưa thể bật nhận đơn.
+3. Vì chưa có backend, tại hồ sơ chọn **Mô phỏng → Mô phỏng: duyệt hồ sơ**, rồi
+   quay lại. Đây là giả lập kết quả của quản trị viên, không phải quyền của tài xế.
+4. Bấm **Vào trang chủ tài xế** để mở FE-19, bật công tắc nhận đơn và tiếp tục
+   FE-20 → FE-21 → FE-22 → FE-23 theo hướng dẫn dưới.
+5. Từ trang chủ tài xế, **Tài khoản** luôn mở lại FE-27 của cùng tài xế. Tại hồ sơ,
+   **Đơn hàng** mở chuyến đang thực hiện, hoặc về trang chủ nhận đơn nếu chưa có chuyến.
+
+Hồ sơ mock được lưu trên máy. Lần sau chạy `flutter run`, vào **Tài khoản →
+Vào trang chủ tài xế** nếu hồ sơ đã duyệt. Có thể dùng ảnh mẫu trong mỗi ô tải ảnh,
+hoặc **Mô phỏng → Tạo hồ sơ mẫu đầy đủ** để điền nhanh trước khi gửi xét duyệt.
+
+Nếu chỉ muốn thử riêng nhận đơn với hồ sơ đã duyệt và đang online có sẵn:
+
+```powershell
 flutter run --dart-define=SCREEN=driver-home
 ```
 
-Màn này dùng hồ sơ đã duyệt để demo. `flutter run` vẫn mở Home cũ, khôi phục
-hồ sơ mock đã lưu; sau khi hồ sơ được duyệt, vào Tài khoản → Trang chủ để nhận đơn.
+Lệnh tắt này bỏ qua đăng ký/xét duyệt, không dùng hồ sơ đã lưu của luồng mặc định.
 
 ## Luồng thử
 
-1. Màn demo bắt đầu trực tuyến, có hai đơn phù hợp. Chọn một đơn để mở popup.
+1. Bật trực tuyến ở trang chủ tài xế, có hai đơn phù hợp. Chọn một đơn để mở popup.
    Có thể tắt rồi bật công tắc để thử trạng thái hoạt động; 6 giây sau khi bật lại
    sẽ có popup đơn mới.
 2. Bấm **Xem chi tiết → Nhận chuyến** trong 30 giây. Có thể bấm một đơn ở danh sách
@@ -72,19 +101,14 @@ thu tiền người gửi, tối đa 5 lần gửi và chờ khách duyệt trư
   lại tạo phiên chuyến mới. Hồ sơ onboarding vẫn dùng kho lưu riêng như trước.
 - GPS phát tọa độ mô phỏng mỗi 5 giây khi app ở foreground và tài xế online.
   Ra nền thì dừng stream, trở lại thì lấy fix mới. Chưa có dịch vụ GPS chạy nền.
-- Bản đồ mặc định là vector mô phỏng, có pan/zoom, tuyến và vị trí minh họa. Không
-  dùng nó để chỉ đường thật. Nhấn thẻ ETA để mở Google Maps ngoài app khi cần.
-- Đã có Google Maps Flutter SDK tùy chọn. Để bật tiles thật, dùng key Android đã
-  giới hạn package/SHA và bật Maps SDK for Android:
-
-  ```powershell
-  $env:MAPS_API_KEY = '<Android Maps API key của bạn>'
-  flutter run --dart-define=SCREEN=driver-home --dart-define=GOOGLE_MAPS_ENABLED=true
-  ```
-
-  Key được truyền qua environment vào Android manifest; không commit key. Khi bật
-  tiles, tọa độ và polyline vẫn là mock; chưa gọi Directions API. Cần cấu hình key
-  mới kiểm tra được tiles thật. Mặc định không cần key, không gọi Google Maps.
+- Bản đồ dùng Google Maps SDK, kéo/zoom/xoay trực tiếp. Vùng nhận đơn 5 km có vòng
+  sóng khi online, cùng bán kính với mock matching; dừng khi offline hoặc có chuyến.
+  Key đọc từ `android/secrets.properties` (Git ignore) hoặc biến `MAPS_API_KEY`.
+  Khi chưa có key, app tự dùng map mô phỏng cũ, có kéo/zoom và vòng sóng minh họa.
+  Khi đã thêm key và bật Billing, rebuild app để tự chuyển sang Google Maps.
+  Xem [cấu hình và test](google-maps-android.md).
+- Tọa độ và đường nét đứt đến điểm lấy vẫn mô phỏng; chưa gọi Directions/Routes API.
+  Nhấn thẻ ETA để mở Google Maps ngoài app và tìm đường thật.
 - Nút gọi khách mở dialer, không tự gọi điện. Yêu cầu sự cố chỉ tạo biên nhận mock,
   chưa triển khai toàn bộ UC báo sự cố có ảnh và quy trình điều phối.
 - FE-25/26/28/29 nằm ngoài đợt này. Các số tổng hợp/ví ở Home là dữ liệu mock.
@@ -108,9 +132,15 @@ flutter test --dart-define=CAPTURE_SCREENSHOTS=true test/driver_trip_ui_test.dar
 Ảnh ở `test/screenshots/iteration2/` được Git bỏ qua. Không commit screenshots,
 file nén screenshots, APK, coverage hoặc cấu hình agent.
 
-Kết quả xác minh ngày 2026-11-08: analyzer không có vấn đề, toàn bộ **72 tests**
-qua với coverage; build debug APK thành công. Trên AVD Android 36 đã kiểm tra mở
-Home tài xế, popup, chi tiết/nhận chuyến, arrival qua GPS mô phỏng và chụp bằng
-camera Android → quay về app → upload mock thành công (`1/2` ảnh). Luồng hai ảnh,
-retry, khách từ chối/duyệt và responsive được kiểm tra tự động ở widget/repository.
-Google Maps tiles với key thật và backend thật chưa được kiểm tra.
+Kết quả xác minh ngày 2026-11-08: analyzer không có vấn đề, toàn bộ **77 tests**
+qua với coverage; build debug APK thành công. Trên AVD Android 36 đã kiểm tra
+gửi hồ sơ mẫu → chờ duyệt → đóng/mở lại app vẫn chờ duyệt → mô phỏng duyệt →
+trang chủ tài xế → online → popup tự phát → chi tiết → nhận chuyến → đến điểm lấy.
+Theo yêu cầu dùng tạm khi chưa có Billing, bản mới fallback sang map mô phỏng
+khi chưa có key; vẫn test được cùng luồng nhận đơn.
+
+Tests mới còn kiểm tra hồ sơ đã duyệt sau restart, camera commands/gestures gửi
+đến SDK, circle theo tọa độ/mét, pulse/lifecycle/reduced motion. Google Maps tiles
+và thao tác native trên bản đồ với key thật chưa được xác minh vì chưa có key.
+Luồng hai ảnh, retry, khách từ chối/duyệt và responsive được kiểm tra tự động.
+Kiểm tra Android trước đó đã xác minh camera → quay về app → upload mock (`1/2`).
