@@ -5,6 +5,7 @@ import '../features/onboarding/presentation/controllers/driver_controller.dart';
 import '../features/driver_trip/data/repositories/mock_driver_trip_repository.dart';
 import '../features/driver_trip/domain/entities/trip_models.dart';
 import '../features/driver_trip/domain/repositories/driver_trip_repository.dart';
+import '../features/driver_trip/domain/repositories/trip_history_repository.dart';
 import '../features/driver_trip/domain/usecases/driver_trip_actions.dart';
 import '../features/driver_trip/presentation/bloc/driver_home_bloc.dart';
 import '../features/driver_trip/presentation/bloc/job_offer_bloc.dart';
@@ -94,29 +95,44 @@ class _DriverTripScopeState extends State<DriverTripScope>
   }
 
   @override
-  Widget build(BuildContext context) =>
-      RepositoryProvider<DriverTripRepository>.value(
-        value: _repository,
-        child: MultiBlocProvider(
-          providers: [
-            BlocProvider(
-              create: (_) => EvidenceCubit(
-                DriverTripActions(_repository),
-                widget.cargoPhotos ?? DeviceCargoPhotoRepository(),
-              ),
-            ),
-            BlocProvider.value(value: _homeBloc),
-            BlocProvider(
-              create: (_) => JobOfferBloc(DriverTripActions(_repository)),
-            ),
-            BlocProvider(
-              create: (_) => ActiveTripBloc(
-                DriverTripActions(_repository),
-                const PlatformTripContactRepository(),
-              ),
-            ),
-          ],
-          child: widget.child,
+  Widget build(BuildContext context) => MultiRepositoryProvider(
+    providers: [
+      RepositoryProvider<DriverTripRepository>.value(value: _repository),
+      RepositoryProvider<CargoPhotoRepository>(
+        create: (_) => widget.cargoPhotos ?? DeviceCargoPhotoRepository(),
+      ),
+      RepositoryProvider<TripContactRepository>(
+        create: (_) => const PlatformTripContactRepository(),
+      ),
+      if (_repository is DriverDeliveryRepository)
+        RepositoryProvider<DriverDeliveryRepository>.value(
+          value: _repository as DriverDeliveryRepository,
         ),
-      );
+      if (_repository is TripHistoryRepository)
+        RepositoryProvider<TripHistoryRepository>.value(
+          value: _repository as TripHistoryRepository,
+        ),
+    ],
+    child: MultiBlocProvider(
+      providers: [
+        BlocProvider(
+          create: (_) => EvidenceCubit(
+            DriverTripActions(_repository),
+            widget.cargoPhotos ?? DeviceCargoPhotoRepository(),
+          ),
+        ),
+        BlocProvider.value(value: _homeBloc),
+        BlocProvider(
+          create: (_) => JobOfferBloc(DriverTripActions(_repository)),
+        ),
+        BlocProvider(
+          create: (_) => ActiveTripBloc(
+            DriverTripActions(_repository),
+            const PlatformTripContactRepository(),
+          ),
+        ),
+      ],
+      child: widget.child,
+    ),
+  );
 }

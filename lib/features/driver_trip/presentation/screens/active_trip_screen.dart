@@ -8,6 +8,8 @@ import 'pickup_navigation_screen.dart';
 import 'cargo_inspection_screen.dart';
 import 'pickup_approval_screen.dart';
 import 'driver_simulation_sheet.dart';
+import '../../domain/repositories/driver_trip_repository.dart';
+import 'delivery_screen.dart';
 
 class ActiveTripScreen extends StatelessWidget {
   const ActiveTripScreen({super.key});
@@ -17,6 +19,10 @@ class ActiveTripScreen extends StatelessWidget {
   ) => BlocBuilder<ActiveTripBloc, ActiveTripState>(
     builder: (context, state) {
       final trip = state.session.trip;
+      if (trip?.stage == TripStage.delivered ||
+          trip?.stage == TripStage.completed) {
+        return DeliverySuccessScreen(trip!);
+      }
       if (trip == null || !trip.ongoing) {
         return Scaffold(
           appBar: const AppHeader('Chuyến giao hàng'),
@@ -58,6 +64,10 @@ class ActiveTripScreen extends StatelessWidget {
       if (trip.editable) return CargoInspectionScreen(tripState: state);
       if (trip.stage == TripStage.pickedUp) {
         return PickupApprovalScreen(state: state);
+      }
+      if (trip.stage == TripStage.inTransit &&
+          context.read<DriverTripRepository>() is! TripSimulator) {
+        return DeliveryScreen(key: ValueKey(trip.job.id), tripState: state);
       }
       return Scaffold(
         appBar: AppHeader(
