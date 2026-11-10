@@ -84,6 +84,20 @@ void main() {
           );
         }
         switch (r.url.path) {
+          case '/api/driver/wallet/earnings':
+            return jsonResponse({'completedTrips': 3, 'netEarnings': 430000});
+          case '/api/driver/matching/orders/42':
+            return jsonResponse({
+              ...nearbyOrder(now),
+              'canAccept': true,
+              'distanceFee': 220000,
+              'serviceFee': 40000,
+              'discountAmount': 20000,
+              'vehicleTypeName': 'Xe tải 1 tấn',
+              'matchingExpiresAt': now
+                  .add(const Duration(seconds: 12))
+                  .toIso8601String(),
+            });
           case '/api/driver/trips/42/arrive':
             writes++;
             stage = 'Arrived';
@@ -175,6 +189,19 @@ void main() {
     await expectLater(repo.openOffer('42'), throwsA(isA<TripFailure>()));
     expect(accepts, 0);
   });
+  test(
+    'job details use backend fee breakdown and shorter matching deadline',
+    () async {
+      await repo.openOffer('42');
+      expect(repo.current.offer!.job.distanceFee, 220000);
+      expect(repo.current.offer!.job.discount, 20000);
+      expect(repo.current.offer!.remainingAt(now), 12);
+      expect(repo.current.shift.completed, 3);
+      now = now.add(const Duration(seconds: 13));
+      await expectLater(repo.acceptOffer('42'), throwsA(isA<TripFailure>()));
+      expect(accepts, 0);
+    },
+  );
   test('409 removes offer and never creates a local accepted trip', () async {
     acceptCode = 409;
     await expectLater(repo.acceptOffer('42'), throwsA(isA<TripFailure>()));

@@ -28,6 +28,7 @@ abstract final class DriverTripDto {
     return ActiveTrip(
       job: DeliveryJob(
         id: '${data['id']}',
+        fareBreakdownAvailable: true,
         orderCode: '${data['orderCode']}',
         pickup: data['pickupAddress'] as String,
         dropoff: data['dropoffAddress'] as String,

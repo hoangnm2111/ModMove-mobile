@@ -33,7 +33,10 @@ class RemoteDriverTripRepository
   Timer? _timer;
   Future<void>? _refreshing;
   bool _foreground = true, _closed = false, _ticking = false, _mutating = false;
-  DriverSession _current = DriverSession();
+  DriverSession _current = DriverSession(
+    shift: const ShiftSummary(available: false),
+  );
+  DateTime? _summaryAt;
   Map<String, dynamic>? _accepted;
   final Map<String, DateTime> _deadlines = {};
   final Set<String> _dismissed = {};
@@ -123,6 +126,29 @@ class RemoteDriverTripRepository
     final status = await api.request('GET', '/api/driver/status') as Map;
     if (_closed) return;
     final activeId = status['activeOrderId']?.toString();
+    if (status['approvalStatus'] == 'Approved' &&
+        (_summaryAt == null ||
+            now.difference(_summaryAt!) >= const Duration(minutes: 1))) {
+      try {
+        final summary =
+            await api.request(
+                  'GET',
+                  '/api/driver/wallet/earnings?period=Today&pageSize=1',
+                )
+                as Map;
+        _emit(
+          _copy(
+            shift: ShiftSummary(
+              completed: (summary['completedTrips'] as num).toInt(),
+              income: (summary['netEarnings'] as num).round(),
+            ),
+          ),
+        );
+        _summaryAt = now;
+      } on ApiFailure {
+        /* earnings failure must not block GPS or trip execution */
+      }
+    }
     ActiveTrip? trip;
     if (activeId != null) {
       trip = await detail(activeId);
@@ -207,6 +233,10 @@ class RemoteDriverTripRepository
   });
   Map<String, Map<String, dynamic>> _rows = {};
   DeliveryJob _job(Map<String, dynamic> row) => DeliveryJob(
+    fareBreakdownAvailable: row.containsKey('distanceFee'),
+    distanceFee: (row['distanceFee'] as num?)?.round() ?? 0,
+    serviceFee: (row['serviceFee'] as num?)?.round() ?? 0,
+    discount: (row['discountAmount'] as num?)?.round() ?? 0,
     orderCode: '${row['orderCode'] ?? ''}',
     cargoDescription:
         '${row['cargoTypeName'] ?? row['cargoType']} · ${row['cargoLengthCm']} × ${row['cargoWidthCm']} × ${row['cargoHeightCm']} cm',
@@ -238,9 +268,10 @@ class RemoteDriverTripRepository
         : row['payerRole'] == 'Receiver'
         ? PaymentMethod.cashReceiver
         : PaymentMethod.cashSender,
+    paid: row['paymentMethod'] == 'PayOS',
     customerName: '',
     customerPhone: '',
-    vehicle: 'Xe đã đăng ký',
+    vehicle: '${row['vehicleTypeName'] ?? 'Xe đã đăng ký'}',
     fragile: row['cargoType'] == 'Fragile',
   );
 
@@ -281,7 +312,7 @@ class RemoteDriverTripRepository
   }
 
   @override
-  Future<void> openOffer(String jobId) async {
+  Future<void> openOffer(String jobId) => _guard(() async {
     final job = current.jobs.where((j) => j.id == jobId).firstOrNull;
     if (job == null) {
       throw const TripFailure('Đơn không còn trong danh sách. Hãy tải lại.');
@@ -293,8 +324,29 @@ class RemoteDriverTripRepository
     if (!now.isBefore(deadline)) {
       throw const TripFailure('Đã hết thời gian xem lời mời này. Chờ đơn mới.');
     }
-    _emit(_copy(offer: JobOffer(job, deadline)));
-  }
+    final row = Map<String, dynamic>.from(
+      await api.request('GET', '/api/driver/matching/orders/$jobId') as Map,
+    );
+    if (row['canAccept'] != true) {
+      _emit(
+        _copy(
+          clearOffer: true,
+          jobs: current.jobs.where((j) => j.id != jobId).toList(),
+        ),
+      );
+      throw const TripFailure(
+        'Đơn không còn đủ điều kiện nhận. Hãy kiểm tra trạng thái và làm mới danh sách.',
+      );
+    }
+    final expires = DateTime.parse(row['matchingExpiresAt'] as String);
+    final effectiveDeadline = expires.isBefore(deadline) ? expires : deadline;
+    _deadlines[jobId] = effectiveDeadline;
+    if (!now.isBefore(effectiveDeadline) || current.trip?.ongoing == true) {
+      throw const TripFailure('Đơn không còn khả dụng.');
+    }
+    _rows[jobId] = row;
+    _emit(_copy(offer: JobOffer(_job(row), effectiveDeadline)));
+  });
 
   @override
   Future<void> declineOffer() async {
@@ -397,10 +449,11 @@ class RemoteDriverTripRepository
         );
       }
       if (trip.job.payment == PaymentMethod.cashSender && !trip.cashCollected) {
-        if (!cashCollected)
+        if (!cashCollected) {
           throw const TripFailure(
             'Xác nhận đã thu tiền từ người gửi trước khi gửi ảnh.',
           );
+        }
         await api.request(
           'POST',
           '/api/driver/trips/${trip.job.id}/collect-cash',
@@ -537,8 +590,9 @@ class RemoteDriverTripRepository
   @override
   Future<String> reportIncident(String message) => _guard(() async {
     final trip = current.trip;
-    if (trip == null || !trip.ongoing)
+    if (trip == null || !trip.ongoing) {
       throw const TripFailure('Chỉ báo sự cố khi đang có chuyến.');
+    }
     final result =
         await api.request(
               'POST',

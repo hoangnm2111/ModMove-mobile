@@ -72,7 +72,7 @@ class ActiveTripBloc extends Bloc<ActiveTripEvent, ActiveTripState> {
     if (event is ActiveTripUpdated) {
       emit(
         ActiveTripState(
-          event.session,
+          actions.repository.current,
           actions.repository.now,
           error: state.error,
           receipt: state.receipt,

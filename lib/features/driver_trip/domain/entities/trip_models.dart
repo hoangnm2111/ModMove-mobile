@@ -87,6 +87,7 @@ class DeliveryJob {
     this.discount = 0,
     this.commissionRate = 0,
     this.handoverPoint,
+    this.fareBreakdownAvailable = false,
   });
   final String id, pickup, dropoff, vehicle, customerName, customerPhone;
   final GeoPoint pickupPoint, dropoffPoint;
@@ -103,6 +104,7 @@ class DeliveryJob {
   final int distanceFee, serviceFee, discount;
   final double commissionRate;
   final GeoPoint? handoverPoint;
+  final bool fareBreakdownAvailable;
   GeoPoint get collectionPoint => handoverPoint ?? pickupPoint;
   String get displayCode => orderCode.isEmpty ? id : orderCode;
   int get net => fare - commission;
@@ -213,8 +215,10 @@ class ShiftSummary {
     this.completed = 0,
     this.income = 0,
     this.acceptanceRate = 0,
+    this.available = true,
   });
   final int completed, income, acceptanceRate;
+  final bool available;
 }
 
 class DriverSession {
