@@ -9,6 +9,63 @@ import 'support/remote_fixtures.dart';
 
 void main() {
   test(
+    'approved profile uses registered vehicle dimensions and server ratings',
+    () async {
+      final api = ApiClient(
+        store: MemorySessionStore(),
+        client: MockClient((r) async {
+          switch (r.url.path) {
+            case '/api/public/vehicletypes':
+              return jsonResponse([testVehicle]);
+            case '/api/driver/status':
+              return jsonResponse(driverStatus());
+            case '/api/driver/profile':
+              return jsonResponse({
+                'fullName': 'Tài Xế Thật',
+                'phoneNumber': '0901234567',
+                'citizenIdNumber': '123456789',
+                'driverLicenseNumber': 'ABC123456',
+                'completedTrips': 19,
+                'averageStars': 4.7,
+                'totalRatings': 12,
+                'vehicle': {
+                  'vehicleTypeName': 'Xe tải 1 tấn',
+                  'licensePlate': '51C-999.99',
+                  'maxLoadWeightKg': 900,
+                  'cargoBedLengthCm': 299,
+                  'cargoBedWidthCm': 155,
+                  'cargoBedHeightCm': 150,
+                  'registrationCertUrl': 'https://images.test/approved.png',
+                },
+              });
+            case '/api/driver/onboarding/status':
+              return jsonResponse({
+                'hasApplication': true,
+                'profileApprovalStatus': 'Approved',
+                'documentUrls': [],
+                'vehicleTypeName': testVehicle['name'],
+              });
+            default:
+              throw StateError('Unexpected route ${r.url.path}');
+          }
+        }),
+      );
+      addTearDown(api.close);
+      await api.saveSession(tokens());
+      final repo = RemoteDriverRepository(api);
+      await repo.initialize();
+      final app = repo.loadCachedApplication();
+      expect(app.fields['length'], '2.99');
+      expect(app.fields['plate'], '51C-999.99');
+      expect(app.fields['completedTrips'], '19');
+      expect(app.fields['averageStars'], '4.7');
+      expect(
+        app.documents[DocumentKind.registration]!.remoteReference,
+        'https://images.test/approved.png',
+      );
+    },
+  );
+  test(
     'backend form submits numeric vehicle ID and exactly five ordered document URLs',
     () async {
       Map<String, dynamic>? submitted;
@@ -18,7 +75,7 @@ void main() {
           if (r.url.path == '/api/public/vehicletypes') {
             return jsonResponse([testVehicle]);
           }
-          if (r.url.path == '/api/account/profile') {
+          if (r.url.path == '/api/driver/profile') {
             return jsonResponse({
               'fullName': 'Tài Xế Test',
               'phoneNumber': '0901234567',

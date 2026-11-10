@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:modmove_mobile/core/theme/app_theme.dart';
@@ -27,8 +28,41 @@ class DriverProfileScreen extends StatefulWidget {
   State<DriverProfileScreen> createState() => _DriverProfileScreenState();
 }
 
-class _DriverProfileScreenState extends State<DriverProfileScreen> {
+class _DriverProfileScreenState extends State<DriverProfileScreen>
+    with WidgetsBindingObserver {
   bool? _vehicle;
+  Timer? _refreshTimer;
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+    _refreshTimer = Timer.periodic(
+      const Duration(seconds: 15),
+      (_) => _refresh(),
+    );
+    WidgetsBinding.instance.addPostFrameCallback((_) => _refresh());
+  }
+
+  void _refresh() {
+    if (!mounted ||
+        !(ModalRoute.of(context)?.isCurrent ?? false) ||
+        WidgetsBinding.instance.lifecycleState == AppLifecycleState.paused)
+      return;
+    final driver = context.read<DriverController>();
+    if (driver.remote && !driver.busy && !driver.syncing) driver.refresh();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) _refresh();
+  }
+
+  @override
+  void dispose() {
+    _refreshTimer?.cancel();
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -76,6 +110,29 @@ class _DriverProfileScreenState extends State<DriverProfileScreen> {
         padding: const EdgeInsets.fromLTRB(16, 4, 16, 12),
         children: [
           ProfileIdentity(driver),
+          if (driver.remote && driver.canGoOnline) ...[
+            const SizedBox(height: 12),
+            AppCard(
+              child: Row(
+                children: [
+                  const Icon(Icons.star_rounded, color: AppColors.amber),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      driver.fields['averageStars']?.isNotEmpty == true
+                          ? '${driver.fields['averageStars']} · ${driver.fields['totalRatings']} đánh giá'
+                          : 'Chưa có đánh giá',
+                      style: appText(size: 12),
+                    ),
+                  ),
+                  Text(
+                    '${driver.fields['completedTrips'] ?? 0} chuyến',
+                    style: appText(size: 12, weight: FontWeight.w600),
+                  ),
+                ],
+              ),
+            ),
+          ],
           const SizedBox(height: 14),
           if (driver.demoEnabled) ...[
             Row(

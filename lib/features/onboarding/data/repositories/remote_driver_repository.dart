@@ -63,7 +63,7 @@ class RemoteDriverRepository implements DriverProfileRepository {
   DriverApplication loadCachedApplication() => _cached;
   @override
   Future<DriverApplication> refresh() => _guard(() async {
-    final account = await api.request('GET', '/api/account/profile') as Map;
+    final account = await api.request('GET', '/api/driver/profile') as Map;
     final status =
         await api.request('GET', '/api/driver/onboarding/status') as Map;
     final driver = await api.request('GET', '/api/driver/status') as Map;
@@ -71,6 +71,10 @@ class RemoteDriverRepository implements DriverProfileRepository {
       ..._cached.fields,
       'fullName': '${account['fullName']}',
       'phone': '${account['phoneNumber']}',
+      'email': '${account['email'] ?? ''}',
+      'completedTrips': '${account['completedTrips'] ?? 0}',
+      'averageStars': '${account['averageStars'] ?? ''}',
+      'totalRatings': '${account['totalRatings'] ?? 0}',
     };
     var approval = ApprovalStatus.draft;
     var documents = {..._cached.documents};
@@ -113,6 +117,37 @@ class RemoteDriverRepository implements DriverProfileRepository {
         'height': 'cargoBedHeightCm',
       }.entries) {
         fields[entry.key] = ((type[entry.value] as num) / 100).toString();
+      }
+    }
+    // Approved vehicle data belongs to the driver's vehicle, not today's catalog.
+    final vehicle = account['vehicle'] as Map?;
+    if (approval == ApprovalStatus.approved && vehicle != null) {
+      fields.addAll({
+        'citizenId': '${account['citizenIdNumber'] ?? ''}',
+        'license': '${account['driverLicenseNumber'] ?? ''}',
+        'vehicleType': '${vehicle['vehicleTypeName']}',
+        'plate': '${vehicle['licensePlate']}',
+        'payload': '${vehicle['maxLoadWeightKg']}',
+        for (final entry in {
+          'length': 'cargoBedLengthCm',
+          'width': 'cargoBedWidthCm',
+          'height': 'cargoBedHeightCm',
+        }.entries)
+          entry.key: ((vehicle[entry.value] as num) / 100).toString(),
+      });
+      for (final entry in {
+        DocumentKind.licenseFront: account['licenseFrontUrl'],
+        DocumentKind.licenseBack: account['licenseBackUrl'],
+        DocumentKind.registration: vehicle['registrationCertUrl'],
+        DocumentKind.inspection: vehicle['inspectionCertUrl'],
+        DocumentKind.vehicle: vehicle['vehiclePhotoUrl'],
+      }.entries) {
+        if (entry.value is String && (entry.value as String).isNotEmpty) {
+          documents[entry.key] = VerificationDocument(
+            remoteReference: entry.value as String,
+            accepted: true,
+          );
+        }
       }
     }
     _cached = DriverApplication(
