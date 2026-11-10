@@ -257,6 +257,7 @@ class CargoInspectionScreen extends StatelessWidget {
                 ],
               ),
             ),
+            const TripIncidentHistoryLink(),
             const SizedBox(height: 5),
           ],
         ),

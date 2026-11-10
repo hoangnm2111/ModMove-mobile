@@ -30,7 +30,16 @@ class _HistoryBody extends StatelessWidget {
     builder: (context, state) {
       final cubit = context.read<TripHistoryCubit>();
       return Scaffold(
-        appBar: const AppHeader('Chuyến của tôi'),
+        appBar: AppHeader(
+          'Chuyến của tôi',
+          actions: [
+            IconButton(
+              tooltip: 'Sự cố của tôi',
+              icon: const Icon(Icons.support_agent_outlined),
+              onPressed: () => Navigator.pushNamed(context, '/incidents'),
+            ),
+          ],
+        ),
         bottomNavigationBar: const DriverNavigation(1),
         body: RefreshIndicator(
           onRefresh: cubit.load,

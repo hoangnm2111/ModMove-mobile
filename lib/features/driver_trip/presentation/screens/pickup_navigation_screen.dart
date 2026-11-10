@@ -224,6 +224,7 @@ class PickupNavigationScreen extends StatelessWidget {
                           : () => showTripIncident(context),
                       child: const Text('Báo sự cố'),
                     ),
+                    const TripIncidentHistoryLink(),
                   ],
                 ),
               ),

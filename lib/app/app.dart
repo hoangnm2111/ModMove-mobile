@@ -2,6 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'driver_trip_scope.dart';
+import '../features/incidents/domain/driver_incident_repository.dart';
+import '../features/incidents/presentation/incident_list_screen.dart';
+import '../features/incidents/presentation/incident_detail_screen.dart';
+import '../features/incidents/presentation/incident_report_screen.dart';
 import '../features/driver_trip/domain/repositories/driver_trip_repository.dart';
 import '../features/driver_trip/presentation/screens/driver_dashboard.dart';
 import '../features/driver_trip/presentation/screens/job_details_screen.dart';
@@ -40,6 +44,7 @@ class ModMoveApp extends StatelessWidget {
     this.onLogout,
     this.walletBuilder,
     this.revenueBuilder,
+    this.incidentRepository,
   });
   final String screen;
   final DriverController? driverController;
@@ -49,6 +54,7 @@ class ModMoveApp extends StatelessWidget {
   final VoidCallback? onLogout;
   final WidgetBuilder? walletBuilder;
   final WidgetBuilder? revenueBuilder;
+  final DriverIncidentRepository? incidentRepository;
 
   DriverController _createDriver() {
     final fixture = DemoDriverRepository(
@@ -100,6 +106,7 @@ class ModMoveApp extends StatelessWidget {
       child: DriverTripScope(
         repository: tripRepository,
         cargoPhotos: cargoPhotos,
+        incidents: incidentRepository,
         child: MaterialApp(
           title: 'ModMove',
           debugShowCheckedModeBanner: false,
@@ -125,6 +132,26 @@ class ModMoveApp extends StatelessWidget {
                 : _home(context),
           ),
           onGenerateRoute: (settings) {
+            if (incidentRepository != null) {
+              final incidentPage = switch (settings.name) {
+                '/incidents' => IncidentListScreen(
+                  orderId: settings.arguments as String?,
+                ),
+                '/incident-detail' => IncidentDetailScreen(
+                  id: settings.arguments as String,
+                ),
+                '/incident-report' => IncidentReportScreen(
+                  orderId: settings.arguments as String,
+                ),
+                _ => null,
+              };
+              if (incidentPage != null) {
+                return MaterialPageRoute<void>(
+                  settings: settings,
+                  builder: (_) => incidentPage,
+                );
+              }
+            }
             if (settings.name == '/revenue' && revenueBuilder != null) {
               return MaterialPageRoute<void>(
                 settings: settings,
@@ -236,6 +263,9 @@ class ModMoveApp extends StatelessWidget {
         );
 
   Widget _profile(BuildContext context) => DriverProfileScreen(
+    onIncidents: incidentRepository == null
+        ? null
+        : () => Navigator.pushNamed(context, '/incidents'),
     onLogout: onLogout,
     onWallet: walletBuilder == null
         ? null

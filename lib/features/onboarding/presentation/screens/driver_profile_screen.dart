@@ -19,11 +19,13 @@ class DriverProfileScreen extends StatefulWidget {
     this.onHistory,
     this.onLogout,
     this.onWallet,
+    this.onIncidents,
   });
   final VoidCallback onHome;
   final VoidCallback onOrders;
   final ValueChanged<int> onUpdate;
   final VoidCallback? onDemo, onHistory, onLogout, onWallet;
+  final VoidCallback? onIncidents;
   @override
   State<DriverProfileScreen> createState() => _DriverProfileScreenState();
 }
@@ -135,6 +137,22 @@ class _DriverProfileScreenState extends State<DriverProfileScreen>
             ),
           ],
           const SizedBox(height: 14),
+          if (widget.onIncidents != null) ...[
+            AppCard(
+              onTap: widget.onIncidents,
+              child: const ListTile(
+                contentPadding: EdgeInsets.zero,
+                leading: Icon(
+                  Icons.support_agent_outlined,
+                  color: AppColors.orange,
+                ),
+                title: Text('Sự cố của tôi'),
+                subtitle: Text('Theo dõi phản hồi từ điều phối'),
+                trailing: Icon(Icons.chevron_right),
+              ),
+            ),
+            const SizedBox(height: 12),
+          ],
           if (driver.demoEnabled) ...[
             Row(
               children: [

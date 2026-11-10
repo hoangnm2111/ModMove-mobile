@@ -4,6 +4,7 @@ import '../../../../core/widgets/app_widgets.dart';
 import '../../domain/entities/trip_models.dart';
 import '../bloc/active_trip_bloc.dart';
 import '../widgets/trip_components.dart';
+import '../widgets/trip_contact_actions.dart';
 import 'pickup_navigation_screen.dart';
 import 'cargo_inspection_screen.dart';
 import 'pickup_approval_screen.dart';
@@ -35,6 +36,7 @@ class ActiveTripScreen extends StatelessWidget {
                   icon: 'warning',
                 ),
                 const SizedBox(height: 16),
+                const TripIncidentHistoryLink(),
                 PrimaryButton(
                   'Về trang chủ',
                   onPressed: () =>

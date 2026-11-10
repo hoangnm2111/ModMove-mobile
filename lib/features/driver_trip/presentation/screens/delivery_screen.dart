@@ -276,6 +276,7 @@ class _DeliveryBody extends StatelessWidget {
               onPressed: state.busy ? null : () => showTripIncident(context),
               child: const Text('Báo sự cố'),
             ),
+            const TripIncidentHistoryLink(),
           ],
         ),
       );

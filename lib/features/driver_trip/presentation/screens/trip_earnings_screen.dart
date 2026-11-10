@@ -208,6 +208,14 @@ class _EarningsBody extends StatelessWidget {
                         '${incident.description}\n${incident.resolution ?? 'Đang chờ điều phối xử lý'}',
                     peach: true,
                   ),
+                  TextButton(
+                    onPressed: () => Navigator.pushNamed(
+                      context,
+                      '/incident-detail',
+                      arguments: incident.id,
+                    ),
+                    child: const Text('Xem chi tiết sự cố'),
+                  ),
                 ],
                 const SizedBox(height: 18),
                 PrimaryButton(

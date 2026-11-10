@@ -2,14 +2,45 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../../core/widgets/app_widgets.dart';
 import '../bloc/active_trip_bloc.dart';
+import '../../domain/repositories/driver_trip_repository.dart';
 
 Future<void> showTripIncident(BuildContext context) async {
+  final trips = context.read<DriverTripRepository>();
+  if (trips is! TripSimulator) {
+    final trip = trips.current.trip;
+    if (trip?.ongoing == true) {
+      await Navigator.pushNamed(
+        context,
+        '/incident-report',
+        arguments: trip!.job.id,
+      );
+    }
+    return;
+  }
   final message = await showDialog<String>(
     context: context,
     builder: (_) => const _IncidentDialog(),
   );
   if (message != null && context.mounted) {
     context.read<ActiveTripBloc>().add(IncidentReported(message));
+  }
+}
+
+class TripIncidentHistoryLink extends StatelessWidget {
+  const TripIncidentHistoryLink({super.key});
+  @override
+  Widget build(BuildContext context) {
+    final trips = context.read<DriverTripRepository>();
+    if (trips is TripSimulator) return const SizedBox.shrink();
+    return TextButton.icon(
+      icon: const Icon(Icons.support_agent_outlined, size: 20),
+      label: const Text('Sự cố và phản hồi điều phối'),
+      onPressed: () => Navigator.pushNamed(
+        context,
+        '/incidents',
+        arguments: trips.current.trip?.job.id,
+      ),
+    );
   }
 }
 

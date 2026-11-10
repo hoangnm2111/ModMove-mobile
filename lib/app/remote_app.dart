@@ -16,6 +16,7 @@ import '../features/driver_trip/data/repositories/device_driver_location.dart';
 import '../features/driver_trip/data/repositories/remote_driver_trip_repository.dart';
 import '../features/driver_trip/data/services/driver_tracking_connection.dart';
 import 'app.dart';
+import '../features/incidents/data/remote_driver_incident_repository.dart';
 import '../features/wallet/data/remote_wallet_repository.dart';
 import '../features/wallet/presentation/wallet_cubit.dart';
 import '../features/wallet/presentation/wallet_screen.dart';
@@ -134,6 +135,7 @@ class _DriverSessionAppState extends State<_DriverSessionApp> {
         return ModMoveApp(
           driverController: _driver,
           tripRepository: _trips,
+          incidentRepository: RemoteDriverIncidentRepository(widget.api),
           onLogout: widget.logout,
           walletBuilder: (_) => BlocProvider(
             create: (_) => WalletCubit(RemoteWalletRepository(widget.api)),
