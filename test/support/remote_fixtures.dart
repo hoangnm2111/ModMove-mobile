@@ -43,6 +43,45 @@ final testVehicle = {
   'pricePerKm': 15000,
   'minimumFare': 90000,
 };
+
+Map<String, dynamic> walletFixture({
+  int deposit = 250000,
+  int earnings = 120000,
+  bool pending = false,
+}) => {
+  'walletId': 1,
+  'walletStatus': 'Active',
+  'depositBalance': deposit,
+  'earningsBalance': earnings,
+  'commissionDebt': deposit < 0 ? -deposit : 0,
+  'maxWithdrawableAmount': (earnings + (deposit < 0 ? deposit : 0)).clamp(
+    0,
+    earnings,
+  ),
+  'minCodDeposit': 200000,
+  'canReceiveCod': deposit >= 200000,
+  'hasPendingWithdrawal': pending,
+  'pendingWithdrawalAmount': pending ? 10000 : 0,
+  'bankAccount': {
+    'bankName': 'Vietcombank',
+    'bankAccountNumber': '1234567890',
+    'bankAccountHolder': 'TAI XE TEST',
+  },
+};
+
+Map<String, dynamic> pageFixture(
+  List<dynamic> items, {
+  int page = 1,
+  int? total,
+  bool more = false,
+}) => {
+  'items': items,
+  'pageNumber': page,
+  'pageSize': 20,
+  'totalCount': total ?? items.length,
+  'hasNextPage': more,
+  'hasPreviousPage': page > 1,
+};
 Map<String, dynamic> driverStatus({bool online = false, int? orderId}) => {
   'hasProfile': true,
   'approvalStatus': 'Approved',

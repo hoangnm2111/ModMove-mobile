@@ -274,6 +274,22 @@ class ApiClient {
       'Chưa đủ điều kiện nhận đơn. Kiểm tra online, GPS, loại xe và số dư cọc.',
     'ORDER_CANCELLED' => 'Đơn hàng đã bị hủy.',
     'DRIVER_NOT_APPROVED' => 'Hồ sơ tài xế cần được duyệt trước.',
+    'BANK_ACCOUNT_REQUIRED' =>
+      'Thêm tài khoản ngân hàng trước khi rút thu nhập.',
+    'WITHDRAWAL_ALREADY_PENDING' =>
+      'Bạn đã có một yêu cầu rút tiền đang chờ xử lý.',
+    'INSUFFICIENT_BALANCE' => 'Số dư khả dụng không đủ để thực hiện giao dịch.',
+    'CASH_NOT_COLLECTED' =>
+      'Xác nhận đã thu tiền trước khi hoàn tất giao hàng.',
+    'CASH_COLLECTION_NOT_ALLOWED' =>
+      'Chưa đến bước thu tiền của chuyến này. Hãy tải lại trạng thái.',
+    'ORDER_ALREADY_PAID' =>
+      'Tiền chuyến này đã được ghi nhận. Hãy tải lại trạng thái.',
+    'PICKUP_PHOTO_LIMIT' =>
+      'Đã dùng hết 5 lần gửi ảnh. Hãy báo sự cố để điều phối hỗ trợ.',
+    'TOO_MANY_PHOTOS' => 'Chỉ gửi tối đa 5 ảnh trong một lần.',
+    'ORDER_NOT_YOURS' =>
+      'Đơn không còn được giao cho bạn. Hãy tải lại danh sách chuyến.',
     _ => switch (status) {
       400 => 'Thông tin chưa hợp lệ. Kiểm tra các trường đã nhập.',
       401 => 'Thông tin đăng nhập không đúng hoặc phiên đã hết hạn.',

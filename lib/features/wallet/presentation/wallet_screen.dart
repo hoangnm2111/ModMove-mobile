@@ -1,10 +1,25 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:url_launcher/url_launcher.dart';
 import '../../../core/widgets/app_widgets.dart';
+import '../../../core/widgets/driver_navigation.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/formatting/currency.dart';
+import '../domain/driver_wallet_repository.dart';
 import 'wallet_cubit.dart';
+import 'wallet_transactions_screen.dart';
+import 'deposit_screen.dart';
+import 'withdrawal_screen.dart';
+
+Future<void> openWalletPage(BuildContext context, Widget page) async {
+  final cubit = context.read<WalletCubit>();
+  await Navigator.push<void>(
+    context,
+    MaterialPageRoute(
+      builder: (_) => BlocProvider.value(value: cubit, child: page),
+    ),
+  );
+  if (!cubit.isClosed) await cubit.refresh();
+}
 
 class WalletScreen extends StatefulWidget {
   const WalletScreen({super.key});
@@ -14,7 +29,6 @@ class WalletScreen extends StatefulWidget {
 
 class _WalletScreenState extends State<WalletScreen>
     with WidgetsBindingObserver {
-  final _amount = TextEditingController(text: '50000');
   @override
   void initState() {
     super.initState();
@@ -32,7 +46,6 @@ class _WalletScreenState extends State<WalletScreen>
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
-    _amount.dispose();
     super.dispose();
   }
 
@@ -40,115 +53,195 @@ class _WalletScreenState extends State<WalletScreen>
   Widget build(BuildContext context) => BlocBuilder<WalletCubit, WalletState>(
     builder: (context, state) {
       final cubit = context.read<WalletCubit>();
+      final balance = state.balance;
       return Scaffold(
         appBar: AppHeader(
           'Ví tài xế',
           actions: [
             IconButton(
+              tooltip: 'Tải lại ví',
               onPressed: state.busy ? null : cubit.refresh,
               icon: const Icon(Icons.refresh),
             ),
           ],
         ),
+        bottomNavigationBar: const DriverNavigation(2),
         body: RefreshIndicator(
           onRefresh: cubit.refresh,
           child: ListView(
-            padding: const EdgeInsets.all(20),
+            padding: const EdgeInsets.all(16),
             children: [
-              AppCard(
-                color: AppColors.peach,
-                child: Column(
+              if (state.busy) const LinearProgressIndicator(),
+              Container(
+                padding: const EdgeInsets.symmetric(
+                  vertical: 26,
+                  horizontal: 18,
+                ),
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(14),
+                  gradient: const LinearGradient(
+                    colors: [AppColors.orange, Color(0xFFF47716)],
+                  ),
+                ),
+                child: Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Text('Số dư ký quỹ'),
-                    const SizedBox(height: 8),
-                    Text(
-                      state.balance == null
-                          ? '—'
-                          : formatVnd(state.balance!.deposit),
-                      style: appText(size: 30, weight: FontWeight.w700),
+                    Expanded(
+                      child: _balance(
+                        'Ví thu nhập',
+                        balance?.earnings,
+                        'Thu nhập đã ghi nhận',
+                      ),
                     ),
-                    const SizedBox(height: 16),
-                    Text(
-                      'Ví thu nhập: ${state.balance == null ? '—' : formatVnd(state.balance!.earnings)}',
+                    Container(
+                      width: 1,
+                      height: 75,
+                      color: Colors.white30,
+                      margin: const EdgeInsets.symmetric(horizontal: 12),
+                    ),
+                    Expanded(
+                      child: _balance(
+                        'Ký quỹ',
+                        balance?.deposit,
+                        'Dùng để nhận đơn',
+                      ),
                     ),
                   ],
                 ),
               ),
-              const SizedBox(height: 24),
-              const SectionTitle('Nạp tiền ký quỹ'),
               const SizedBox(height: 12),
-              TextField(
-                controller: _amount,
-                keyboardType: TextInputType.number,
-                decoration: const InputDecoration(
-                  labelText: 'Số tiền (VND)',
-                  helperText: 'Tối thiểu 50.000đ',
-                ),
-              ),
-              const SizedBox(height: 16),
-              if (state.error != null)
-                Padding(
-                  padding: const EdgeInsets.only(bottom: 12),
-                  child: Notice(state.error!, peach: true),
-                ),
-              PrimaryButton(
-                'Tạo thanh toán PayOS',
-                busy: state.busy,
-                onPressed: state.busy
-                    ? null
-                    : () => cubit.topUp(int.tryParse(_amount.text.trim()) ?? 0),
-              ),
-              if (state.payment != null) ...[
-                const SizedBox(height: 16),
+              if (balance != null)
                 Notice(
-                  'Đang chờ thanh toán ${formatVnd(state.payment!.amount)}',
+                  !balance.active
+                      ? 'Ví đang bị khóa'
+                      : balance.canReceiveCash
+                      ? 'Đủ ký quỹ tối thiểu để nhận đơn tiền mặt'
+                      : 'Cần bổ sung ký quỹ để nhận đơn tiền mặt',
                   detail:
-                      'Liên kết hết hạn lúc ${state.payment!.expiresAt.toLocal().toString().substring(0, 16)}. Số dư chỉ cập nhật sau xác nhận từ PayOS.',
+                      'Ký quỹ tối thiểu ${formatVnd(balance.minimumDeposit)}. Hệ thống kiểm tra thêm hoa hồng của từng đơn.',
+                  icon: balance.canReceiveCash ? 'check' : 'warning',
+                  peach: !balance.canReceiveCash,
+                  success: balance.active && balance.canReceiveCash,
                 ),
-                TextButton(
-                  onPressed: () async {
-                    if (!DateTime.now().isBefore(state.payment!.expiresAt)) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(
-                          content: Text(
-                            'Liên kết đã hết hạn. Hãy tạo thanh toán mới.',
-                          ),
-                        ),
-                      );
-                      return;
-                    }
-                    try {
-                      if (!await launchUrl(
-                        state.payment!.checkoutUrl,
-                        mode: LaunchMode.externalApplication,
-                      )) {
-                        throw StateError('launch');
-                      }
-                    } catch (_) {
-                      if (context.mounted) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(
-                            content: Text(
-                              'Chưa mở được trang thanh toán. Vui lòng thử lại.',
-                            ),
-                          ),
-                        );
-                      }
-                    }
-                  },
-                  child: const Text('Mở thanh toán PayOS'),
+              if (balance != null && balance.debt > 0) ...[
+                const SizedBox(height: 8),
+                Notice(
+                  'Nợ hoa hồng ${formatVnd(balance.debt)}',
+                  detail:
+                      'Có thể rút ${formatVnd(balance.withdrawable)} sau khi trừ nợ.',
+                  peach: true,
                 ),
               ],
-              const SizedBox(height: 24),
-              const Notice(
-                'Rút tiền và thống kê thu nhập đang chờ API.',
-                icon: 'info',
+              const SizedBox(height: 14),
+              IntrinsicHeight(
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Expanded(
+                      child: _action(
+                        'wallet-plus',
+                        'Nạp ký quỹ',
+                        () => openWalletPage(context, const DepositScreen()),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: _action(
+                        'withdraw',
+                        'Rút thu nhập',
+                        () => openWalletPage(context, const WithdrawalScreen()),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: _action(
+                        'receipt',
+                        'Báo cáo doanh thu',
+                        () => Navigator.pushNamed(context, '/revenue'),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              if (state.error != null) ...[
+                const SizedBox(height: 12),
+                Notice(state.error!, peach: true),
+              ],
+              const SizedBox(height: 18),
+              Row(
+                children: [
+                  const Expanded(
+                    child: SectionTitle('Giao dịch gần đây', size: 16),
+                  ),
+                  TextButton(
+                    onPressed: () => openWalletPage(
+                      context,
+                      const WalletTransactionsScreen(),
+                    ),
+                    child: const Text('Xem tất cả'),
+                  ),
+                ],
+              ),
+              if (state.transactions?.items.isEmpty == true)
+                const AppCard(child: Text('Chưa có giao dịch.')),
+              for (final tx
+                  in state.transactions?.items.take(5) ?? <WalletTransaction>[])
+                WalletTransactionTile(tx),
+              const SizedBox(height: 12),
+              ListTile(
+                contentPadding: EdgeInsets.zero,
+                leading: const AppIcon('bank', color: AppColors.orange),
+                title: const Text('Tài khoản nhận tiền'),
+                subtitle: Text(
+                  balance?.bank == null
+                      ? 'Chưa liên kết ngân hàng'
+                      : '${balance!.bank!.name} · ${balance.bank!.masked}',
+                ),
+                trailing: const AppIcon('chevron-right'),
+                onTap: () => openWalletPage(context, const WithdrawalScreen()),
               ),
             ],
           ),
         ),
       );
     },
+  );
+  Widget _balance(String label, int? value, String hint) => Column(
+    crossAxisAlignment: CrossAxisAlignment.start,
+    children: [
+      Text(
+        label,
+        style: appText(size: 12, color: Colors.white, weight: FontWeight.w600),
+      ),
+      const SizedBox(height: 8),
+      FittedBox(
+        fit: BoxFit.scaleDown,
+        child: Text(
+          value == null ? '—' : formatVnd(value),
+          style: appText(
+            size: 25,
+            color: Colors.white,
+            weight: FontWeight.w800,
+          ),
+        ),
+      ),
+      const SizedBox(height: 7),
+      Text(hint, style: appText(size: 10, color: Colors.white)),
+    ],
+  );
+  Widget _action(String icon, String label, VoidCallback onTap) => AppCard(
+    onTap: onTap,
+    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 16),
+    child: Column(
+      children: [
+        AppIcon(icon, size: 30, color: AppColors.orange),
+        const SizedBox(height: 12),
+        Text(
+          label,
+          textAlign: TextAlign.center,
+          style: appText(size: 12, weight: FontWeight.w600),
+        ),
+      ],
+    ),
   );
 }
