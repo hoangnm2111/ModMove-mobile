@@ -48,6 +48,35 @@ ThemeData buildAppTheme() => ThemeData(
     labelLarge: appText(size: 14, weight: FontWeight.w600),
   ),
   dividerTheme: const DividerThemeData(color: AppColors.line, thickness: 1),
+  segmentedButtonTheme: SegmentedButtonThemeData(
+    style: ButtonStyle(
+      shape: WidgetStatePropertyAll(
+        RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+      ),
+      side: const WidgetStatePropertyAll(BorderSide.none),
+      backgroundColor: WidgetStateProperty.resolveWith(
+        (states) => states.contains(WidgetState.selected)
+            ? AppColors.orange
+            : AppColors.pale,
+      ),
+      foregroundColor: WidgetStateProperty.resolveWith(
+        (states) => states.contains(WidgetState.selected)
+            ? Colors.white
+            : AppColors.ink,
+      ),
+      textStyle: WidgetStatePropertyAll(
+        appText(size: 13, weight: FontWeight.w600),
+      ),
+    ),
+  ),
+  outlinedButtonTheme: OutlinedButtonThemeData(
+    style: OutlinedButton.styleFrom(
+      minimumSize: const Size(0, 46),
+      foregroundColor: AppColors.orange,
+      side: const BorderSide(color: AppColors.orange),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+    ),
+  ),
   appBarTheme: AppBarTheme(
     backgroundColor: Colors.white,
     surfaceTintColor: Colors.transparent,

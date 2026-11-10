@@ -46,6 +46,10 @@ class DriverHomeScreen extends StatelessWidget {
           onSelect: (i) {
             if (i == 3) Navigator.pushNamed(context, '/profile');
             if (i == 1) {
+              if (onSimulation == null) {
+                Navigator.pushNamed(context, '/trips');
+                return;
+              }
               if (session.trip?.ongoing ?? false) {
                 onActiveTrip?.call();
               } else {
@@ -272,7 +276,7 @@ class DriverHomeScreen extends StatelessWidget {
                             children: [
                               _summary(
                                 'route',
-                                onSimulation == null
+                                !session.shift.available
                                     ? '—'
                                     : '${session.shift.completed}',
                                 'chuyến',
@@ -280,7 +284,7 @@ class DriverHomeScreen extends StatelessWidget {
                               const SizedBox(width: 5),
                               _summary(
                                 'coins',
-                                onSimulation == null
+                                !session.shift.available
                                     ? '—'
                                     : vnd(session.shift.income),
                                 'Thu nhập',
@@ -289,9 +293,11 @@ class DriverHomeScreen extends StatelessWidget {
                               _summary(
                                 'chart-bar',
                                 onSimulation == null
-                                    ? '—'
+                                    ? '${session.jobs.length}'
                                     : '${session.shift.acceptanceRate}%',
-                                'Tỷ lệ nhận',
+                                onSimulation == null
+                                    ? 'Đơn gần bạn'
+                                    : 'Tỷ lệ nhận',
                               ),
                             ],
                           ),

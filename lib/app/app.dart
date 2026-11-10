@@ -6,6 +6,8 @@ import '../features/driver_trip/domain/repositories/driver_trip_repository.dart'
 import '../features/driver_trip/presentation/screens/driver_dashboard.dart';
 import '../features/driver_trip/presentation/screens/job_details_screen.dart';
 import '../features/driver_trip/presentation/screens/active_trip_screen.dart';
+import '../features/driver_trip/presentation/screens/trip_history_screen.dart';
+import '../features/driver_trip/presentation/screens/trip_earnings_screen.dart';
 import '../core/theme/app_theme.dart';
 import '../core/widgets/app_widgets.dart';
 import '../features/home/data/repositories/demo_fare_repository.dart';
@@ -37,6 +39,7 @@ class ModMoveApp extends StatelessWidget {
     this.cargoPhotos,
     this.onLogout,
     this.walletBuilder,
+    this.revenueBuilder,
   });
   final String screen;
   final DriverController? driverController;
@@ -45,6 +48,7 @@ class ModMoveApp extends StatelessWidget {
   final CargoPhotoRepository? cargoPhotos;
   final VoidCallback? onLogout;
   final WidgetBuilder? walletBuilder;
+  final WidgetBuilder? revenueBuilder;
 
   DriverController _createDriver() {
     final fixture = DemoDriverRepository(
@@ -121,6 +125,25 @@ class ModMoveApp extends StatelessWidget {
                 : _home(context),
           ),
           onGenerateRoute: (settings) {
+            if (settings.name == '/revenue' && revenueBuilder != null) {
+              return MaterialPageRoute<void>(
+                settings: settings,
+                builder: revenueBuilder!,
+              );
+            }
+            if (settings.name == '/trips') {
+              return MaterialPageRoute<void>(
+                settings: settings,
+                builder: (_) => const TripHistoryScreen(),
+              );
+            }
+            if (settings.name == '/trip-earnings') {
+              return MaterialPageRoute<void>(
+                settings: settings,
+                builder: (_) =>
+                    TripEarningsScreen(id: settings.arguments as String),
+              );
+            }
             if (settings.name == '/wallet' && walletBuilder != null) {
               return MaterialPageRoute<void>(
                 settings: settings,
@@ -220,6 +243,11 @@ class ModMoveApp extends StatelessWidget {
     onDemo: () => Navigator.pushNamed(context, '/driver-demo'),
     onHistory: () => Navigator.pushNamed(context, '/driver-history'),
     onOrders: () {
+      if (context.read<DriverController>().remote &&
+          context.read<DriverController>().canGoOnline) {
+        Navigator.pushNamed(context, '/trips');
+        return;
+      }
       final trip = context.read<DriverTripRepository>().current.trip;
       if (trip?.ongoing ?? false) {
         Navigator.pushNamed(context, '/active-trip');
