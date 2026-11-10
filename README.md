@@ -31,12 +31,12 @@ Cross-platform mobile application built with **Flutter (Android)** supporting tw
 
 ## Run and review the mobile UI
 
-The app now defaults to the real local backend at `http://10.0.2.2:5133` on Android Emulator. Start the backend, then run `flutter run` from this repository. See [backend API setup and sequential driver testing](docs/backend-api.md) for authentication, onboarding, GPS, matching, wallet, and currently unavailable endpoints.
+The app defaults to the real local backend at `http://10.0.2.2:5133` on Android Emulator. Start the backend, then run `flutter run` from this repository. See [backend API setup and sequential driver testing](docs/backend-api.md) for all 11 Driver tasks and the remaining Cloudinary/PayOS verification.
 
 The UI fixture commands below describe the earlier demo. Add `--dart-define=USE_MOCK_API=true` when reviewing those mock screens; `SCREEN` does not bypass authentication in real API mode.
 
-The Home, public fare, driver verification and profile screens are implemented
-using Flutter Material, BLoC and feature-first Clean Architecture.
+Driver onboarding, profile, dispatch, pickup, POD, trip earnings, wallet and
+revenue screens use Flutter Material, BLoC/Cubit and feature-first Clean Architecture.
 
 ```sh
 flutter pub get
@@ -48,22 +48,25 @@ points, validation commands, APK location and current mock-data boundaries.
 See [architecture](docs/architecture.md) for source organization and dependency
 direction. Review screenshots are generated locally and excluded from Git.
 
-## Driver pickup (FE-19 to FE-23)
+## Driver flow (FE-43, FE-27, FE-19 to FE-23, FE-25, FE-26, FE-28, FE-29)
 
-Online/offline, mock GPS, 30-second job offers, job details/atomic acceptance,
-pickup navigation, cargo evidence uploads and customer approval are implemented
-with BLoC/Cubit. To test the connected driver flow on an Android emulator, run:
+Online/offline, device GPS, 30-second offers, job details/atomic acceptance,
+pickup, evidence review, POD, cash collection, trip history/earnings, wallet
+top-up/withdrawal and Day/Week/Month revenue use real backend contracts.
+To run on an Android emulator:
 
 ```sh
 flutter run
 ```
 
 Follow **Đăng ký tài xế (FE-43) → Gửi hồ sơ xét duyệt → Hồ sơ tài xế (FE-27)**.
-Use **Mô phỏng** to simulate approval, return to the profile, then select
-**Vào trang chủ tài xế (FE-19)** and go online. **Tài khoản** returns to the same
-profile; its **Đơn hàng** tab opens the active trip. Pending/rejected profiles
-cannot go online. The separate `--dart-define=SCREEN=driver-home` shortcut seeds
-an approved demo driver and skips onboarding; it is only for isolated trip tests.
+An Admin approves the application. Return to the profile, select
+**Vào trang chủ tài xế (FE-19)** and go online. **Tài khoản** returns to the
+profile, **Đơn hàng** opens trip history, and **Ví** opens balances, transactions,
+withdrawals and revenue. Pending/rejected profiles cannot go online.
+Pickup photos require customer approval; Delivered remains distinct from the
+Completed settlement. The separate `SCREEN=driver-home` shortcut only seeds a
+demo driver when `USE_MOCK_API=true`.
 
 Configure the Android key once using [Google Maps setup and sequential UI tests](docs/google-maps-android.md).
 Maps use the native Google Maps SDK, with pan/pinch/rotate, zoom/recenter controls
@@ -71,22 +74,25 @@ and an animated 5 km dispatch area while searching. `android/secrets.properties`
 stays ignored. No extra `GOOGLE_MAPS_ENABLED` flag is needed.
 Until a key is configured, the app automatically uses the labelled original mock
 map with pan/zoom and animated search waves. Run `flutter run` now to test the
-full driver flow; after key/Billing setup, rebuild to switch to Google Maps.
+driver UI; after key/Billing setup, rebuild to switch to Google Maps.
 
-Read [the pickup walkthrough](docs/driver-pickup-mock.md) for demo scenarios,
-architecture and tests. The trip API, GPS, routing and
-uploads are mocked; the session resets on app restart. Screenshots stay ignored.
+Read [the real API walkthrough](docs/backend-api.md) for sequential testing.
+Cloudinary/PayOS credentials were unavailable during local verification, so
+real uploads/payments and a full new trip through settlement remain to be tested.
+Routing opens Google Maps externally; GPS currently runs in the foreground.
+The older [pickup walkthrough](docs/driver-pickup-mock.md) applies only to the
+explicit mock mode. Screenshots stay ignored.
 
 ## Driver profile mock API
 
-Driver onboarding now supports a complete interactive demo: register, upload
+With `USE_MOCK_API=true`, driver onboarding supports an interactive demo: register, upload
 documents, submit, simulate a rejection, replace rejected documents, resubmit,
-approve and toggle availability. The normal app persists the mock profile and
+approve and toggle availability. The demo persists the mock profile and
 version history locally. A separate **Mô phỏng** screen controls review outcomes
 and one-shot API failures; the driver screens expose loading, retry and draft save.
 
 Read [the Vietnamese walkthrough](docs/driver-profile-mock.md) for demo steps,
 the proposed mock HTTP contract and the exact source call order for submission.
 Presentation uses BLoC/Cubit, and the original profile mock API and persisted data
-remain compatible. The pickup flow is documented separately above; wallet and
-earnings operations remain planned.
+remain compatible. Real wallet and earnings screens are available in the default
+API mode; the legacy demo is retained for isolated onboarding/pickup review.

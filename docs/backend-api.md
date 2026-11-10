@@ -1,63 +1,170 @@
-# Mobile kết nối backend thật
+# Driver mobile: API thật và test tuần tự
 
-Ứng dụng mặc định dùng API thật. Android Emulator kết nối máy host qua `http://10.0.2.2:5133`; không thêm `/api` vào `API_BASE_URL`.
+Cập nhật 10/11/2026, đối chiếu backend local commit `2cbed81`.
+Ứng dụng mặc định gọi API thật; lỗi HTTP không chuyển sang dữ liệu mock.
+Backend là nguồn quyết định trạng thái chuyến, số tiền, hồ sơ và quyền nhận đơn.
+
+## Chạy trên Android Emulator
+
+Backend đang chạy ở `http://localhost:5133` trên máy host. Mở máy ảo Android
+Studio, chạy từ thư mục `ModMove-mobile`:
 
 ```powershell
-# Terminal backend, từ ModMove-backend
-docker start modmove-mobile-mysql
-dotnet run --project src/ModMove.WebApi --launch-profile http
-
-# Terminal mobile, từ ModMove-mobile
+flutter pub get
 flutter run
 ```
 
-MySQL local được tạo trong container riêng `modmove-mobile-mysql`, volume `modmove-mobile-mysql-data`, chỉ bind `127.0.0.1:3306`. Cấu hình DB/JWT đã đặt trong file **không commit** `ModMove-backend/src/ModMove.WebApi/appsettings.Development.json`. Máy khác cần tự tạo MySQL và cấu hình theo README backend. Không dùng cấu hình này cho production.
+Mobile tự dùng `http://10.0.2.2:5133`, không thêm `/api` vào `API_BASE_URL`.
+Nếu có nhiều thiết bị: `flutter devices`, rồi `flutter run -d <device-id>`.
+Điện thoại thật cần URL LAN của máy chạy backend:
+`flutter run --dart-define=API_BASE_URL=http://<IP-LAN>:5133`.
+Debug cho phép HTTP local; release cần HTTPS.
 
-Server khác: `flutter run --dart-define=API_BASE_URL=https://api.example.com`. Debug cho phép HTTP để chạy local; release cần HTTPS. Điện thoại thật cần địa chỉ LAN phù hợp, không dùng `10.0.2.2`.
+Không cần thay đổi source backend để chạy mobile. Cấu hình database, SMTP,
+Cloudinary và PayOS thuộc môi trường backend. Thông tin thiết lập backend xem
+README của repo backend.
 
-Muốn mở lại toàn bộ bản mock: `flutter run --dart-define=USE_MOCK_API=true`. Các fixture `SCREEN=...` chỉ dùng trong chế độ mock. Lỗi server ở chế độ API thật **không** chuyển thành dữ liệu/thao tác mock. Bản đồ mô phỏng vẫn được giữ khi chưa cấu hình Google Maps; GPS gửi server là vị trí thiết bị, độc lập với hình bản đồ.
+## Phạm vi đã tích hợp
 
-## Những API đã nối
+Các đường dẫn trong bảng có tiền tố `/api`.
 
-| Chức năng | API và hành vi |
+| Task | Màn hình và API |
 | --- | --- |
-| Đăng ký tài xế | `POST /api/public/auth/register-driver`; xác minh `/verify-email` kèm email, OTP và mật khẩu đã đăng ký; gửi lại `/otp/resend` |
-| Đăng nhập/phiên | `/login`, `/refresh`, `/api/account/logout`; chỉ role Driver; JWT/refresh token lưu mã hóa; refresh xoay token được tuần tự hóa |
-| Thông tin tài khoản | `GET /api/account/profile` |
-| Loại xe | `GET /api/public/vehicletypes`; hiển thị tên server, gửi ID số, kiểm tra tải trọng tối đa |
-| Upload hồ sơ | `POST /api/driver/uploads`, multipart field `file`, JPG/PNG ≤5 MB; endpoint bổ sung trong backend cùng đợt này |
-| Nộp/trạng thái | `POST /api/driver/onboarding`, `GET /api/driver/onboarding/status`; hiển thị Pending/Rejected/Approved và lý do từ chối thực tế |
-| Online và ví | `GET /api/driver/status`, `PATCH /api/driver/online-status` với `{isOnline}` |
-| GPS | Xin quyền vị trí thiết bị; SignalR `/hubs/tracking` → `SendLocation(lat,lng)` mỗi khoảng 5 giây; dùng `POST /api/driver/location` khi WebSocket chưa kết nối |
-| Đồng bộ | Nghe `OrderStatusChanged`/`NotificationReceived`, tải lại trạng thái; polling 5 giây để tìm đơn và khôi phục khi mất realtime |
-| Đơn gần tài xế | `GET /api/driver/matching/orders`; backend lọc khoảng cách, loại xe, GPS, ví cọc và đơn đang chạy |
-| Nhận đơn | `POST /api/driver/matching/orders/{orderId}/accept`; giữ countdown tuyệt đối 30 giây; 409 không tạo chuyến giả; mất response thì đọc trạng thái trước, không gửi POST lặp |
-| Ví/nạp cọc | Số dư từ `/api/driver/status`; `POST /api/driver/wallet/topup` với `{amount,platform:"App"}`; mở checkout PayOS; chỉ số dư server xác nhận mới được hiển thị |
+| FE-43 | Đăng ký `POST /public/auth/register-driver`, xác minh `/verify-email`, gửi lại `/otp/resend`; upload `POST /driver/uploads`; loại xe `GET /public/vehicletypes`; nộp `POST /driver/onboarding`, trạng thái `GET /driver/onboarding/status` |
+| FE-27 | Hồ sơ, xe thực tế, đánh giá và số chuyến từ `GET /driver/profile`; tự tải lại trạng thái khi quay về app và mỗi 15 giây khi đang mở hồ sơ |
+| FE-19 | `GET /driver/status`, `PATCH /driver/online-status`; vị trí thiết bị qua SignalR `/hubs/tracking` → `SendLocation` mỗi khoảng 5 giây, REST `POST /driver/location` dự phòng; chỉ số hôm nay từ `GET /driver/wallet/earnings` |
+| FE-20 | `GET /driver/matching/orders`; countdown tối đa 30 giây, giới hạn bởi thời hạn ghép đơn của server; không bắt đầu lại khi polling |
+| FE-21 | `GET /driver/matching/orders/{id}` cho chi tiết và điều kiện nhận; `POST /driver/matching/orders/{id}/accept`; xử lý 409 và mất response mà không tự gửi POST lặp |
+| FE-22 | `GET /driver/trips/{id}` khôi phục chuyến/điểm bàn giao; `POST /driver/trips/{id}/arrive`; gọi khách và mở chỉ đường Google Maps |
+| FE-23 | `POST /driver/uploads`, `POST /driver/trips/{id}/pickup` với 2–5 ảnh; tiền mặt người gửi trả qua `POST /driver/trips/{id}/collect-cash`; chờ khách duyệt ảnh |
+| FE-25 | `POST /driver/trips/{id}/arrive-dropoff`, upload POD, `POST /driver/trips/{id}/deliver` với ảnh và xác nhận tiền mặt; hiển thị đã giao/chờ khách xác nhận |
+| FE-26 | Lịch sử phân trang `GET /driver/trips`; thu nhập mỗi chuyến từ `GET /driver/trips/{id}`: cước, phí, giảm giá, hoa hồng và thực nhận |
+| FE-28 | `GET /driver/wallet`, `GET /driver/wallet/transactions`, `GET /driver/wallet/withdrawals`; `PUT /driver/wallet/bank-account`, `POST /driver/wallet/withdrawals`, `POST /driver/wallet/topup` |
+| FE-29 | `GET /driver/wallet/earnings` theo ngày/tuần/tháng, giờ Việt Nam; tổng và so sánh kỳ trước từ server; đọc hết các trang để biểu đồ không bỏ sót chuyến |
 
-Hồ sơ backend nhận **5 URL theo thứ tự**: GPLX trước, GPLX sau, đăng ký xe, đăng kiểm, ảnh xe. CCCD hiện chỉ gửi số, không có trường ảnh CCCD. Kích thước thùng xe lấy từ danh mục loại xe. Bản nháp chỉ lưu trên thiết bị, mã hóa và tách theo tài khoản/server; backend chưa có endpoint lưu nháp/lịch sử dành cho Driver. Khi bị từ chối, tài xế được sửa thông tin và gửi phiên bản mới. Quyết định duyệt luôn thực hiện ở Admin, không có nút tự duyệt trong chế độ thật.
+Đăng nhập/refresh/logout dùng các API auth hiện có; JWT và refresh token được
+lưu mã hóa, refresh token được tuần tự hóa. Mobile chỉ chấp nhận role Driver.
+Báo sự cố chuyến đang chạy gọi `POST /driver/incidents`.
+
+Hồ sơ nộp đúng 5 URL theo thứ tự: GPLX trước, GPLX sau, đăng ký xe, đăng kiểm,
+ảnh xe. CCCD hiện chỉ có trường số, chưa có trường ảnh trong API. Ảnh JPG/PNG
+tối đa 5 MB được upload multipart field `file` lên backend. Mobile không chứa
+Cloudinary secret. Bản nháp mã hóa trên thiết bị, tách theo tài khoản/server;
+backend chưa có API bản nháp/lịch sử hồ sơ cho Driver. Xe đã duyệt hiển thị
+thông số xe đăng ký từ hồ sơ, không thay bằng kích thước danh mục.
 
 ## Test tuần tự trên giao diện
 
-1. Chạy backend, mở app → **Đăng ký tài xế** → nhập thông tin → OTP. Chưa cấu hình SMTP thì backend Development ghi OTP trong terminal dạng `[DEV] Register OTP ... To: ...`.
-2. Xác minh → chọn 2 ảnh GPLX, nhập CCCD/GPLX → chọn loại xe, biển số, tải trọng và 3 ảnh xe → gửi hồ sơ. **Bước upload cần cấu hình Cloudinary thật.**
-3. App hiện chờ duyệt. Admin duyệt/từ chối bằng web hoặc Swagger `http://localhost:5133/swagger`; demo Admin: `admin@modmove.local` / `ModMove@123`. Driver không dùng token Admin.
-4. Bấm **Kiểm tra trạng thái mới nhất**; nếu từ chối, sửa và gửi lại; nếu được duyệt, bấm **Vào trang chủ tài xế**.
-5. Bật online, cấp quyền vị trí. Trong emulator: Extended controls → Location → đặt vị trí gần đơn, ví dụ `10.7769, 106.7009` cho dữ liệu seed TP.HCM. Đơn phải còn thời hạn ghép, đúng loại xe; tiền mặt cần đủ ví cọc. Danh sách rỗng có thể là kết quả đúng từ server.
-6. Chọn đơn → nhận trong 30 giây. Kiểm tra `activeOrderId` trên backend; khởi động lại app vẫn nhận biết đơn đang chạy. App giữ chi tiết đã nhận ở bộ nhớ mã hóa và đối chiếu với server; nếu chưa có cache thì chỉ hiện mã đơn vì backend chưa có GET chi tiết đơn dành cho Driver.
-7. Tab **Ví** → nạp ít nhất 50.000đ → mở PayOS → trở lại app/tải lại số dư. Không tự cộng tiền khi mở trang hoặc khi quay lại.
+### 1. Đăng ký → chờ duyệt → được duyệt
 
-Đăng nhập nhanh với driver được duyệt, chưa có chuyến: `driver2@modmove.local` / `ModMove@123` (dữ liệu seed Development). `driver@modmove.local` đã có chuyến seed, nên không thấy đơn mới. Dữ liệu seed được backend tạo để kiểm thử; các thao tác của mobile vẫn đi qua HTTP/SignalR thật.
+1. Mở app → **Đăng ký tài xế**, nhập thông tin và OTP. Nếu SMTP chưa cấu hình,
+   backend Development hiện OTP trong terminal theo cấu hình môi trường.
+2. Chọn 2 ảnh GPLX, nhập số CCCD/GPLX; chọn loại xe, biển số, tải trọng và 3 ảnh
+   xe → gửi hồ sơ. Bước upload cần Cloudinary hoạt động.
+3. Hồ sơ chuyển **Chờ duyệt**. Admin duyệt/từ chối trên web hoặc Swagger
+   `http://localhost:5133/swagger`: lấy ID từ
+   `GET /api/admin/driver-applications/pending`, gọi
+   `POST /api/admin/driver-applications/{id}/approve`.
+   Đây là thao tác bằng tài khoản Admin; Driver không tự duyệt.
+4. Mở lại hồ sơ hoặc bấm **Kiểm tra trạng thái mới nhất**. Nếu bị từ chối,
+   chỉnh sửa và gửi lại; nếu được duyệt, chọn **Vào trang chủ tài xế**.
 
-## Giới hạn xác nhận từ source backend
+Để kiểm tra ngay các màn sau khi đăng nhập, seed Development có:
 
-- Chưa có API Driver cho đến nơi, kiểm hàng/POD, báo sự cố, rút tiền và thống kê doanh thu. App không tự chuyển trạng thái các bước đó; giữ trạng thái server và thông báo chức năng đang chờ API.
-- API đơn gần tài xế chưa trả tên/số điện thoại khách. App không dùng thông tin mẫu và không bật nút gọi khách khi thiếu số.
-- Chưa có API route Directions cho mobile; nút chỉ đường mở Google Maps ngoài app. Bản đồ trong app hiện fallback mô phỏng theo yêu cầu; khi có Maps SDK key sẽ dùng Google Maps thật.
-- GPS hoạt động khi app ở foreground; khi xuống nền ngừng gửi, backend tự coi GPS cũ sau 5 phút. Chưa triển khai background location service/FCM.
-- **Cloudinary và PayOS chưa có credentials trên máy này theo xác nhận của người dùng.** Đã kiểm tra request/response và lỗi bằng tests, chưa kiểm thử upload ảnh hay giao dịch PayOS thật. Không bỏ qua kiểm tra này bằng URL/tiền giả trong app.
+| Tài khoản | Mật khẩu demo | Mục đích |
+| --- | --- | --- |
+| `driver2@modmove.local` | `ModMove@123` | Tài xế đã duyệt, chưa có chuyến tại thời điểm kiểm tra |
+| `driver@modmove.local` | `ModMove@123` | Có chuyến đang chạy, lịch sử, doanh thu và yêu cầu rút chờ xử lý |
+| `admin@modmove.local` | `ModMove@123` | Duyệt hồ sơ qua web/Swagger |
 
-## Kết quả kiểm tra
+Đây là tài khoản seed local, dữ liệu có thể thay đổi sau khi thao tác. Dù dữ liệu
+được seed, mobile vẫn đọc và ghi qua HTTP/SignalR thật.
 
-- Test hợp đồng mobile: token refresh đồng thời, sai role, phiên hết hạn, 5 ảnh đúng thứ tự, upload multipart, countdown, 409, mất response nhận đơn, phục hồi đơn, quyền GPS và nạp tiền không tự cộng số dư.
-- Kiểm tra HTTP trực tiếp trên backend local + MySQL riêng: đăng ký → OTP → Pending → từ chối → gửi lại → Approved v2 → online → GPS → tìm đơn → nhận đơn → xác nhận active order và không nhận thêm đơn.
-- Kiểm tra HTTP này dùng URL ảnh fixture và dữ liệu đơn/ví được seed **trong DB local riêng**, không xác nhận upload Cloudinary hay thanh toán PayOS thật.
+### 2. Online → nhận đơn → đến lấy hàng
+
+1. Bật online và cấp quyền vị trí. Emulator → Extended controls → Location:
+   đặt `10.7769, 106.7009` nếu thử đơn khu vực Nguyễn Huệ, TP.HCM.
+2. Đơn phải còn thời hạn ghép, trong 5 km, đúng loại xe; đơn tiền mặt cần đủ
+   cọc theo backend. Tài xế đang có chuyến không nhận thêm đơn.
+3. Mở popup/chi tiết đơn, kiểm tra giá và nhận trong thời hạn. Nếu tài xế khác
+   đã nhận trước, app báo không còn khả dụng. Tắt/mở app: chuyến được phục hồi
+   từ server, gồm trạng thái, liên hệ và bằng chứng.
+4. Chọn **Chỉ đường** để mở Google Maps. Đến trong 500 m điểm lấy hàng hoặc
+   điểm bàn giao, với GPS mới, mới bật xác nhận đến nơi. Có thể đặt tọa độ máy
+   ảo theo địa chỉ đơn để kiểm tra điều kiện này.
+
+### 3. Kiểm hàng → giao hàng → thu nhập chuyến
+
+1. Chụp/chọn 2–5 ảnh khác nhau, chờ upload xong. Đơn tiền mặt người gửi trả
+   yêu cầu xác nhận thu tiền trước khi nộp bằng chứng lấy hàng.
+2. Gửi kiểm hàng → chờ khách duyệt. Khách của đơn dùng web hoặc
+   `POST /api/customer/orders/{id}/pickup-evidence` theo schema Swagger.
+   Driver không tự duyệt ảnh. Nếu từ chối, app hiện lý do và số lần gửi còn lại
+   theo giới hạn server; thay ảnh rồi gửi lại.
+3. Khi backend chuyển **InTransit**, app mở giao hàng. Xem thông tin/gọi người
+   nhận, mở chỉ đường và thông báo đã đến điểm giao.
+4. Upload một ảnh POD. Nếu còn tiền mặt phải thu, xác nhận đã thu → hoàn tất.
+   App hiển thị **Đã giao**, không tự coi tiền đã quyết toán.
+5. Khách xác nhận qua `POST /api/customer/orders/{id}/confirm-receipt` hoặc
+   cơ chế tự hoàn tất của backend sau thời gian quy định. Khi server chuyển
+   **Completed**, thu nhập được ghi nhận trong ví/doanh thu.
+6. **Đơn hàng → chuyến → Thu nhập chuyến** để xem cước, hoa hồng, thực nhận,
+   thanh toán, POD và sự cố. Lịch sử có lọc và phân trang.
+
+### 4. Ví → nạp/rút → báo cáo doanh thu
+
+1. Mở **Ví**: kiểm tra ví cọc, ví thu nhập, nợ hoa hồng, số có thể rút, trạng
+   thái khóa và lịch sử từ server.
+2. **Nạp cọc**: tối thiểu 50.000đ; tạo phiên PayOS, xem QR/mở trang thanh toán.
+   Phiên có hạn 10 phút. Quay lại app để kiểm tra; chỉ giao dịch server xác
+   nhận thành công mới hiện đã nạp. Mở checkout không tự cộng tiền.
+3. **Rút thu nhập**: lưu ngân hàng, nhập số tiền nguyên dương, xem xác nhận.
+   Không áp đặt mức rút tối thiểu. Backend quyết định số có thể rút sau nợ
+   hoa hồng; chỉ một yêu cầu chờ xử lý. Admin xử lý chuyển tiền.
+4. Nếu mất mạng lúc gửi yêu cầu rút, tải lại trạng thái trước khi thử lại;
+   app không tự gửi lại POST tài chính.
+5. **Ví → Báo cáo doanh thu**: đổi Ngày/Tuần/Tháng, kỳ trước hoặc lịch. Kiểm tra tổng cước,
+   hoa hồng, thực nhận, biểu đồ và bấm một chuyến để đối chiếu.
+   Chỉ chuyến **Completed** được tính, theo múi giờ Việt Nam.
+
+## Phạm vi đã kiểm tra và phần cần cấu hình
+
+- Kiểm tra trực tiếp backend local bằng các repository mobile: hồ sơ, ví,
+  giao dịch/rút tiền, doanh thu ngày/tuần/tháng, trạng thái và 11 chi tiết
+  chuyến seed ở các trạng thái Accepted/Arrived/PickedUp/InTransit/Delivered/
+  Completed.
+- Chạy Android Emulator bằng API thật: đăng nhập, trang chủ có chuyến, ví,
+  lịch sử, chi tiết thu nhập và đổi kỳ doanh thu; xác nhận màn rút tiền khóa
+  nút gửi khi backend đã có yêu cầu đang chờ. Không chỉnh dữ liệu DB để bỏ
+  qua quy tắc backend.
+- Unit/widget tests kiểm tra hợp đồng HTTP, token refresh, countdown, 409,
+  mất response, khôi phục chuyến, quyền GPS, pickup/POD/COD, rút tiền, top-up,
+  phân trang, ngày Việt Nam và giao diện 390×844 / 320×640 với cỡ chữ lớn.
+- **Cloudinary và PayOS chưa có credentials ở backend local lúc kiểm tra.**
+  Chưa xác nhận upload thật, thanh toán thật hoặc toàn bộ một chuyến mới từ
+  đăng ký đến quyết toán. Test HTTP giả lập không thay thế kiểm thử này.
+- Bản đồ trong app tạm fallback có pan/zoom và vòng phủ sóng nhấp nháy theo
+  yêu cầu hiện tại. GPS gửi server vẫn là GPS thiết bị. Khi có Maps SDK key/
+  Billing, rebuild để dùng Google Maps thật; xem
+  [thiết lập Maps](google-maps-android.md). Chưa có Directions API cho mobile;
+  chỉ đường từng chặng mở Google Maps bên ngoài.
+- GPS/SignalR hoạt động khi app ở foreground. Chưa có background location
+  service/FCM trong đợt này; backend coi GPS quá 5 phút là cũ.
+
+Muốn xem bản demo cũ: `flutter run --dart-define=USE_MOCK_API=true`.
+`SCREEN=...` chỉ có hiệu lực trong chế độ mock. Quy trình thật ở trên không
+có nút mô phỏng duyệt hồ sơ/duyệt ảnh hay nạp/rút tiền giả.
+
+## Kiểm tra và bản build
+
+```powershell
+flutter analyze --no-fatal-infos
+flutter test --coverage
+flutter build apk --debug
+```
+
+APK: `build/app/outputs/flutter-apk/app-debug.apk`.
+Screenshots kiểm tra nằm trong thư mục bị Git ignore, không đưa vào commit.
+
+Kết quả local ngày 10/11/2026: 120 tests passed, analyzer không có lỗi và build
+APK debug thành công. Đây là kiểm tra local, không thay thế CI/peer review của PR.
