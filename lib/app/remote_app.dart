@@ -16,6 +16,7 @@ import '../features/driver_trip/data/repositories/device_driver_location.dart';
 import '../features/driver_trip/data/repositories/remote_driver_trip_repository.dart';
 import '../features/driver_trip/data/services/driver_tracking_connection.dart';
 import 'app.dart';
+import 'payment_return_cubit.dart';
 import '../features/incidents/data/remote_driver_incident_repository.dart';
 import '../features/wallet/data/remote_wallet_repository.dart';
 import '../features/wallet/presentation/wallet_cubit.dart';
@@ -33,23 +34,29 @@ class RemoteApp extends StatefulWidget {
 class _RemoteAppState extends State<RemoteApp> {
   late final ApiClient _api;
   late final AuthCubit _auth;
+  late final PaymentReturnCubit _paymentReturns;
   @override
   void initState() {
     super.initState();
     _api = ApiClient(store: const SecureSessionStore());
     _auth = AuthCubit(RemoteAuthRepository(_api))..restore();
+    _paymentReturns = PaymentReturnCubit()..initialize();
   }
 
   @override
   void dispose() {
     unawaited(_auth.close());
+    unawaited(_paymentReturns.close());
     unawaited(_api.close());
     super.dispose();
   }
 
   @override
-  Widget build(BuildContext context) => BlocProvider.value(
-    value: _auth,
+  Widget build(BuildContext context) => MultiBlocProvider(
+    providers: [
+      BlocProvider.value(value: _auth),
+      BlocProvider.value(value: _paymentReturns),
+    ],
     child: BlocBuilder<AuthCubit, AuthState>(
       builder: (context, state) => state.stage == AuthStage.signedIn
           ? _DriverSessionApp(
@@ -75,6 +82,23 @@ class _DriverSessionApp extends StatefulWidget {
 }
 
 class _DriverSessionAppState extends State<_DriverSessionApp> {
+  final _navigator = GlobalKey<NavigatorState>();
+
+  void _openReturnedWallet() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted || _driver == null || _navigator.currentState == null) {
+        return;
+      }
+      final returns = context.read<PaymentReturnCubit>();
+      if (!returns.state) return;
+      returns.consume();
+      _navigator.currentState!.pushNamedAndRemoveUntil(
+        '/wallet',
+        (route) => route.isFirst,
+      );
+    });
+  }
+
   DriverController? _driver;
   RemoteDriverTripRepository? _trips;
   late Future<void> _loading;
@@ -126,67 +150,76 @@ class _DriverSessionAppState extends State<_DriverSessionApp> {
   }
 
   @override
-  Widget build(BuildContext context) => FutureBuilder<void>(
-    future: _loading,
-    builder: (context, snapshot) {
-      if (snapshot.connectionState == ConnectionState.done &&
-          !snapshot.hasError &&
-          _driver != null) {
-        return ModMoveApp(
-          driverController: _driver,
-          tripRepository: _trips,
-          incidentRepository: RemoteDriverIncidentRepository(widget.api),
-          onLogout: widget.logout,
-          walletBuilder: (_) => BlocProvider(
-            create: (_) => WalletCubit(RemoteWalletRepository(widget.api)),
-            child: const WalletScreen(),
-          ),
-          revenueBuilder: (_) => BlocProvider(
-            create: (_) => RevenueCubit(RemoteEarningsRepository(widget.api)),
-            child: const RevenueScreen(),
-          ),
-          screen: _driver!.status == ApprovalStatus.approved
-              ? 'driver-home'
-              : _driver!.status == ApprovalStatus.draft
-              ? 'driver-onboarding'
-              : 'profile-pending',
-        );
-      }
-      return MaterialApp(
-        debugShowCheckedModeBanner: false,
-        theme: buildAppTheme(),
-        home: Scaffold(
-          body: SafeArea(
-            child: Center(
-              child: Padding(
-                padding: const EdgeInsets.all(24),
-                child: snapshot.hasError
-                    ? Column(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Text(
-                            snapshot.error is ApplicationFailure
-                                ? (snapshot.error as ApplicationFailure).message
-                                : '${snapshot.error}',
-                            textAlign: TextAlign.center,
-                          ),
-                          const SizedBox(height: 16),
-                          FilledButton(
-                            onPressed: () => setState(() => _loading = _load()),
-                            child: const Text('Thử lại'),
-                          ),
-                          TextButton(
-                            onPressed: widget.logout,
-                            child: const Text('Đăng xuất'),
-                          ),
-                        ],
-                      )
-                    : const CircularProgressIndicator(),
+  Widget build(BuildContext context) => BlocListener<PaymentReturnCubit, bool>(
+    listener: (_, pending) {
+      if (pending) _openReturnedWallet();
+    },
+    child: FutureBuilder<void>(
+      future: _loading,
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.done &&
+            !snapshot.hasError &&
+            _driver != null) {
+          if (context.read<PaymentReturnCubit>().state) _openReturnedWallet();
+          return ModMoveApp(
+            navigatorKey: _navigator,
+            driverController: _driver,
+            tripRepository: _trips,
+            incidentRepository: RemoteDriverIncidentRepository(widget.api),
+            onLogout: widget.logout,
+            walletBuilder: (_) => BlocProvider(
+              create: (_) => WalletCubit(RemoteWalletRepository(widget.api)),
+              child: const WalletScreen(),
+            ),
+            revenueBuilder: (_) => BlocProvider(
+              create: (_) => RevenueCubit(RemoteEarningsRepository(widget.api)),
+              child: const RevenueScreen(),
+            ),
+            screen: _driver!.status == ApprovalStatus.approved
+                ? 'driver-home'
+                : _driver!.status == ApprovalStatus.draft
+                ? 'driver-onboarding'
+                : 'profile-pending',
+          );
+        }
+        return MaterialApp(
+          debugShowCheckedModeBanner: false,
+          theme: buildAppTheme(),
+          home: Scaffold(
+            body: SafeArea(
+              child: Center(
+                child: Padding(
+                  padding: const EdgeInsets.all(24),
+                  child: snapshot.hasError
+                      ? Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text(
+                              snapshot.error is ApplicationFailure
+                                  ? (snapshot.error as ApplicationFailure)
+                                        .message
+                                  : '${snapshot.error}',
+                              textAlign: TextAlign.center,
+                            ),
+                            const SizedBox(height: 16),
+                            FilledButton(
+                              onPressed: () =>
+                                  setState(() => _loading = _load()),
+                              child: const Text('Thử lại'),
+                            ),
+                            TextButton(
+                              onPressed: widget.logout,
+                              child: const Text('Đăng xuất'),
+                            ),
+                          ],
+                        )
+                      : const CircularProgressIndicator(),
+                ),
               ),
             ),
           ),
-        ),
-      );
-    },
+        );
+      },
+    ),
   );
 }

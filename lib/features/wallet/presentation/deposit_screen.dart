@@ -40,6 +40,7 @@ class _DepositScreenState extends State<DepositScreen>
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     _foreground = state == AppLifecycleState.resumed;
+    if (_foreground) context.read<WalletCubit>().refresh();
   }
 
   @override

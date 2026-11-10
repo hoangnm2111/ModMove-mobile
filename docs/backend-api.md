@@ -131,6 +131,11 @@ thông số xe đăng ký từ hồ sơ, không thay bằng kích thước danh 
 
 ### Khi nút rút tiền bị khóa hoặc không tạo được mã PayOS
 
+**Cập nhật 11/11/2026:** đã cấu hình PayOS local theo key người dùng cấp và
+tạo được QR 50.000đ bằng API thật trên Android. Firebase tạm tắt; webhook
+ngrok còn offline. Xem [kết quả kiểm thử mới](wallet-payos-local-test.md).
+Phần chẩn đoán thiếu key bên dưới ghi nhận tình trạng trước lần cấu hình này.
+
 - Rút tiền nhận **số nguyên VND lớn hơn 0**, tức từ **1đ** đến số có thể rút
   do server trả về. Mức **50.000đ áp dụng cho nạp cọc**, không áp dụng cho rút.
 - Tại lần kiểm tra này, `driver@modmove.local` có 89.000đ có thể rút nhưng đã
@@ -190,7 +195,7 @@ thông số xe đăng ký từ hồ sơ, không thay bằng kích thước danh 
 - Unit/widget tests kiểm tra hợp đồng HTTP, token refresh, countdown, 409,
   mất response, khôi phục chuyến, quyền GPS, pickup/POD/COD, rút tiền, top-up,
   phân trang, ngày Việt Nam và giao diện 390×844 / 320×640 với cỡ chữ lớn.
-- **Cloudinary và PayOS chưa có credentials ở backend local lúc kiểm tra.**
+- **Cloudinary và PayOS chưa có credentials ở lần kiểm tra ngày 10/11/2026.**
   Chưa xác nhận upload thật, thanh toán thật hoặc toàn bộ một chuyến mới từ
   đăng ký đến quyết toán. Test HTTP giả lập không thay thế kiểm thử này.
 - Bản đồ trong app tạm fallback có pan/zoom và vòng phủ sóng nhấp nháy theo

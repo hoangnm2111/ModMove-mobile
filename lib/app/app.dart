@@ -45,6 +45,7 @@ class ModMoveApp extends StatelessWidget {
     this.walletBuilder,
     this.revenueBuilder,
     this.incidentRepository,
+    this.navigatorKey,
   });
   final String screen;
   final DriverController? driverController;
@@ -55,6 +56,7 @@ class ModMoveApp extends StatelessWidget {
   final WidgetBuilder? walletBuilder;
   final WidgetBuilder? revenueBuilder;
   final DriverIncidentRepository? incidentRepository;
+  final GlobalKey<NavigatorState>? navigatorKey;
 
   DriverController _createDriver() {
     final fixture = DemoDriverRepository(
@@ -108,6 +110,7 @@ class ModMoveApp extends StatelessWidget {
         cargoPhotos: cargoPhotos,
         incidents: incidentRepository,
         child: MaterialApp(
+          navigatorKey: navigatorKey,
           title: 'ModMove',
           debugShowCheckedModeBanner: false,
           theme: buildAppTheme(),
