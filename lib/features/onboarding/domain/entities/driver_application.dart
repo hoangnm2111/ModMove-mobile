@@ -2,9 +2,9 @@ import 'dart:typed_data';
 
 enum ApprovalStatus { draft, pending, approved, rejected }
 
+/// Đúng 5 giấy tờ BE yêu cầu, theo thứ tự `documentUrls` của POST api/driver/onboarding:
+/// GPLX trước, GPLX sau, đăng ký xe, đăng kiểm, ảnh xe. (BE không nhận ảnh CCCD, chỉ số CCCD.)
 enum DocumentKind {
-  citizenFront,
-  citizenBack,
   licenseFront,
   licenseBack,
   registration,
@@ -70,4 +70,19 @@ class ApplicationReceipt {
 class ApplicationFailure implements Exception {
   const ApplicationFailure(this.message);
   final String message;
+}
+
+/// Loại xe BE đang bán (GET api/public/vehicletypes); kích thước thùng tính bằng mét.
+class VehicleTypeOption {
+  const VehicleTypeOption({
+    required this.id,
+    required this.name,
+    required this.maxLoadKg,
+    required this.lengthM,
+    required this.widthM,
+    required this.heightM,
+  });
+  final int id;
+  final String name;
+  final double maxLoadKg, lengthM, widthM, heightM;
 }

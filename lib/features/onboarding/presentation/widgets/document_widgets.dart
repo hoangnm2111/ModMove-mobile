@@ -23,6 +23,12 @@ class DocumentImage extends StatelessWidget {
       height: height,
       child: document.bytes != null
           ? Image.memory(document.bytes!, fit: BoxFit.cover)
+          : (document.remoteReference ?? '').startsWith('http')
+          ? Image.network(
+              document.remoteReference!,
+              fit: BoxFit.cover,
+              errorBuilder: (_, _, _) => const Center(child: Icon(Icons.broken_image_outlined)),
+            )
           : kind == DocumentKind.vehicle
           ? VehicleImage('truck-white', height: height, width: width)
           : DocumentThumbnail(kind.preview, width: width, height: height),

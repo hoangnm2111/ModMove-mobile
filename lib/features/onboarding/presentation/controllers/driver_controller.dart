@@ -28,11 +28,13 @@ class DriverController extends Cubit<DriverPresentationState> {
     this._profile,
     this.simulator,
     this.onDispose,
-  }) : super(DriverPresentationState()) {
+  }) : _load = loadApplication,
+       super(DriverPresentationState()) {
     _apply(loadApplication(), initial: true);
     if (_profile == null) online = application.canGoOnline;
     _notify();
   }
+  final GetDriverApplication _load;
   final SubmitDriverApplication _submitApplication;
   final PickDocumentPhoto _pickPhoto;
   final ManageDriverProfile? _profile;
@@ -58,6 +60,49 @@ class DriverController extends Cubit<DriverPresentationState> {
   String? lastError;
   DocumentKind? uploadingDocument;
   bool get hasApi => _profile != null;
+
+  /// Loại xe lấy từ BE (rỗng khi chạy bản mô phỏng).
+  List<VehicleTypeOption> vehicleTypes = const [];
+
+  /// Đăng nhập tài xế: tải hồ sơ + danh mục loại xe từ BE.
+  Future<String?> syncAccount() async {
+    if (!hasApi || busy) return null;
+    try {
+      vehicleTypes = await _profile!.vehicleTypes();
+    } catch (_) {
+      /* Danh mục chỉ phục vụ form nộp hồ sơ; lỗi sẽ hiện khi nộp. */
+    }
+    return _synchronize(() async {});
+  }
+
+  /// Đăng xuất / đổi tài khoản: bỏ hồ sơ của người trước.
+  void clearAccount() {
+    if (!hasApi) return;
+    _profile!.clearLocal();
+    uploadErrors.clear();
+    versions = [];
+    history.clear();
+    lastError = null;
+    _apply(_load());
+    _notify();
+  }
+
+  /// Chọn loại xe: ghi tên + id và điền kích thước thùng theo loại xe (BE quyết định).
+  void selectVehicleType(String name) {
+    if (status != ApprovalStatus.draft || busy) return;
+    fields['vehicleType'] = name;
+    for (final option in vehicleTypes) {
+      if (option.name != name) continue;
+      String m(double v) => v.toString().replaceAll(RegExp(r'\.0$'), '').replaceAll('.', ',');
+      fields['vehicleTypeId'] = '${option.id}';
+      fields['length'] = m(option.lengthM);
+      fields['width'] = m(option.widthM);
+      fields['height'] = m(option.heightM);
+      fields.putIfAbsent('payload', () => '');
+      if ((fields['payload'] ?? '').isEmpty) fields['payload'] = m(option.maxLoadKg);
+    }
+    _notify();
+  }
   bool get demoEnabled => simulator != null;
   bool get busy => submitting || picking || syncing || changingAvailability;
   DriverApplication get application => DriverApplication(
@@ -166,7 +211,7 @@ class DriverController extends Cubit<DriverPresentationState> {
         documents.entries
             .where(
               (item) =>
-                  (!personalOnly || item.key.index < 4) &&
+                  (!personalOnly || item.key.index < 2) &&
                   item.value.remoteReference == null,
             )
             .map((item) => item.key),

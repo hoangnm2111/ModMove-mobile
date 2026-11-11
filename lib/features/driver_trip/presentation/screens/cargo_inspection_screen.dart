@@ -33,7 +33,7 @@ class CargoInspectionScreen extends StatelessWidget {
               'Xác nhận đã lấy hàng',
               key: const Key('submit-inspection'),
               busy: state.busy,
-              onPressed: state.ready && (!needsCash || state.cashCollected)
+              onPressed: state.ready && (!needsCash || state.cashCollected) && !tripState.paused
                   ? context.read<EvidenceCubit>().submit
                   : null,
             ),
@@ -43,6 +43,7 @@ class CargoInspectionScreen extends StatelessWidget {
           padding: const EdgeInsets.fromLTRB(16, 0, 16, 0),
           children: [
             const PickupStepper(1),
+            IncidentBanner(trip),
             if (trip.review == EvidenceReview.rejected)
               TripError(
                 '${trip.reason}\nLần gửi ${trip.attempts}/5. Chụp lại 2 ảnh trước khi gửi.',
@@ -51,7 +52,7 @@ class CargoInspectionScreen extends StatelessWidget {
             if (tripState.error != null) TripError(tripState.error!),
             if (tripState.receipt != null)
               Notice(
-                'Đã gửi yêu cầu ${tripState.receipt}. Điều phối sẽ liên hệ.',
+                tripState.receipt!,
                 icon: 'check',
               ),
             AppCard(

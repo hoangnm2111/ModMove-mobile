@@ -1,3 +1,4 @@
+import '../../../../core/widgets/notice_banner.dart';
 import 'dart:async';
 import 'dart:math' as math;
 import 'package:flutter/foundation.dart';
@@ -119,11 +120,7 @@ class _DriverMapState extends State<DriverMap>
       await controller.animateCamera(update);
     } on PlatformException {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Chưa điều khiển được bản đồ. Vui lòng thử lại.'),
-          ),
-        );
+        showNotice(context, 'Chưa điều khiển được bản đồ. Vui lòng thử lại.', error: true);
       }
     }
   }

@@ -1,3 +1,4 @@
+import '../../../../core/widgets/notice_banner.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../../core/theme/app_theme.dart';
@@ -22,9 +23,7 @@ class JobDetailsScreen extends StatelessWidget {
         onAccepted!();
       } else {
         Navigator.pop(context);
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Đã nhận chuyến thành công.')),
-        );
+        showNotice(context, 'Đã nhận chuyến thành công.');
       }
     },
     builder: (context, state) {
@@ -69,7 +68,7 @@ class JobDetailsScreen extends StatelessWidget {
               children: [
                 Expanded(
                   child: Text(
-                    '#${job.id}',
+                    '#${job.label}',
                     style: appText(size: 15, weight: FontWeight.w700),
                   ),
                 ),

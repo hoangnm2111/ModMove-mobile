@@ -1,3 +1,4 @@
+import '../../../../core/widgets/notice_banner.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../../core/theme/app_theme.dart';
@@ -31,6 +32,13 @@ Future<void> showTripSimulation(BuildContext context) async {
               TripSimulation.cancelOrder: 'Khách hủy chuyến',
               TripSimulation.nearPickup: 'GPS: đã ở điểm lấy hàng',
               TripSimulation.advanceRoute: 'GPS: di chuyển 300 m theo tuyến',
+              TripSimulation.nearDropoff: 'GPS: đã ở điểm giao hàng',
+              TripSimulation.dispatcherStarts: 'Điều phối viên nhận xử lý sự cố',
+              TripSimulation.dispatcherContinues: 'Điều phối viên: tiếp tục chuyến',
+              TripSimulation.dispatcherReassigns: 'Điều phối viên: đổi tài xế',
+              TripSimulation.dispatcherCancelsOrder: 'Điều phối viên: hủy đơn',
+              TripSimulation.dispatcherDismisses: 'Điều phối viên: hủy báo cáo sự cố',
+              TripSimulation.customerReportsIncident: 'Khách báo sự cố',
               TripSimulation.gpsLost: 'GPS: mất quyền vị trí',
               TripSimulation.gpsRestored: 'GPS: khôi phục vị trí',
               TripSimulation.mapUnavailable: 'Bản đồ: không tải được',
@@ -41,7 +49,7 @@ Future<void> showTripSimulation(BuildContext context) async {
               TripSimulation.customerRejects: 'Khách yêu cầu chụp lại',
               TripSimulation.emptyJobs: 'Không có đơn phù hợp',
               TripSimulation.lowDeposit: 'Ký quỹ còn 100.000đ',
-            }.entries.map(
+            }.entries.where((e) => (repository as TripSimulator).supported.contains(e.key)).map(
               (e) => ListTile(
                 contentPadding: EdgeInsets.zero,
                 title: Text(e.value),
@@ -59,12 +67,10 @@ Future<void> showTripSimulation(BuildContext context) async {
     await (repository as TripSimulator).simulate(action);
   } catch (e) {
     if (context.mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            e is TripFailure ? e.message : 'Chưa thực hiện được kịch bản.',
-          ),
-        ),
+      showNotice(
+        context,
+        e is TripFailure ? e.message : 'Chưa thực hiện được kịch bản.',
+        error: true,
       );
     }
   }

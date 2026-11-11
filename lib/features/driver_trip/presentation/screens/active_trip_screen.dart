@@ -3,11 +3,10 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../../core/widgets/app_widgets.dart';
 import '../../domain/entities/trip_models.dart';
 import '../bloc/active_trip_bloc.dart';
-import '../widgets/trip_components.dart';
 import 'pickup_navigation_screen.dart';
 import 'cargo_inspection_screen.dart';
+import 'delivery_screen.dart';
 import 'pickup_approval_screen.dart';
-import 'driver_simulation_sheet.dart';
 
 class ActiveTripScreen extends StatelessWidget {
   const ActiveTripScreen({super.key});
@@ -45,37 +44,7 @@ class ActiveTripScreen extends StatelessWidget {
           if (trip.stage == TripStage.pickedUp) {
             return PickupApprovalScreen(state: state);
           }
-          return Scaffold(
-            appBar: AppHeader(
-              'Đang giao hàng',
-              onHelp: () => showTripSimulation(context),
-            ),
-            body: SingleChildScrollView(
-              padding: const EdgeInsets.all(16),
-              child: Column(
-                children: [
-                  const PickupStepper(3),
-                  RouteCard(trip.job),
-                  const SizedBox(height: 16),
-                  const Notice(
-                    'Khách đã xác nhận hàng. Chuyến đã bắt đầu giao.',
-                    icon: 'check',
-                  ),
-                  const SizedBox(height: 16),
-                  if (state.error != null) TripError(state.error!),
-                  PrimaryButton(
-                    'Mở chỉ đường giao hàng',
-                    icon: 'navigation',
-                    onPressed: state.busy
-                        ? null
-                        : () => context.read<ActiveTripBloc>().add(
-                            ExternalNavigationOpened(),
-                          ),
-                  ),
-                ],
-              ),
-            ),
-          );
+          return DeliveryScreen(state: state);
         },
       );
 }

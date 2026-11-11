@@ -25,3 +25,13 @@ abstract interface class DriverReviewSimulator {
   Future<void> setAccountActive(bool active);
   Future<void> reset({bool completeDraft = false});
 }
+
+/// Danh mục loại xe lấy từ BE; chỉ repository gọi BE mới có.
+abstract interface class VehicleTypeCatalog {
+  Future<List<VehicleTypeOption>> vehicleTypes();
+}
+
+/// Bộ nhớ hồ sơ trong máy cần xoá khi đăng xuất / đổi tài khoản.
+abstract interface class ProfileLocalCache {
+  void clear();
+}

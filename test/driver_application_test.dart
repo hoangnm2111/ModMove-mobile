@@ -40,7 +40,7 @@ void main() {
     final driver = makeDriver(repo, FakePhotos());
     expect(await driver.submit(), isNotNull);
     expect(repo.submissions, isEmpty);
-    expect(driver.documents[DocumentKind.citizenFront]!.hasImage, isTrue);
+    expect(driver.documents[DocumentKind.licenseFront]!.hasImage, isTrue);
     expect(driver.status, ApprovalStatus.draft);
   });
   test(
@@ -69,15 +69,15 @@ void main() {
       final photos = FakePhotos()..photo = SelectedPhoto('new.png', png);
       final driver = makeDriver(repo, photos);
       expect(await driver.submit(), isNotNull);
-      final original = driver.documents[DocumentKind.citizenFront];
+      final original = driver.documents[DocumentKind.licenseFront];
       expect(
         await driver.pickDocument(
-          DocumentKind.citizenFront,
+          DocumentKind.licenseFront,
           PhotoSource.gallery,
         ),
         isNotNull,
       );
-      expect(driver.documents[DocumentKind.citizenFront], same(original));
+      expect(driver.documents[DocumentKind.licenseFront], same(original));
       expect(
         await driver.pickDocument(
           DocumentKind.licenseBack,

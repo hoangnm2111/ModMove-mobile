@@ -22,7 +22,16 @@ abstract interface class DriverTripRepository {
     required String note,
     required bool cashCollected,
   });
-  Future<String> reportIncident(String message);
+  /// Báo sự cố trên chuyến đang chạy; trả về mã sự cố. Sau khi gửi, sự cố mở do tài xế báo sẽ làm chuyến tạm dừng.
+  Future<int> reportIncident(IncidentDraft draft);
+
+  /// Đã hiện kết quả xử lý sự cố cho tài xế (tránh hiện lại).
+  void acknowledgeOutcome();
+
+  /// Giai đoạn giao hàng (đơn `InTransit`): báo đến điểm giao, thu COD, ảnh giao hàng (POD).
+  Future<void> arriveDropoff();
+  Future<void> collectCash();
+  Future<void> deliver(CargoPhoto proof);
 }
 
 abstract interface class CargoPhotoRepository {
@@ -45,6 +54,13 @@ enum TripSimulation {
   mapUnavailable,
   mapRestored,
   nearPickup,
+  nearDropoff,
+  dispatcherStarts,
+  dispatcherContinues,
+  dispatcherReassigns,
+  dispatcherCancelsOrder,
+  dispatcherDismisses,
+  customerReportsIncident,
   advanceRoute,
   uploadFailure,
   requestFailure,
@@ -55,5 +71,7 @@ enum TripSimulation {
 }
 
 abstract interface class TripSimulator {
+  /// Kịch bản mà repository này hỗ trợ (bản BE thật chỉ giả lập vị trí GPS).
+  Set<TripSimulation> get supported;
   Future<void> simulate(TripSimulation action);
 }

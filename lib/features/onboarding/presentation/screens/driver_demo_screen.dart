@@ -1,3 +1,4 @@
+import '../../../../core/widgets/notice_banner.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../../core/theme/app_theme.dart';
@@ -15,9 +16,7 @@ class DriverDemoScreen extends StatelessWidget {
   ) async {
     final error = await action();
     if (!context.mounted) return;
-    ScaffoldMessenger.of(
-      context,
-    ).showSnackBar(SnackBar(content: Text(error ?? success)));
+    showNotice(context, error ?? success, error: error != null);
   }
 
   Future<void> _reset(
@@ -48,9 +47,7 @@ class DriverDemoScreen extends StatelessWidget {
     final error = await driver.resetDemo(completeDraft: complete);
     if (!context.mounted) return;
     if (error != null) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text(error)));
+      showNotice(context, error, error: true);
     } else {
       Navigator.pushNamedAndRemoveUntil(context, '/verification', (_) => false);
     }
@@ -62,10 +59,7 @@ class DriverDemoScreen extends StatelessWidget {
     return Scaffold(
       appBar: AppHeader(
         'Kịch bản mô phỏng',
-        onBack: () {
-          ScaffoldMessenger.of(context).clearSnackBars();
-          Navigator.pop(context);
-        },
+        onBack: () => Navigator.pop(context),
       ),
       body: ListView(
         padding: const EdgeInsets.all(16),

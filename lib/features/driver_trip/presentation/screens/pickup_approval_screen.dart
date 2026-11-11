@@ -29,6 +29,7 @@ class PickupApprovalScreen extends StatelessWidget {
         padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
         children: [
           const PickupStepper(2),
+          IncidentBanner(trip),
           const SizedBox(height: 8),
           AppCard(
             color: AppColors.peach,
@@ -113,7 +114,7 @@ class PickupApprovalScreen extends StatelessWidget {
           if (state.receipt != null) ...[
             const SizedBox(height: 10),
             Notice(
-              'Yêu cầu ${state.receipt} đã gửi đến điều phối.',
+              state.receipt!,
               icon: 'check',
             ),
           ],

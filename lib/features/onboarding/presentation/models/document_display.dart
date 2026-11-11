@@ -2,8 +2,6 @@ import '../../domain/entities/driver_application.dart';
 
 extension DocumentDisplay on DocumentKind {
   String get label => switch (this) {
-    DocumentKind.citizenFront => 'CCCD · Mặt trước',
-    DocumentKind.citizenBack => 'CCCD · Mặt sau',
     DocumentKind.licenseFront => 'GPLX · Mặt trước',
     DocumentKind.licenseBack => 'GPLX · Mặt sau',
     DocumentKind.registration => 'Đăng ký xe',
