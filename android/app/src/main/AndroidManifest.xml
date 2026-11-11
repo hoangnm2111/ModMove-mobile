@@ -1,10 +1,18 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
     <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <!-- Tài xế gửi vị trí GPS lên BE (POST api/driver/location) để ghép đơn. -->
+    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
+    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
     <application
         android:label="ModMove"
         android:name="${applicationName}"
         android:icon="@drawable/ic_launcher">
         <meta-data android:name="com.google.android.geo.API_KEY" android:value="${MAPS_API_KEY}" />
+        <!-- Thông báo đẩy (FCM): kênh và biểu tượng mặc định; token chỉ lấy sau khi đăng nhập và được cấp quyền. -->
+        <meta-data android:name="com.google.firebase.messaging.default_notification_channel_id" android:value="modmove_notifications" />
+        <meta-data android:name="com.google.firebase.messaging.default_notification_icon" android:resource="@drawable/ic_notification" />
+        <meta-data android:name="firebase_messaging_auto_init_enabled" android:value="false" />
         <activity
             android:name=".MainActivity"
             android:exported="true"
