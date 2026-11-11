@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../../core/theme/app_theme.dart';
+import '../../../core/widgets/notice_banner.dart';
+import '../../notifications/notifications_screen.dart';
 import '../../../core/widgets/app_widgets.dart';
 import '../../auth/presentation/auth_cubit.dart';
 import '../data/customer_api.dart';
@@ -28,7 +30,7 @@ class _CustomerShellState extends State<CustomerShell> {
   Future<void> _book([BookingDraft? initial]) async {
     final created = await Navigator.push<CreatedOrder>(context, MaterialPageRoute(builder: (_) => BookingScreen(initial: initial)));
     if (created == null || !mounted) return;
-    showSnack(context, 'Đã tạo đơn ${created.code}.');
+    notify(context, 'ORDER_CREATED', {'orderId': '${created.id}', 'orderCode': created.code});
     setState(() => _ordersKey++);
     await _open(created.id, openPayment: created.payOs);
   }
@@ -65,10 +67,26 @@ class _CustomerShellState extends State<CustomerShell> {
       selectedIndex: _tab,
       onDestinationSelected: (i) => setState(() => _tab = i),
       destinations: const [
-        NavigationDestination(icon: AppIcon('home', color: AppColors.secondary), selectedIcon: AppIcon('home-filled', color: AppColors.orange), label: 'Trang chủ'),
-        NavigationDestination(icon: AppIcon('orders', color: AppColors.secondary), selectedIcon: AppIcon('orders', color: AppColors.orange), label: 'Đơn hàng'),
-        NavigationDestination(icon: Icon(Icons.star_outline_rounded, color: AppColors.secondary), selectedIcon: Icon(Icons.star_rounded, color: AppColors.orange), label: 'Đánh giá'),
-        NavigationDestination(icon: AppIcon('user', color: AppColors.secondary), selectedIcon: AppIcon('user-filled', color: AppColors.orange), label: 'Tài khoản'),
+        NavigationDestination(
+          icon: AppIcon('home', color: AppColors.secondary),
+          selectedIcon: AppIcon('home-filled', color: AppColors.orange),
+          label: 'Trang chủ',
+        ),
+        NavigationDestination(
+          icon: AppIcon('orders', color: AppColors.secondary),
+          selectedIcon: AppIcon('orders', color: AppColors.orange),
+          label: 'Đơn hàng',
+        ),
+        NavigationDestination(
+          icon: Icon(Icons.star_outline_rounded, color: AppColors.secondary),
+          selectedIcon: Icon(Icons.star_rounded, color: AppColors.orange),
+          label: 'Đánh giá',
+        ),
+        NavigationDestination(
+          icon: AppIcon('user', color: AppColors.secondary),
+          selectedIcon: AppIcon('user-filled', color: AppColors.orange),
+          label: 'Tài khoản',
+        ),
       ],
     ),
   );
@@ -102,8 +120,23 @@ class _HomeTabState extends State<_HomeTab> {
         child: ListView(
           padding: const EdgeInsets.fromLTRB(14, 8, 14, 24),
           children: [
-            Text('ModMove', style: appText(size: 28, weight: FontWeight.w800, color: AppColors.orange, spacing: -1)),
-            Text('Xin chào, $name', style: appText(size: 15, color: AppColors.secondary)),
+            Row(
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'ModMove',
+                        style: appText(size: 28, weight: FontWeight.w800, color: AppColors.orange, spacing: -1),
+                      ),
+                      Text('Xin chào, $name', style: appText(size: 15, color: AppColors.secondary)),
+                    ],
+                  ),
+                ),
+                NotificationBell(onTap: () => Navigator.pushNamed(context, '/inbox')),
+              ],
+            ),
             const SizedBox(height: 14),
             ClipRRect(
               borderRadius: BorderRadius.circular(12),
@@ -117,9 +150,15 @@ class _HomeTabState extends State<_HomeTab> {
                       children: [
                         Text('Chở hàng lớn,\nthật dễ dàng', style: appText(size: 24, weight: FontWeight.w800, height: 1.15)),
                         const SizedBox(height: 6),
-                        SizedBox(width: 190, child: Text('Báo giá theo quãng đường thực, thanh toán PayOS hoặc tiền mặt.', style: appText(size: 13, color: AppColors.secondary))),
+                        SizedBox(
+                          width: 190,
+                          child: Text('Báo giá theo quãng đường thực, thanh toán PayOS hoặc tiền mặt.', style: appText(size: 13, color: AppColors.secondary)),
+                        ),
                         const SizedBox(height: 14),
-                        SizedBox(width: 190, child: PrimaryButton('Đặt xe ngay', icon: 'truck', onPressed: () => widget.onBook())),
+                        SizedBox(
+                          width: 190,
+                          child: PrimaryButton('Đặt xe ngay', icon: 'truck', onPressed: () => widget.onBook()),
+                        ),
                       ],
                     ),
                   ),
@@ -132,7 +171,11 @@ class _HomeTabState extends State<_HomeTab> {
             FutureBuilder<Paged<OrderSummary>>(
               future: _active,
               builder: (_, snap) {
-                if (snap.connectionState != ConnectionState.done) return const Padding(padding: EdgeInsets.all(20), child: Center(child: CircularProgressIndicator()));
+                if (snap.connectionState != ConnectionState.done)
+                  return const Padding(
+                    padding: EdgeInsets.all(20),
+                    child: Center(child: CircularProgressIndicator()),
+                  );
                 if (snap.hasError) {
                   return ErrorView(
                     errorText(snap.error!),
@@ -145,7 +188,11 @@ class _HomeTabState extends State<_HomeTab> {
                 if (items.isEmpty) return Text('Bạn không có đơn nào đang chạy.', style: appText(color: AppColors.muted));
                 return Column(
                   children: [
-                    for (final o in items) Padding(padding: const EdgeInsets.only(bottom: 10), child: OrderCard(order: o, onTap: () => widget.onOpen(o.id))),
+                    for (final o in items)
+                      Padding(
+                        padding: const EdgeInsets.only(bottom: 10),
+                        child: OrderCard(order: o, onTap: () => widget.onOpen(o.id)),
+                      ),
                   ],
                 );
               },

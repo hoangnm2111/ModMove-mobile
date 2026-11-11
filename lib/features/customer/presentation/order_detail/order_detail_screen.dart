@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../../../core/format/formatters.dart';
+import '../../../../core/notifications/app_notice.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/widgets/app_widgets.dart';
 import '../../data/customer_api.dart';
@@ -13,6 +14,10 @@ import '../booking/booking_cubit.dart';
 import '../labels.dart';
 import '../widgets/customer_widgets.dart';
 import 'order_detail_cubit.dart';
+import '../../../../core/widgets/phone_button.dart';
+import '../../../../core/network/api_exception.dart';
+import '../../../../core/notifications/notification_cubit.dart';
+import '../../../../core/widgets/notice_banner.dart';
 import 'order_sheets.dart';
 
 /// Chi tiết đơn của khách. [openPayment] = true khi vừa đặt đơn PayOS (mở thanh toán ngay).
@@ -39,14 +44,35 @@ class _DetailView extends StatefulWidget {
 
 class _DetailViewState extends State<_DetailView> with WidgetsBindingObserver {
   Timer? _refresh, _trackRefresh;
+  final _incidentsKey = GlobalKey();
+  int _ticks = 0;
   bool _paymentOpened = false;
+  StreamSubscription<AppNotice>? _pushed;
+  late final int _orderId;
 
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
     final cubit = context.read<OrderDetailCubit>();
-    _refresh = Timer.periodic(const Duration(seconds: 20), (_) => cubit.load(withTracking: false));
+    _orderId = cubit.orderId;
+    openOrderId.value = _orderId;
+    // Có thông báo mới của đúng đơn này (SignalR) → tải lại ngay, không đợi chu kỳ.
+    NotificationCubit? notices;
+    try {
+      notices = context.read<NotificationCubit>();
+    } on ProviderNotFoundException {
+      notices = null; // dựng riêng (test): không có hộp thông báo
+    }
+    _pushed = notices?.pushed.listen((n) {
+      if (n.orderId == _orderId) cubit.load(withTracking: false);
+    });
+    // Còn sự cố mở (của ai cũng được) thì tải lại mỗi 15 giây; bình thường mỗi 20 giây.
+    _refresh = Timer.periodic(const Duration(seconds: 15), (_) {
+      final state = cubit.state;
+      final open = state.order?.pendingDriverIncidentId != null || state.incidents.any((i) => i.status == 'Open' || i.status == 'InProgress');
+      if (open || ++_ticks % 2 == 0) cubit.load(withTracking: false);
+    });
     _trackRefresh = Timer.periodic(const Duration(seconds: 60), (_) => cubit.loadTracking());
   }
 
@@ -55,6 +81,8 @@ class _DetailViewState extends State<_DetailView> with WidgetsBindingObserver {
     WidgetsBinding.instance.removeObserver(this);
     _refresh?.cancel();
     _trackRefresh?.cancel();
+    _pushed?.cancel();
+    if (openOrderId.value == _orderId) openOrderId.value = null;
     super.dispose();
   }
 
@@ -78,6 +106,7 @@ class _DetailViewState extends State<_DetailView> with WidgetsBindingObserver {
           await cubit.load(withTracking: false);
           return cubit.state.order?.paymentStatus == 'Paid';
         },
+        latestPayment: () => cubit.state.order?.payment,
       ),
     );
   }
@@ -97,7 +126,13 @@ class _DetailViewState extends State<_DetailView> with WidgetsBindingObserver {
       return Scaffold(
         appBar: AppHeader(
           o?.code ?? 'Chi tiết đơn',
-          actions: [IconButton(tooltip: 'Làm mới', onPressed: () => cubit.load(), icon: const AppIcon('refresh', color: AppColors.secondary))],
+          actions: [
+            IconButton(
+              tooltip: 'Làm mới',
+              onPressed: () => cubit.load(),
+              icon: const AppIcon('refresh', color: AppColors.secondary),
+            ),
+          ],
         ),
         body: o == null
             ? (s.error != null ? ErrorView(s.error!, onRetry: () => cubit.load()) : const Center(child: CircularProgressIndicator()))
@@ -110,8 +145,7 @@ class _DetailViewState extends State<_DetailView> with WidgetsBindingObserver {
                       children: [
                         StatusPill(o.status, paymentMethod: o.paymentMethod, paymentStatus: o.paymentStatus),
                         const SizedBox(width: 8),
-                        if (o.paymentMethod == 'PayOS' && !OrderRules.awaitingPayment(o.status, o.paymentMethod, o.paymentStatus))
-                          Pill(toneOf(paymentStatusTone, o.paymentStatus)),
+                        if (o.paymentMethod == 'PayOS' && !OrderRules.awaitingPayment(o.status, o.paymentMethod, o.paymentStatus)) Pill(toneOf(paymentStatusTone, o.paymentStatus)),
                         const Spacer(),
                         Text('Tạo ${dateTime(o.createdAt)}', style: appText(size: 11.5, color: AppColors.muted)),
                       ],
@@ -119,6 +153,29 @@ class _DetailViewState extends State<_DetailView> with WidgetsBindingObserver {
                     const SizedBox(height: 10),
                     OrderProgress(o),
                     const SizedBox(height: 12),
+                    if (o.pendingDriverIncidentId != null)
+                      Padding(
+                        padding: const EdgeInsets.only(bottom: 12),
+                        child: AppCard(
+                          key: const Key('driver-incident-banner'),
+                          color: AppColors.redBg,
+                          borderColor: AppColors.red,
+                          onTap: () {
+                            final target = _incidentsKey.currentContext;
+                            if (target != null) Scrollable.ensureVisible(target, duration: const Duration(milliseconds: 300));
+                          },
+                          child: Row(
+                            children: [
+                              const AppIcon('warning', color: AppColors.red),
+                              const SizedBox(width: 10),
+                              Expanded(
+                                child: Text('Tài xế đã báo sự cố #${o.pendingDriverIncidentId}. Chuyến tạm dừng chờ điều phối viên xử lý.', style: appText(size: 13, weight: FontWeight.w600)),
+                              ),
+                              const AppIcon('chevron-right', size: 16),
+                            ],
+                          ),
+                        ),
+                      ),
                     _NextAction(
                       order: o,
                       hasOpenComplaint: OrderRules.hasOpenComplaint(s.refunds),
@@ -138,6 +195,7 @@ class _DetailViewState extends State<_DetailView> with WidgetsBindingObserver {
                     _RouteCargoCard(o),
                     _FareCard(o),
                     _IncidentsCard(
+                      key: _incidentsKey,
                       order: o,
                       incidents: s.incidents,
                       onReport: () => _sheet(IncidentSheet(api: cubit.api, order: o)),
@@ -146,9 +204,12 @@ class _DetailViewState extends State<_DetailView> with WidgetsBindingObserver {
                     _RefundsCard(
                       refunds: s.refunds,
                       onReply: (r) => _sheet(ReplyInfoSheet(api: cubit.api, refund: r)),
+                      onPayout: (r) => _sheet(PayoutAccountSheet(api: cubit.api, refund: r)),
                       onWithdraw: (r) async {
                         final ok = await _confirm(context, 'Rút yêu cầu', 'Bạn chắc chắn muốn rút yêu cầu này? Không thể hoàn tác.');
-                        if (ok && context.mounted && await runAction(context, () => cubit.api.withdrawRefund(r.id), success: 'Đã rút yêu cầu.')) {
+                        if (ok &&
+                            context.mounted &&
+                            await runAction(context, () => cubit.api.withdrawRefund(r.id), notice: 'REFUND_WITHDRAWN', data: {'orderId': '${r.orderId}', 'orderCode': o.code})) {
                           await cubit.load();
                         }
                       },
@@ -225,11 +286,27 @@ class _NextAction extends StatefulWidget {
 class _NextActionState extends State<_NextAction> {
   bool _busy = false;
 
-  Future<void> _run(Future<void> Function() f, String ok) async {
+  Future<void> _run(Future<void> Function() f, String ok, {String? notice, Map<String, String> data = const {}}) async {
     setState(() => _busy = true);
-    final done = await runAction(context, f, success: ok);
+    var pending = false;
+    final done = await runAction(
+      context,
+      () async {
+        try {
+          await f();
+        } on ApiException catch (e) {
+          // BE từ chối vì tài xế vừa báo sự cố: tải lại để hiện banner và khóa nút.
+          pending = e.code == 'INCIDENT_PENDING';
+          rethrow;
+        }
+      },
+      success: ok,
+      notice: notice,
+      data: data,
+      noticeBody: notice == null ? null : ok,
+    );
     if (mounted) setState(() => _busy = false);
-    if (done) await widget.onDone();
+    if (done || pending) await widget.onDone();
   }
 
   Widget _box(Color bg, Color fg, String icon, String title, String body, List<Widget> actions) => Container(
@@ -276,7 +353,7 @@ class _NextActionState extends State<_NextAction> {
             AppColors.red,
             'credit-card',
             'Thanh toán để bắt đầu tìm tài xế',
-            'Đơn PayOS chỉ được gửi tới tài xế sau khi thanh toán (GB-31). Đơn tự huỷ nếu chưa thanh toán – còn ${timeLeft(OrderRules.unpaidDeadline(o).difference(now))}.'
+            'Đơn PayOS chỉ được gửi tới tài xế sau khi thanh toán. Đơn tự huỷ nếu chưa thanh toán – còn ${timeLeft(OrderRules.unpaidDeadline(o).difference(now))}.'
                 '${o.payment?.isExpired == true ? ' Mã trước đã hết hạn, hãy tạo mã mới.' : ''}',
             [FilledButton(onPressed: widget.onPay, child: Text('Thanh toán ${money(o.totalFee)}')), cancel],
           );
@@ -286,13 +363,20 @@ class _NextActionState extends State<_NextAction> {
           AppColors.amber,
           'clock',
           'Đang tìm tài xế gần điểm lấy',
-          'Đơn hiển thị cho mọi tài xế đủ điều kiện; tài xế nhận trước được giao đơn. Không ai nhận trong 10 phút, đơn tự huỷ (GB-24).',
+          'Đơn hiển thị cho mọi tài xế đủ điều kiện; tài xế nhận trước được giao đơn. Không ai nhận trong 10 phút, đơn tự huỷ.',
           [cancel],
         );
       case OrderStatus.accepted:
-        return _box(AppColors.peach, AppColors.orange, 'truck', 'Tài xế ${o.driver?.fullName ?? ''} đang tới điểm lấy', 'Bạn vẫn có thể huỷ miễn phí cho tới khi tài xế đến (GB-22).', [cancel]);
+        return _box(AppColors.peach, AppColors.orange, 'truck', 'Tài xế ${o.driver?.fullName ?? ''} đang tới điểm lấy', 'Bạn vẫn có thể huỷ miễn phí cho tới khi tài xế đến.', [cancel]);
       case OrderStatus.arrived:
-        return _box(AppColors.pale, AppColors.secondary, 'navigation', 'Tài xế đã đến điểm lấy', 'Tài xế đang kiểm hàng và chụp ảnh để bạn duyệt. Từ bước này không tự huỷ được; có vấn đề hãy báo sự cố.', [incident]);
+        return _box(
+          AppColors.pale,
+          AppColors.secondary,
+          'navigation',
+          'Tài xế đã đến điểm lấy',
+          'Tài xế đang kiểm hàng và chụp ảnh để bạn duyệt. Từ bước này không tự huỷ được; có vấn đề hãy báo sự cố.',
+          [incident],
+        );
       case OrderStatus.pickedUp:
         if (OrderRules.pickupReviewPending(o)) {
           return _box(
@@ -300,10 +384,13 @@ class _NextActionState extends State<_NextAction> {
             AppColors.amber,
             'clipboard-check',
             'Duyệt ảnh lấy hàng (lần ${o.proof?.submissionCount ?? 1}/5)',
-            'Kiểm tra ảnh tài xế vừa chụp bên dưới. Chuyến chỉ bắt đầu sau khi bạn duyệt (GB-26).',
+            OrderRules.canApprovePickup(o)
+                ? 'Kiểm tra ảnh tài xế vừa chụp bên dưới. Chuyến chỉ bắt đầu sau khi bạn duyệt.'
+                : 'Chưa duyệt được khi tài xế đang có sự cố. Bạn vẫn có thể từ chối để tài xế chụp lại.',
             [
               FilledButton(
-                onPressed: _busy ? null : () => _run(() => api.reviewPickup(o.id, approve: true), 'Đã duyệt ảnh. Tài xế bắt đầu vận chuyển.'),
+                key: const Key('approve-pickup'),
+                onPressed: _busy || !OrderRules.canApprovePickup(o) ? null : () => _run(() => api.reviewPickup(o.id, approve: true), 'Đã duyệt ảnh. Tài xế bắt đầu vận chuyển.'),
                 child: const Text('Duyệt, cho xuất phát'),
               ),
               OutlinedButton(onPressed: widget.onRejectPickup, child: const Text('Từ chối, chụp lại')),
@@ -331,7 +418,7 @@ class _NextActionState extends State<_NextAction> {
           'Hàng đã giao – kiểm tra và xác nhận',
           widget.hasOpenComplaint
               ? 'Đơn đang có khiếu nại mở. Đơn sẽ hoàn tất sau khi khiếu nại được đóng.'
-              : 'Hàng ổn: xác nhận đã nhận hàng. Có vấn đề: khiếu nại (còn ${timeLeft(left)}). Xác nhận rồi sẽ không khiếu nại được; quá 24 giờ đơn tự hoàn tất (GB-18, GB-23).',
+              : 'Hàng ổn: xác nhận đã nhận hàng. Có vấn đề: khiếu nại (còn ${timeLeft(left)}). Xác nhận rồi sẽ không khiếu nại được; quá 24 giờ đơn tự hoàn tất.',
           [
             if (!widget.hasOpenComplaint)
               FilledButton(
@@ -339,14 +426,17 @@ class _NextActionState extends State<_NextAction> {
                     ? null
                     : () async {
                         if (await _confirm(context, 'Xác nhận đã nhận hàng', 'Bạn đã kiểm tra hàng của đơn ${o.code} và hàng nguyên vẹn? Sau khi xác nhận bạn không thể khiếu nại.')) {
-                          await _run(() => api.confirmReceipt(o.id), 'Đơn ${o.code} đã hoàn thành. Cảm ơn bạn!');
+                          await _run(() => api.confirmReceipt(o.id), 'Đơn ${o.code} đã hoàn thành. Cảm ơn bạn!', notice: 'RECEIPT_CONFIRMED', data: {'orderId': '${o.id}', 'orderCode': o.code});
                         }
                       },
                 child: const Text('Xác nhận đã nhận hàng'),
               ),
             if (canComplain)
               OutlinedButton(
-                style: OutlinedButton.styleFrom(foregroundColor: AppColors.red, side: const BorderSide(color: AppColors.red)),
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: AppColors.red,
+                  side: const BorderSide(color: AppColors.red),
+                ),
                 onPressed: widget.onComplaint,
                 child: const Text('Khiếu nại'),
               ),
@@ -361,7 +451,7 @@ class _NextActionState extends State<_NextAction> {
           AppColors.green,
           'check',
           'Đơn đã hoàn thành',
-          left.inSeconds > 0 ? 'Hãy đánh giá tài xế (còn ${timeLeft(left)}, chỉ 1 lần – GB-20).' : 'Đã quá thời hạn 1 ngày để đánh giá.',
+          left.inSeconds > 0 ? 'Hãy đánh giá tài xế (còn ${timeLeft(left)}, chỉ 1 lần).' : 'Đã quá thời hạn 1 ngày để đánh giá.',
           [if (left.inSeconds > 0) FilledButton(onPressed: widget.onRate, child: const Text('Đánh giá tài xế'))],
         );
       default:
@@ -382,7 +472,11 @@ class _TrackingCard extends StatelessWidget {
     final toPickup = t != null && (t.etaTarget == 'Pickup' || (t.etaTarget == null && ['Accepted', 'Arrived'].contains(t.orderStatus)));
     return SectionCard(
       title: 'Theo dõi tài xế',
-      trailing: IconButton(tooltip: 'Cập nhật vị trí', onPressed: onRefresh, icon: const AppIcon('refresh', size: 20, color: AppColors.orange)),
+      trailing: IconButton(
+        tooltip: 'Cập nhật vị trí',
+        onPressed: onRefresh,
+        icon: const AppIcon('refresh', size: 20, color: AppColors.orange),
+      ),
       child: t == null
           ? Text(state.trackingError ?? 'Đang tải vị trí…', style: appText(size: 13, color: AppColors.secondary))
           : Column(
@@ -391,11 +485,7 @@ class _TrackingCard extends StatelessWidget {
                 Row(
                   children: [
                     Expanded(
-                      child: _Metric(
-                        label: 'Thời gian dự kiến',
-                        value: t.etaMinutes == null ? '—' : '${t.etaMinutes} phút',
-                        hint: t.etaTarget == null ? 'Chưa tính được' : target[t.etaTarget] ?? '',
-                      ),
+                      child: _Metric(label: 'Thời gian dự kiến', value: t.etaMinutes == null ? '—' : '${t.etaMinutes} phút', hint: t.etaTarget == null ? 'Chưa tính được' : target[t.etaTarget] ?? ''),
                     ),
                     const SizedBox(width: 8),
                     Expanded(
@@ -432,7 +522,10 @@ class _Metric extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(label, style: appText(size: 11, color: AppColors.secondary)),
-        Text(value, style: appText(size: 16, weight: FontWeight.w800, color: color)),
+        Text(
+          value,
+          style: appText(size: 16, weight: FontWeight.w800, color: color),
+        ),
         if (hint.isNotEmpty) Text(hint, style: appText(size: 11, color: AppColors.muted)),
       ],
     ),
@@ -453,7 +546,11 @@ class _ProofCard extends StatelessWidget {
         Text('Ảnh lấy hàng (lần gửi ${p.submissionCount}/5)', style: appText(size: 12.5, weight: FontWeight.w600)),
         const SizedBox(height: 6),
         PhotoStrip(p.pickupPhotoUrls),
-        if (p.rejectionReason != null) Padding(padding: const EdgeInsets.only(top: 6), child: Text('Lý do từ chối gần nhất: ${p.rejectionReason}', style: appText(size: 12, color: AppColors.red))),
+        if (p.rejectionReason != null)
+          Padding(
+            padding: const EdgeInsets.only(top: 6),
+            child: Text('Lý do từ chối gần nhất: ${p.rejectionReason}', style: appText(size: 12, color: AppColors.red)),
+          ),
         const SizedBox(height: 12),
         Text('Ảnh giao hàng (POD)', style: appText(size: 12.5, weight: FontWeight.w600)),
         const SizedBox(height: 6),
@@ -474,7 +571,14 @@ class _DriverCard extends StatelessWidget {
         ? Text(o.status == OrderStatus.cancelled ? 'Không có tài xế.' : 'Chưa có tài xế nhận đơn.', style: appText(size: 13, color: AppColors.secondary))
         : Row(
             children: [
-              CircleAvatar(radius: 22, backgroundColor: AppColors.ink, child: Text(o.driver!.fullName.isEmpty ? 'T' : o.driver!.fullName[0], style: appText(color: Colors.white, weight: FontWeight.w800))),
+              CircleAvatar(
+                radius: 22,
+                backgroundColor: AppColors.ink,
+                child: Text(
+                  o.driver!.fullName.isEmpty ? 'T' : o.driver!.fullName[0],
+                  style: appText(color: Colors.white, weight: FontWeight.w800),
+                ),
+              ),
               const SizedBox(width: 12),
               Expanded(
                 child: Column(
@@ -507,7 +611,18 @@ class _RouteCargoCard extends StatelessWidget {
       children: [
         _place('map-pin', AppColors.orange, 'Điểm lấy', o.pickupAddress),
         const SizedBox(height: 8),
-        _place('target', AppColors.green, 'Điểm giao • ${o.receiverName} (${o.receiverPhone})', o.dropoffAddress),
+        _place('target', AppColors.green, 'Điểm giao • ${o.receiverName}', o.dropoffAddress),
+        Padding(
+          padding: const EdgeInsets.only(left: 26, top: 4),
+          child: Row(
+            children: [
+              Text('Số điện thoại người nhận: ', style: appText(size: 11.5, color: AppColors.secondary)),
+              Flexible(
+                child: PhoneText(o.receiverPhone, style: appText(size: 13, weight: FontWeight.w600)),
+              ),
+            ],
+          ),
+        ),
         const SizedBox(height: 6),
         Text('${o.distanceKm} km • ~${o.durationMin} phút • ${o.vehicleTypeName}${o.hasLoadingService ? ' • Có bốc xếp' : ''}', style: appText(size: 12, color: AppColors.muted)),
         const Divider(height: 22),
@@ -562,7 +677,7 @@ class _FareCard extends StatelessWidget {
 }
 
 class _IncidentsCard extends StatelessWidget {
-  const _IncidentsCard({required this.order, required this.incidents, required this.onReport, required this.onRefund});
+  const _IncidentsCard({super.key, required this.order, required this.incidents, required this.onReport, required this.onRefund});
   final OrderDetail order;
   final List<MyIncident> incidents;
   final VoidCallback onReport;
@@ -577,37 +692,60 @@ class _IncidentsCard extends StatelessWidget {
       child: incidents.isEmpty
           ? Text('Chưa có sự cố nào.', style: appText(size: 13, color: AppColors.muted))
           : Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                for (final i in incidents)
-                  Padding(
-                    padding: const EdgeInsets.only(bottom: 10),
-                    child: AppCard(
-                      color: AppColors.pale,
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Row(
-                            children: [
-                              Expanded(child: Text('#${i.id} – ${incidentTypeLabel[i.incidentType] ?? i.incidentType}', style: appText(size: 13, weight: FontWeight.w700))),
-                              Pill(toneOf(incidentStatusTone, i.status)),
-                            ],
-                          ),
-                          Text('${i.reportedByYou ? 'Bạn báo' : 'Tài xế báo'} • ${dateTime(i.createdAt)}', style: appText(size: 11, color: AppColors.muted)),
-                          const SizedBox(height: 4),
-                          Text(i.description, style: appText(size: 13)),
-                          if (i.photoUrls.isNotEmpty) Padding(padding: const EdgeInsets.only(top: 6), child: PhotoStrip(i.photoUrls, size: 54)),
-                          if (i.decision != null)
-                            Padding(
-                              padding: const EdgeInsets.only(top: 6),
-                              child: Text('Kết quả: ${incidentDecisionLabel[i.decision] ?? i.decision}${i.note == null ? '' : ' – ${i.note}'}', style: appText(size: 12.5, weight: FontWeight.w600)),
-                            ),
-                          if (i.status == 'Cancelled' && i.note != null) Text('Lý do huỷ sự cố: ${i.note}', style: appText(size: 12, color: AppColors.secondary)),
-                          if (OrderRules.canRequestIncidentRefund(order))
-                            TextButton(onPressed: () => onRefund(i), child: const Text('Yêu cầu hoàn tiền cho sự cố này')),
-                        ],
+                for (final group in [(title: 'Tài xế báo', items: incidents.where((i) => !i.reportedByYou).toList()), (title: 'Bạn báo', items: incidents.where((i) => i.reportedByYou).toList())])
+                  if (group.items.isNotEmpty) ...[
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 6),
+                      child: Text(
+                        group.title.toUpperCase(),
+                        style: appText(size: 11, weight: FontWeight.w800, color: AppColors.muted),
                       ),
                     ),
-                  ),
+                    for (final i in group.items)
+                      Padding(
+                        padding: const EdgeInsets.only(bottom: 10),
+                        child: AppCard(
+                          color: AppColors.pale,
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Row(
+                                children: [
+                                  Expanded(
+                                    child: Text('#${i.id} – ${incidentTypeLabel[i.incidentType] ?? i.incidentType}', style: appText(size: 13, weight: FontWeight.w700)),
+                                  ),
+                                  Pill(toneOf(incidentStatusTone, i.status)),
+                                ],
+                              ),
+                              Text(dateTime(i.createdAt), style: appText(size: 11, color: AppColors.muted)),
+                              const SizedBox(height: 4),
+                              Text(i.description, style: appText(size: 13)),
+                              if (i.photoUrls.isNotEmpty) Padding(padding: const EdgeInsets.only(top: 6), child: PhotoStrip(i.photoUrls, size: 54)),
+                              if (i.status == 'InProgress')
+                                Padding(
+                                  padding: const EdgeInsets.only(top: 6),
+                                  child: Text(
+                                    'Điều phối viên đang xử lý',
+                                    style: appText(size: 12.5, weight: FontWeight.w600, color: AppColors.amber),
+                                  ),
+                                ),
+                              if (i.status == 'Resolved' && i.decision != null)
+                                Padding(
+                                  padding: const EdgeInsets.only(top: 6),
+                                  child: Text(
+                                    'Kết quả: ${incidentDecisionLabel[i.decision] ?? i.decision}${i.note == null ? '' : ' – ${i.note}'}',
+                                    style: appText(size: 12.5, weight: FontWeight.w600),
+                                  ),
+                                ),
+                              if (i.status == 'Cancelled') Text('Báo cáo đã bị hủy${i.note == null ? '' : ': ${i.note}'}', style: appText(size: 12, color: AppColors.secondary)),
+                              if (OrderRules.canRequestIncidentRefund(order)) TextButton(onPressed: () => onRefund(i), child: const Text('Yêu cầu hoàn tiền cho sự cố này')),
+                            ],
+                          ),
+                        ),
+                      ),
+                  ],
               ],
             ),
     );
@@ -615,9 +753,9 @@ class _IncidentsCard extends StatelessWidget {
 }
 
 class _RefundsCard extends StatelessWidget {
-  const _RefundsCard({required this.refunds, required this.onReply, required this.onWithdraw});
+  const _RefundsCard({required this.refunds, required this.onReply, required this.onWithdraw, required this.onPayout});
   final List<MyRefund> refunds;
-  final ValueChanged<MyRefund> onReply, onWithdraw;
+  final ValueChanged<MyRefund> onReply, onWithdraw, onPayout;
   @override
   Widget build(BuildContext context) {
     if (refunds.isEmpty) return const SizedBox.shrink();
@@ -635,17 +773,20 @@ class _RefundsCard extends StatelessWidget {
                   children: [
                     Row(
                       children: [
-                        Expanded(child: Text('${refundSourceLabel[r.sourceType] ?? r.sourceType} #${r.id}', style: appText(size: 13, weight: FontWeight.w700))),
+                        Expanded(
+                          child: Text('${refundSourceLabel[r.sourceType] ?? r.sourceType} #${r.id}', style: appText(size: 13, weight: FontWeight.w700)),
+                        ),
                         Pill(refundTone(r.status)),
                       ],
                     ),
                     Text(dateTime(r.createdAt), style: appText(size: 11, color: AppColors.muted)),
-                    if (r.reason.isNotEmpty) Padding(padding: const EdgeInsets.only(top: 4), child: Text(r.reason, style: appText(size: 13))),
+                    if (r.reason.isNotEmpty)
+                      Padding(
+                        padding: const EdgeInsets.only(top: 4),
+                        child: Text(r.reason, style: appText(size: 13)),
+                      ),
                     const SizedBox(height: 4),
-                    Text(
-                      'Yêu cầu: ${money(r.requestedAmount)}${r.approvedAmount == null ? '' : ' • Được duyệt: ${money(r.approvedAmount!)}'}',
-                      style: appText(size: 12.5, weight: FontWeight.w600),
-                    ),
+                    Text('Yêu cầu: ${money(r.requestedAmount)}${r.approvedAmount == null ? '' : ' • Được duyệt: ${money(r.approvedAmount!)}'}', style: appText(size: 12.5, weight: FontWeight.w600)),
                     if (r.processedAt != null) Text('Đã chuyển khoản ${dateTime(r.processedAt!)}', style: appText(size: 12, color: AppColors.green)),
                     if (r.evidenceUrls.isNotEmpty) Padding(padding: const EdgeInsets.only(top: 6), child: PhotoStrip(r.evidenceUrls, size: 54)),
                     if (r.infoRequestNote != null)
@@ -653,10 +794,36 @@ class _RefundsCard extends StatelessWidget {
                         padding: const EdgeInsets.only(top: 6),
                         child: Notice('Điều phối viên hỏi: ${r.infoRequestNote}', icon: 'info', peach: true, detail: r.customerReply == null ? null : 'Bạn trả lời: ${r.customerReply}'),
                       ),
-                    if (r.decisionReason != null) Padding(padding: const EdgeInsets.only(top: 6), child: Text('Quyết định của Admin: ${r.decisionReason}', style: appText(size: 12.5))),
+                    if (r.decisionReason != null)
+                      Padding(
+                        padding: const EdgeInsets.only(top: 6),
+                        child: Text('Quyết định của Admin: ${r.decisionReason}', style: appText(size: 12.5)),
+                      ),
+                    if (r.payoutAccount != null)
+                      Padding(
+                        padding: const EdgeInsets.only(top: 6),
+                        child: Text('Tài khoản nhận hoàn tiền: ${r.payoutAccount!.bankName} • ${r.payoutAccount!.maskedAccountNumber} • ${r.payoutAccount!.accountHolder}', style: appText(size: 12.5)),
+                      ),
+                    if (r.needsPayoutAccount)
+                      const Padding(
+                        padding: EdgeInsets.only(top: 6),
+                        child: Notice('Bạn chưa khai tài khoản nhận hoàn tiền nên quản trị viên chưa thể chuyển khoản.', icon: 'warning', peach: true),
+                      ),
+                    if (r.payoutFailureReason != null)
+                      Padding(
+                        padding: const EdgeInsets.only(top: 6),
+                        child: Notice('Chuyển khoản hoàn tiền bị lỗi: ${r.payoutFailureReason}. Hãy kiểm tra hoặc nhập tài khoản khác.', icon: 'warning', peach: true),
+                      ),
+                    if (r.bankReferenceCode != null)
+                      Padding(
+                        padding: const EdgeInsets.only(top: 6),
+                        child: Text('Mã chuyển khoản: ${r.bankReferenceCode}', style: appText(size: 12.5)),
+                      ),
                     Wrap(
                       spacing: 8,
                       children: [
+                        if (r.needsPayoutAccount || r.status == 'Failed' || (r.payoutAccount != null && (r.status == 'Requested' || r.status == 'Approved')))
+                          TextButton(onPressed: () => onPayout(r), child: Text(r.payoutAccount == null ? 'Khai tài khoản nhận tiền' : 'Sửa tài khoản nhận tiền')),
                         if (r.waitingForYourReply) TextButton(onPressed: () => onReply(r), child: const Text('Bổ sung thông tin')),
                         if (OrderRules.canWithdrawRefund(r)) TextButton(onPressed: () => onWithdraw(r), child: const Text('Rút yêu cầu')),
                       ],

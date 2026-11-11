@@ -167,13 +167,15 @@ class BookingCubit extends Cubit<BookingState> {
         coupons = await api.coupons();
       } catch (_) {}
       final cargo = results[1] as List<LookupItem>;
-      emit(state.copyWith(
-        vehicles: results[0] as List<VehicleType>,
-        cargoTypes: cargo,
-        coupons: coupons,
-        loadingLookups: false,
-        draft: state.draft.cargoType.isEmpty && cargo.isNotEmpty ? state.draft.copyWith(cargoType: cargo.first.code) : null,
-      ));
+      emit(
+        state.copyWith(
+          vehicles: results[0] as List<VehicleType>,
+          cargoTypes: cargo,
+          coupons: coupons,
+          loadingLookups: false,
+          draft: state.draft.cargoType.isEmpty && cargo.isNotEmpty ? state.draft.copyWith(cargoType: cargo.first.code) : null,
+        ),
+      );
     } catch (e) {
       emit(state.copyWith(loadingLookups: false, lookupError: e is ApiException ? e.message : '$e'));
     }
@@ -223,13 +225,7 @@ class BookingCubit extends Cubit<BookingState> {
   void _scheduleEstimate({bool immediate = false}) {
     _debounce?.cancel();
     final d = state.draft;
-    final ready = state.vehicle != null &&
-        InputRules.address(d.pickupAddress) &&
-        InputRules.address(d.dropoffAddress) &&
-        d.weightKg > 0 &&
-        d.lengthCm > 0 &&
-        d.widthCm > 0 &&
-        d.heightCm > 0;
+    final ready = state.vehicle != null && InputRules.address(d.pickupAddress) && InputRules.address(d.dropoffAddress) && d.weightKg > 0 && d.lengthCm > 0 && d.widthCm > 0 && d.heightCm > 0;
     if (!ready) {
       emit(state.copyWith(clearEstimate: true, clearErrors: true));
       return;
@@ -258,12 +254,14 @@ class BookingCubit extends Cubit<BookingState> {
       if (seq != _estimateSeq || isClosed) return;
       final code = e is ApiException ? e.code : null;
       final msg = e is ApiException ? e.message : 'Không tính được giá.';
-      emit(state.copyWith(
-        estimating: false,
-        clearEstimate: true,
-        couponError: code != null && code.startsWith('COUPON_') ? msg : null,
-        estimateError: code != null && code.startsWith('COUPON_') ? null : msg,
-      ));
+      emit(
+        state.copyWith(
+          estimating: false,
+          clearEstimate: true,
+          couponError: code != null && code.startsWith('COUPON_') ? msg : null,
+          estimateError: code != null && code.startsWith('COUPON_') ? null : msg,
+        ),
+      );
     }
   }
 

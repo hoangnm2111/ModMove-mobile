@@ -5,16 +5,7 @@ import '../../data/customer_api.dart';
 import '../../domain/entities/customer_models.dart';
 
 class OrderDetailState {
-  const OrderDetailState({
-    this.order,
-    this.incidents = const [],
-    this.refunds = const [],
-    this.rating,
-    this.tracking,
-    this.trackingError,
-    this.loading = true,
-    this.error,
-  });
+  const OrderDetailState({this.order, this.incidents = const [], this.refunds = const [], this.rating, this.tracking, this.trackingError, this.loading = true, this.error});
   final OrderDetail? order;
   final List<MyIncident> incidents;
   final List<MyRefund> refunds;
@@ -34,7 +25,7 @@ class OrderDetailCubit extends Cubit<OrderDetailState> {
     try {
       final order = await api.order(orderId);
       final extras = await Future.wait<Object?>([
-        api.incidents().catchError((_) => <MyIncident>[]),
+        api.incidents(orderId: orderId).catchError((_) => <MyIncident>[]),
         api.refunds().catchError((_) => <MyRefund>[]),
         api.ratings(pageSize: 50).then<Object?>((r) => r.items).catchError((_) => <MyRating>[]),
       ]);
@@ -43,26 +34,30 @@ class OrderDetailCubit extends Cubit<OrderDetailState> {
       final refunds = await Future.wait(summaries.map((r) => api.refund(r.id).catchError((_) => r)));
       final rating = (extras[2] as List<MyRating>).where((r) => r.orderId == orderId).firstOrNull;
       if (isClosed) return;
-      emit(OrderDetailState(
-        order: order,
-        incidents: (extras[0] as List<MyIncident>).where((i) => i.orderId == orderId).toList(),
-        refunds: refunds,
-        rating: rating,
-        tracking: state.tracking,
-        loading: false,
-      ));
+      emit(
+        OrderDetailState(
+          order: order,
+          incidents: (extras[0] as List<MyIncident>).where((i) => i.orderId == orderId).toList(),
+          refunds: refunds,
+          rating: rating,
+          tracking: state.tracking,
+          loading: false,
+        ),
+      );
       if (withTracking) await loadTracking();
     } catch (e) {
       if (!isClosed) {
-        emit(OrderDetailState(
-          order: state.order,
-          incidents: state.incidents,
-          refunds: state.refunds,
-          rating: state.rating,
-          tracking: state.tracking,
-          loading: false,
-          error: e is ApiException ? e.message : '$e',
-        ));
+        emit(
+          OrderDetailState(
+            order: state.order,
+            incidents: state.incidents,
+            refunds: state.refunds,
+            rating: state.rating,
+            tracking: state.tracking,
+            loading: false,
+            error: e is ApiException ? e.message : '$e',
+          ),
+        );
       }
     }
   }
@@ -79,13 +74,7 @@ class OrderDetailCubit extends Cubit<OrderDetailState> {
     }
   }
 
-  void _emitWith({OrderTracking? tracking, String? trackingError}) => emit(OrderDetailState(
-    order: state.order,
-    incidents: state.incidents,
-    refunds: state.refunds,
-    rating: state.rating,
-    tracking: tracking ?? state.tracking,
-    trackingError: trackingError,
-    loading: false,
-  ));
+  void _emitWith({OrderTracking? tracking, String? trackingError}) => emit(
+    OrderDetailState(order: state.order, incidents: state.incidents, refunds: state.refunds, rating: state.rating, tracking: tracking ?? state.tracking, trackingError: trackingError, loading: false),
+  );
 }

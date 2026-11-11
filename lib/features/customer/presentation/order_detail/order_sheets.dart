@@ -7,6 +7,7 @@ import 'package:url_launcher/url_launcher.dart';
 import '../../../../core/format/formatters.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/widgets/app_widgets.dart';
+import '../../../../core/widgets/notice_banner.dart';
 import '../../data/customer_api.dart';
 import '../../domain/entities/customer_models.dart';
 import '../../domain/order_rules.dart';
@@ -22,7 +23,9 @@ Future<bool> showActionSheet(BuildContext context, Widget child) async =>
       backgroundColor: Colors.white,
       builder: (c) => Padding(
         padding: EdgeInsets.only(bottom: MediaQuery.viewInsetsOf(c).bottom),
-        child: SafeArea(child: SingleChildScrollView(padding: const EdgeInsets.fromLTRB(20, 0, 20, 20), child: child)),
+        child: SafeArea(
+          child: SingleChildScrollView(padding: const EdgeInsets.fromLTRB(20, 0, 20, 20), child: child),
+        ),
       ),
     ) ??
     false;
@@ -65,6 +68,113 @@ class _FormState extends State<_Form> {
 
 Widget _gap() => const SizedBox(height: 12);
 
+/// Ô nhập tài khoản nhận hoàn tiền: chọn ngân hàng (lookups/banks), số tài khoản, chủ tài khoản.
+class _PayoutFields extends StatefulWidget {
+  const _PayoutFields({required this.api, required this.controller});
+  final CustomerApi api;
+  final _PayoutController controller;
+  @override
+  State<_PayoutFields> createState() => _PayoutFieldsState();
+}
+
+class _PayoutController {
+  String? bankCode;
+  final number = TextEditingController();
+  final holder = TextEditingController();
+  void dispose() {
+    number.dispose();
+    holder.dispose();
+  }
+
+  /// null nếu hợp lệ, ngược lại là câu báo lỗi.
+  String? validate() => PayoutAccountInput.validate(bankCode: bankCode, number: number.text, holder: holder.text);
+
+  PayoutAccountInput get input => PayoutAccountInput(bankCode: bankCode!, accountNumber: number.text, accountHolder: holder.text.trim());
+}
+
+class _PayoutFieldsState extends State<_PayoutFields> {
+  late final Future<List<LookupItem>> _banks = widget.api.banks();
+  @override
+  Widget build(BuildContext context) => Column(
+    crossAxisAlignment: CrossAxisAlignment.stretch,
+    children: [
+      Text('Tài khoản nhận tiền hoàn', style: appText(size: 14, weight: FontWeight.w700)),
+      const SizedBox(height: 8),
+      FutureBuilder<List<LookupItem>>(
+        future: _banks,
+        builder: (_, snap) => DropdownButtonFormField<String>(
+          initialValue: widget.controller.bankCode,
+          isExpanded: true,
+          decoration: const InputDecoration(labelText: 'Ngân hàng'),
+          items: [for (final b in snap.data ?? const <LookupItem>[]) DropdownMenuItem(value: b.code, child: Text(b.name))],
+          onChanged: (v) => setState(() => widget.controller.bankCode = v),
+        ),
+      ),
+      TextField(
+        controller: widget.controller.number,
+        keyboardType: TextInputType.number,
+        maxLength: 19,
+        inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+        decoration: const InputDecoration(labelText: 'Số tài khoản (6 đến 19 chữ số)'),
+      ),
+      TextField(
+        controller: widget.controller.holder,
+        textCapitalization: TextCapitalization.characters,
+        maxLength: 100,
+        onChanged: (v) {
+          final n = PayoutAccountInput.normalizeHolder(v);
+          if (n != v) {
+            widget.controller.holder.value = TextEditingValue(
+              text: n,
+              selection: TextSelection.collapsed(offset: n.length),
+            );
+          }
+        },
+        decoration: const InputDecoration(labelText: 'Chủ tài khoản (chữ in hoa, không dấu)'),
+      ),
+      Text('Hệ thống chỉ hiển thị lại 4 số cuối. Quản trị viên dùng thông tin này để chuyển khoản hoàn tiền.', style: appText(size: 11, color: AppColors.muted)),
+    ],
+  );
+}
+
+/// Khai hoặc sửa tài khoản nhận hoàn tiền cho một khoản hoàn đã gửi.
+class PayoutAccountSheet extends StatefulWidget {
+  const PayoutAccountSheet({super.key, required this.api, required this.refund});
+  final CustomerApi api;
+  final MyRefund refund;
+  @override
+  State<PayoutAccountSheet> createState() => _PayoutAccountSheetState();
+}
+
+class _PayoutAccountSheetState extends State<PayoutAccountSheet> {
+  final _payout = _PayoutController();
+  @override
+  void dispose() {
+    _payout.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => _Form(
+    title: 'Tài khoản nhận hoàn tiền – khoản #${widget.refund.id}',
+    submitLabel: 'Lưu tài khoản',
+    onSubmit: () async {
+      final error = _payout.validate();
+      if (error != null) {
+        showSnack(context, error, error: true);
+        return false;
+      }
+      return runAction(context, () => widget.api.setRefundPayoutAccount(widget.refund.id, _payout.input), success: 'Đã lưu tài khoản nhận hoàn tiền.');
+    },
+    children: [
+      if (widget.refund.payoutFailureReason != null)
+        Notice('Lần chuyển khoản trước bị lỗi: ${widget.refund.payoutFailureReason}. Hãy nhập tài khoản khác hoặc kiểm tra lại.', icon: 'warning', peach: true),
+      if (widget.refund.payoutFailureReason != null) _gap(),
+      _PayoutFields(api: widget.api, controller: _payout),
+    ],
+  );
+}
+
 /* ------------------------------------------------------------ Huỷ đơn (UC-CUS-29) */
 class CancelOrderSheet extends StatefulWidget {
   const CancelOrderSheet({super.key, required this.api, required this.order});
@@ -105,12 +215,14 @@ class _CancelOrderSheetState extends State<CancelOrderSheet> {
         return runAction(
           context,
           () => widget.api.cancelOrder(o.id, _code!, _reason.text.trim()),
-          success: 'Đã huỷ đơn ${o.code}.${paid ? ' Yêu cầu hoàn 100% đã gửi tới Admin.' : ''}',
+          notice: 'ORDER_CANCELLED',
+          data: {'orderId': '${o.id}', 'orderCode': o.code},
+          noticeBody: 'Đã huỷ đơn ${o.code}.${paid ? ' Yêu cầu hoàn 100% đã gửi tới Admin.' : ''}',
         );
       },
       children: [
         Notice(
-          'Huỷ miễn phí khi đơn đang tìm tài xế hoặc tài xế đã nhận (GB-22).'
+          'Huỷ miễn phí khi đơn đang tìm tài xế hoặc tài xế đã nhận.'
           '${paid ? ' Đơn đã thanh toán sẽ được hoàn 100% (${money(o.totalFee)}) sau khi Admin duyệt.' : ''}',
           icon: 'info',
         ),
@@ -126,7 +238,11 @@ class _CancelOrderSheetState extends State<CancelOrderSheet> {
           ),
         ),
         _gap(),
-        TextField(controller: _reason, maxLength: 500, decoration: InputDecoration(labelText: _code == 'OTHER' ? 'Ghi rõ lý do *' : 'Ghi chú thêm')),
+        TextField(
+          controller: _reason,
+          maxLength: 500,
+          decoration: InputDecoration(labelText: _code == 'OTHER' ? 'Ghi rõ lý do *' : 'Ghi chú thêm'),
+        ),
       ],
     );
   }
@@ -161,7 +277,7 @@ class _RejectPickupSheetState extends State<RejectPickupSheet> {
       return runAction(context, () => widget.api.reviewPickup(widget.order.id, approve: false, reason: _reason.text.trim()), success: 'Đã từ chối ảnh. Tài xế sẽ chụp lại.');
     },
     children: [
-      Notice('Lần gửi ảnh thứ ${widget.order.proof?.submissionCount ?? 1}/5. Sau lần từ chối thứ 5, tài xế phải báo sự cố (GB-11).', icon: 'warning', peach: true),
+      Notice('Lần gửi ảnh thứ ${widget.order.proof?.submissionCount ?? 1}/5. Sau lần từ chối thứ 5, tài xế phải báo sự cố.', icon: 'warning', peach: true),
       _gap(),
       TextField(
         controller: _reason,
@@ -187,12 +303,14 @@ class _ComplaintSheetState extends State<ComplaintSheet> {
   String? _code;
   final _reason = TextEditingController();
   final _amount = TextEditingController();
+  final _payout = _PayoutController();
   List<String> _photos = const [];
 
   @override
   void dispose() {
     _reason.dispose();
     _amount.dispose();
+    _payout.dispose();
     super.dispose();
   }
 
@@ -216,15 +334,21 @@ class _ComplaintSheetState extends State<ComplaintSheet> {
           showSnack(context, 'Số tiền yêu cầu từ 1đ đến ${money(o.totalFee)}.', error: true);
           return false;
         }
+        final payoutError = _payout.validate();
+        if (payoutError != null) {
+          showSnack(context, payoutError, error: true);
+          return false;
+        }
         return runAction(
           context,
-          () => widget.api.submitComplaint(orderId: o.id, reasonCode: _code!, reason: _reason.text.trim(), evidenceUrls: _photos, requestedAmount: amount),
-          success: 'Đã gửi khiếu nại. Điều phối viên sẽ xem xét.',
+          () => widget.api.submitComplaint(orderId: o.id, reasonCode: _code!, reason: _reason.text.trim(), evidenceUrls: _photos, requestedAmount: amount, payoutAccount: _payout.input),
+          notice: 'COMPLAINT_SUBMITTED',
+          data: {'orderId': '${o.id}', 'orderCode': o.code},
         );
       },
       children: [
         Notice(
-          'Khiếu nại trong 24 giờ sau khi giao (GB-18). Khi khiếu nại đang mở, đơn chưa hoàn tất.'
+          'Khiếu nại trong 24 giờ sau khi giao. Khi khiếu nại đang mở, đơn chưa hoàn tất.'
           '${o.paymentMethod == 'Cash' ? ' Đơn tiền mặt: tranh chấp tiền xử lý ngoài hệ thống.' : ''}',
           icon: 'info',
         ),
@@ -240,7 +364,12 @@ class _ComplaintSheetState extends State<ComplaintSheet> {
           ),
         ),
         _gap(),
-        TextField(controller: _reason, maxLines: 3, maxLength: 1000, decoration: InputDecoration(labelText: _code == 'OTHER' ? 'Mô tả chi tiết *' : 'Mô tả chi tiết')),
+        TextField(
+          controller: _reason,
+          maxLines: 3,
+          maxLength: 1000,
+          decoration: InputDecoration(labelText: _code == 'OTHER' ? 'Mô tả chi tiết *' : 'Mô tả chi tiết'),
+        ),
         TextField(
           controller: _amount,
           keyboardType: TextInputType.number,
@@ -249,6 +378,8 @@ class _ComplaintSheetState extends State<ComplaintSheet> {
         ),
         _gap(),
         PhotoPicker(label: 'Ảnh bằng chứng', urls: _photos, max: OrderRules.maxEvidencePhotos, upload: widget.api.upload, onChanged: (p) => setState(() => _photos = p)),
+        _gap(),
+        _PayoutFields(api: widget.api, controller: _payout),
       ],
     );
   }
@@ -263,8 +394,19 @@ class IncidentSheet extends StatefulWidget {
   State<IncidentSheet> createState() => _IncidentSheetState();
 }
 
+/// Lý do nhanh của khách: bấm thì chọn loại sự cố và điền câu mở đầu (trễ, sai tuyến, vắng mặt đều ghi là `Other`).
+const incidentQuickReasons = <({String label, String type, String starter})>[
+  (label: 'Hàng hư hỏng', type: 'DamagedCargo', starter: 'Hàng bị hư hỏng: '),
+  (label: 'Tài xế đến trễ', type: 'Other', starter: 'Tài xế đến trễ: '),
+  (label: 'Đi sai tuyến', type: 'Other', starter: 'Tài xế đi sai tuyến: '),
+  (label: 'Không liên lạc được tài xế / tài xế vắng mặt', type: 'Other', starter: 'Không liên lạc được với tài xế: '),
+  (label: 'Tai nạn', type: 'Accident', starter: 'Tai nạn trên đường: '),
+  (label: 'Khác', type: 'Other', starter: ''),
+];
+
 class _IncidentSheetState extends State<IncidentSheet> {
   String _type = 'Other';
+  String _quick = 'Khác';
   final _desc = TextEditingController();
   List<String> _photos = const [];
 
@@ -272,6 +414,19 @@ class _IncidentSheetState extends State<IncidentSheet> {
   void dispose() {
     _desc.dispose();
     super.dispose();
+  }
+
+  void _pick(({String label, String type, String starter}) reason) {
+    setState(() {
+      _quick = reason.label;
+      _type = reason.type;
+      // Chỉ thay câu mở đầu khi khách chưa tự viết thêm.
+      final current = _desc.text.trim();
+      if (current.isEmpty || incidentQuickReasons.any((r) => r.starter.isNotEmpty && r.starter.trim() == current)) {
+        _desc.text = reason.starter;
+        _desc.selection = TextSelection.collapsed(offset: _desc.text.length);
+      }
+    });
   }
 
   @override
@@ -286,21 +441,33 @@ class _IncidentSheetState extends State<IncidentSheet> {
       return runAction(
         context,
         () => widget.api.reportIncident(orderId: widget.order.id, type: _type, description: _desc.text.trim(), photoUrls: _photos),
-        success: 'Đã gửi báo cáo sự cố. Điều phối viên sẽ xử lý.',
+        notice: 'INCIDENT_REPORTED',
+        data: {'orderId': '${widget.order.id}', 'orderCode': widget.order.code},
+        noticeBody: 'Đã gửi báo cáo sự cố của đơn ${widget.order.code}. Điều phối viên sẽ xử lý.',
       );
     },
     children: [
-      const Notice('Từ khi tài xế đến điểm lấy, bạn không tự huỷ được đơn. Điều phối viên sẽ quyết định tiếp tục, đổi tài xế hoặc huỷ.', icon: 'info'),
+      const Notice(
+        'Điều phối viên sẽ kiểm tra và có thể cho tiếp tục, đổi tài xế hoặc hủy đơn. '
+        'Tài xế chỉ nhận thông báo chung, không thấy nội dung bạn viết. Chuyến vẫn tiếp tục trong lúc chờ xử lý.',
+        icon: 'info',
+      ),
       _gap(),
+      Text('Lý do nhanh', style: appText(size: 13, weight: FontWeight.w700)),
+      const SizedBox(height: 6),
       Wrap(
         spacing: 8,
         runSpacing: 8,
-        children: [
-          for (final e in incidentTypeLabel.entries) ChoiceChip(label: Text(e.value), selected: _type == e.key, onSelected: (_) => setState(() => _type = e.key)),
-        ],
+        children: [for (final r in incidentQuickReasons) ChoiceChip(key: ValueKey('incident-reason-${r.label}'), label: Text(r.label), selected: _quick == r.label, onSelected: (_) => _pick(r))],
       ),
       _gap(),
-      TextField(controller: _desc, maxLines: 3, maxLength: 1000, decoration: const InputDecoration(labelText: 'Mô tả sự cố')),
+      TextField(
+        key: const Key('customer-incident-description'),
+        controller: _desc,
+        maxLines: 3,
+        maxLength: 1000,
+        decoration: const InputDecoration(labelText: 'Mô tả sự cố'),
+      ),
       PhotoPicker(label: 'Ảnh minh chứng', urls: _photos, max: OrderRules.maxEvidencePhotos, upload: widget.api.upload, onChanged: (p) => setState(() => _photos = p)),
     ],
   );
@@ -319,12 +486,14 @@ class IncidentRefundSheet extends StatefulWidget {
 class _IncidentRefundSheetState extends State<IncidentRefundSheet> {
   final _reason = TextEditingController();
   final _amount = TextEditingController();
+  final _payout = _PayoutController();
   List<String> _photos = const [];
 
   @override
   void dispose() {
     _reason.dispose();
     _amount.dispose();
+    _payout.dispose();
     super.dispose();
   }
 
@@ -342,16 +511,27 @@ class _IncidentRefundSheetState extends State<IncidentRefundSheet> {
         showSnack(context, 'Số tiền từ 1đ đến ${money(widget.order.totalFee)}.', error: true);
         return false;
       }
+      final payoutError = _payout.validate();
+      if (payoutError != null) {
+        showSnack(context, payoutError, error: true);
+        return false;
+      }
       return runAction(
         context,
-        () => widget.api.requestIncidentRefund(incidentId: widget.incident.id, reason: _reason.text.trim(), evidenceUrls: _photos, requestedAmount: amount),
-        success: 'Đã gửi yêu cầu hoàn tiền.',
+        () => widget.api.requestIncidentRefund(incidentId: widget.incident.id, reason: _reason.text.trim(), evidenceUrls: _photos, requestedAmount: amount, payoutAccount: _payout.input),
+        notice: 'INCIDENT_REFUND_REQUESTED',
+        data: {'orderId': '${widget.order.id}', 'orderCode': widget.order.code},
       );
     },
     children: [
-      const Notice('Chỉ áp dụng đơn PayOS đã thanh toán. Số được duyệt không vượt số bạn yêu cầu (GB-42).', icon: 'info'),
+      const Notice('Chỉ áp dụng đơn PayOS đã thanh toán. Số được duyệt không vượt số bạn yêu cầu.', icon: 'info'),
       _gap(),
-      TextField(controller: _reason, maxLines: 3, maxLength: 1000, decoration: const InputDecoration(labelText: 'Lý do')),
+      TextField(
+        controller: _reason,
+        maxLines: 3,
+        maxLength: 1000,
+        decoration: const InputDecoration(labelText: 'Lý do'),
+      ),
       TextField(
         controller: _amount,
         keyboardType: TextInputType.number,
@@ -360,6 +540,8 @@ class _IncidentRefundSheetState extends State<IncidentRefundSheet> {
       ),
       _gap(),
       PhotoPicker(label: 'Ảnh bằng chứng', urls: _photos, max: OrderRules.maxEvidencePhotos, upload: widget.api.upload, onChanged: (p) => setState(() => _photos = p)),
+      _gap(),
+      _PayoutFields(api: widget.api, controller: _payout),
     ],
   );
 }
@@ -394,12 +576,17 @@ class _ReplyInfoSheetState extends State<ReplyInfoSheet> {
           showSnack(context, 'Nhập câu trả lời.', error: true);
           return false;
         }
-        return runAction(context, () => widget.api.replyRefund(widget.refund.id, _reply.text.trim(), _photos), success: 'Đã gửi thông tin bổ sung.');
+        return runAction(context, () => widget.api.replyRefund(widget.refund.id, _reply.text.trim(), _photos), notice: 'REFUND_INFO_REPLIED', data: {'orderId': '${widget.refund.orderId}'});
       },
       children: [
         if (widget.refund.infoRequestNote != null) Notice('Điều phối viên hỏi: ${widget.refund.infoRequestNote}', icon: 'info', peach: true),
         _gap(),
-        TextField(controller: _reply, maxLines: 3, maxLength: 1000, decoration: const InputDecoration(labelText: 'Câu trả lời')),
+        TextField(
+          controller: _reply,
+          maxLines: 3,
+          maxLength: 1000,
+          decoration: const InputDecoration(labelText: 'Câu trả lời'),
+        ),
         if (room > 0)
           PhotoPicker(label: 'Ảnh bổ sung', urls: _photos, max: room, upload: widget.api.upload, onChanged: (p) => setState(() => _photos = p))
         else
@@ -431,9 +618,14 @@ class _RatingSheetState extends State<RatingSheet> {
   Widget build(BuildContext context) => _Form(
     title: 'Đánh giá chuyến ${widget.order.code}',
     submitLabel: 'Gửi đánh giá',
-    onSubmit: () => runAction(context, () => widget.api.rate(widget.order.id, _stars, _comment.text.trim()), success: 'Cảm ơn bạn đã đánh giá!'),
+    onSubmit: () => runAction(context, () => widget.api.rate(widget.order.id, _stars, _comment.text.trim()), notice: 'RATING_SUBMITTED'),
     children: [
-      if (widget.order.driver != null) Text('Tài xế: ${widget.order.driver!.fullName}', textAlign: TextAlign.center, style: appText(color: AppColors.secondary)),
+      if (widget.order.driver != null)
+        Text(
+          'Tài xế: ${widget.order.driver!.fullName}',
+          textAlign: TextAlign.center,
+          style: appText(color: AppColors.secondary),
+        ),
       Row(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
@@ -446,8 +638,13 @@ class _RatingSheetState extends State<RatingSheet> {
             ),
         ],
       ),
-      TextField(controller: _comment, maxLines: 3, maxLength: 1000, decoration: const InputDecoration(labelText: 'Nhận xét')),
-      Text('Mỗi đơn đánh giá 1 lần, không sửa được, trong 1 ngày sau khi hoàn thành (GB-20).', style: appText(size: 11.5, color: AppColors.muted)),
+      TextField(
+        controller: _comment,
+        maxLines: 3,
+        maxLength: 1000,
+        decoration: const InputDecoration(labelText: 'Nhận xét'),
+      ),
+      Text('Mỗi đơn đánh giá 1 lần, không sửa được, trong 1 ngày sau khi hoàn thành.', style: appText(size: 11.5, color: AppColors.muted)),
     ],
   );
 }
@@ -456,10 +653,13 @@ class _RatingSheetState extends State<RatingSheet> {
 /// Tạo phiên PayOS (platform=App), mở trang thanh toán ngoài app, đếm ngược 10 phút.
 /// Trạng thái "đã trả" chỉ tin webhook → [onCheck] tải lại đơn, trả về true nếu Paid.
 class PayOsSheet extends StatefulWidget {
-  const PayOsSheet({super.key, required this.api, required this.order, required this.onCheck});
+  const PayOsSheet({super.key, required this.api, required this.order, required this.onCheck, this.latestPayment});
   final CustomerApi api;
   final OrderDetail order;
   final Future<bool> Function() onCheck;
+
+  /// Thông tin thanh toán mới nhất của đơn (sau khi tải lại), để phân biệt hết hạn/thất bại/huỷ.
+  final OrderPayment? Function()? latestPayment;
   @override
   State<PayOsSheet> createState() => _PayOsSheetState();
 }
@@ -507,11 +707,23 @@ class _PayOsSheetState extends State<PayOsSheet> {
     final paid = await widget.onCheck();
     if (!mounted) return;
     setState(() => _checking = false);
+    final data = {'orderId': '${widget.order.id}', 'orderCode': widget.order.code, 'amount': money(widget.order.totalFee)};
     if (paid) {
-      showSnack(context, 'Đã nhận thanh toán. Đơn đang được gửi tới tài xế.');
+      notify(context, 'PAYMENT_CONFIRMED', data);
       Navigator.pop(context, true);
     } else {
-      showSnack(context, 'Chưa nhận được xác nhận từ PayOS. Nếu vừa chuyển khoản, đợi vài giây rồi kiểm tra lại.', error: true);
+      // Chưa có tiền: phân biệt hết hạn, thất bại, bị hủy và chưa trả (đang chờ).
+      final latest = widget.latestPayment?.call();
+      final expired = latest?.isExpired == true || (_session?.expiresAt.isBefore(DateTime.now()) ?? false);
+      final type = expired
+          ? 'PAYMENT_EXPIRED'
+          : switch (latest?.transactionStatus) {
+              'Failed' => 'PAYMENT_FAILED',
+              'Cancelled' => 'PAYMENT_CANCELLED',
+              'Expired' => 'PAYMENT_EXPIRED',
+              _ => 'PAYMENT_PENDING',
+            };
+      notify(context, type, data);
     }
   }
 
@@ -527,13 +739,20 @@ class _PayOsSheetState extends State<PayOsSheet> {
         SectionTitle('Thanh toán PayOS – ${widget.order.code}'),
         const SizedBox(height: 12),
         if (_error != null) Notice(_error!, icon: 'warning', peach: true),
-        if (_creating && s == null) const Padding(padding: EdgeInsets.all(20), child: Center(child: CircularProgressIndicator())),
+        if (_creating && s == null)
+          const Padding(
+            padding: EdgeInsets.all(20),
+            child: Center(child: CircularProgressIndicator()),
+          ),
         if (s != null) ...[
           AppCard(
             color: AppColors.pale,
             child: Column(
               children: [
-                Text('SỐ TIỀN CẦN THANH TOÁN', style: appText(size: 11, weight: FontWeight.w700, color: AppColors.secondary)),
+                Text(
+                  'SỐ TIỀN CẦN THANH TOÁN',
+                  style: appText(size: 11, weight: FontWeight.w700, color: AppColors.secondary),
+                ),
                 const SizedBox(height: 4),
                 Text(money(s.amount), style: appText(size: 28, weight: FontWeight.w800)),
                 const SizedBox(height: 4),
@@ -551,20 +770,16 @@ class _PayOsSheetState extends State<PayOsSheet> {
             const Notice('Mã cũ không còn nhận chuyển khoản. Hãy tạo mã mới cho cùng đơn.', icon: 'warning', peach: true),
         ],
         const SizedBox(height: 10),
-        Text(
-          'Đơn chỉ hiện cho tài xế sau khi PayOS xác nhận (GB-31). Mỗi mã sống 10 phút; đơn chưa thanh toán sau 30 phút sẽ tự huỷ (GB-13).',
-          style: appText(size: 11.5, color: AppColors.muted),
-        ),
+        Text('Đơn chỉ hiện cho tài xế sau khi PayOS xác nhận. Mỗi mã sống 10 phút; đơn chưa thanh toán sau 30 phút sẽ tự huỷ.', style: appText(size: 11.5, color: AppColors.muted)),
         const SizedBox(height: 12),
         Row(
           children: [
-            Expanded(child: OutlinedButton(onPressed: _creating ? null : _create, child: const Text('Tạo mã mới'))),
+            Expanded(
+              child: OutlinedButton(onPressed: _creating ? null : _create, child: const Text('Tạo mã mới')),
+            ),
             const SizedBox(width: 10),
             Expanded(
-              child: FilledButton(
-                onPressed: s == null || _checking ? null : _check,
-                child: Text(_checking ? 'Đang kiểm tra…' : 'Đã thanh toán – kiểm tra'),
-              ),
+              child: FilledButton(onPressed: s == null || _checking ? null : _check, child: Text(_checking ? 'Đang kiểm tra…' : 'Đã thanh toán – kiểm tra')),
             ),
           ],
         ),
@@ -575,11 +790,7 @@ class _PayOsSheetState extends State<PayOsSheet> {
 
 /// Mở Google Maps (app hoặc web) chỉ đường – không cần API key.
 Future<void> openDirections(BuildContext context, GeoPoint to, {GeoPoint? from}) async {
-  final params = {
-    'api': '1',
-    'destination': '${to.latitude},${to.longitude}',
-    if (from != null) 'origin': '${from.latitude},${from.longitude}',
-  };
+  final params = {'api': '1', 'destination': '${to.latitude},${to.longitude}', if (from != null) 'origin': '${from.latitude},${from.longitude}'};
   final ok = await launchUrl(Uri.https('www.google.com', '/maps/dir/', params), mode: LaunchMode.externalApplication);
   if (!ok && context.mounted) showSnack(context, 'Không mở được bản đồ.', error: true);
 }
