@@ -12,12 +12,7 @@ import 'api_exception.dart';
 /// HTTP client cho ModMove.WebApi: gắn Bearer token, tự làm mới access token khi 401
 /// (một lần cho nhiều request đồng thời), chuẩn hoá lỗi thành [ApiException].
 class ApiClient {
-  ApiClient({
-    required this.sessions,
-    http.Client? client,
-    this.baseUrl = AppConfig.apiBaseUrl,
-    this.onSessionExpired,
-  }) : _http = client ?? http.Client();
+  ApiClient({required this.sessions, http.Client? client, this.baseUrl = AppConfig.apiBaseUrl, this.onSessionExpired}) : _http = client ?? http.Client();
 
   final SessionStore sessions;
   final String baseUrl;
@@ -36,8 +31,7 @@ class ApiClient {
     return Uri.parse('$baseUrl$path').replace(queryParameters: q.isEmpty ? null : q);
   }
 
-  Future<dynamic> get(String path, {Map<String, Object?>? query}) =>
-      _send('GET', path, query: query);
+  Future<dynamic> get(String path, {Map<String, Object?>? query}) => _send('GET', path, query: query);
   Future<dynamic> post(String path, [Object? body]) => _send('POST', path, body: body);
   Future<dynamic> put(String path, [Object? body]) => _send('PUT', path, body: body);
   Future<dynamic> patch(String path, [Object? body]) => _send('PATCH', path, body: body);
@@ -50,6 +44,19 @@ class ApiClient {
     Future<http.BaseRequest> build() async {
       final req = http.MultipartRequest('POST', _uri(path));
       req.files.add(await http.MultipartFile.fromPath('file', file.path, contentType: type));
+      return req;
+    }
+
+    return _execute(build);
+  }
+
+  /// Upload ảnh đã nằm trong bộ nhớ (ảnh chụp/chọn từ thư viện của tài xế).
+  /// Cùng quy tắc với [upload]: field `file`, JPG/PNG ≤ 5 MB.
+  Future<dynamic> uploadBytes(String path, String fileName, List<int> bytes) async {
+    final type = fileName.toLowerCase().endsWith('.png') ? MediaType('image', 'png') : MediaType('image', 'jpeg');
+    Future<http.BaseRequest> build() async {
+      final req = http.MultipartRequest('POST', _uri(path));
+      req.files.add(http.MultipartFile.fromBytes('file', bytes, filename: fileName, contentType: type));
       return req;
     }
 
@@ -104,11 +111,7 @@ class ApiClient {
     if (current == null) return null;
     try {
       final res = await _http
-          .post(
-            _uri('/public/Auth/refresh'),
-            headers: {'Content-Type': 'application/json'},
-            body: jsonEncode({'refreshToken': current.refreshToken}),
-          )
+          .post(_uri('/public/Auth/refresh'), headers: {'Content-Type': 'application/json'}, body: jsonEncode({'refreshToken': current.refreshToken}))
           .timeout(AppConfig.requestTimeout);
       if (res.statusCode != 200) return null;
       final j = jsonDecode(utf8.decode(res.bodyBytes)) as Map<String, dynamic>;

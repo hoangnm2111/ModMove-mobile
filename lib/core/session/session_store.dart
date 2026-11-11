@@ -3,26 +3,14 @@ import 'dart:io';
 
 /// Phiên đăng nhập (POST /public/Auth/login → LoginResponse).
 class Session {
-  const Session({
-    required this.accessToken,
-    required this.refreshToken,
-    required this.userId,
-    required this.fullName,
-    required this.role,
-  });
+  const Session({required this.accessToken, required this.refreshToken, required this.userId, required this.fullName, required this.role});
   final String accessToken, refreshToken, fullName, role;
   final int userId;
 
   bool get isCustomer => role == 'Customer';
   bool get isDriver => role == 'Driver';
 
-  Session withTokens(String access, String refresh) => Session(
-    accessToken: access,
-    refreshToken: refresh,
-    userId: userId,
-    fullName: fullName,
-    role: role,
-  );
+  Session withTokens(String access, String refresh) => Session(accessToken: access, refreshToken: refresh, userId: userId, fullName: fullName, role: role);
 
   factory Session.fromJson(Map<String, dynamic> j) => Session(
     accessToken: j['accessToken'] as String,
@@ -32,13 +20,7 @@ class Session {
     role: j['role'] as String? ?? '',
   );
 
-  Map<String, dynamic> toJson() => {
-    'accessToken': accessToken,
-    'refreshToken': refreshToken,
-    'userId': userId,
-    'fullName': fullName,
-    'role': role,
-  };
+  Map<String, dynamic> toJson() => {'accessToken': accessToken, 'refreshToken': refreshToken, 'userId': userId, 'fullName': fullName, 'role': role};
 }
 
 /// Nơi giữ phiên hiện tại. [current] đọc đồng bộ; ghi thì lưu bền nếu có.
