@@ -52,7 +52,7 @@ lib/features/customer/
 ## Chưa làm
 
 - Thông báo đẩy FCM (`PUT account/fcmtoken`) – cần cấu hình Firebase.
-- Cập nhật tức thời qua SignalR – hiện tải lại: đơn 20 giây, vị trí tài xế 60 giây (BE giới hạn 10 lần/phút).
+- ~~Cập nhật tức thời qua SignalR~~ – đã có: `NotificationReceived` → banner trên đỉnh màn + hộp thông báo (chuông); chi tiết đơn tải lại ngay khi có thông báo của đơn đó. Vẫn giữ tải định kỳ (đơn 20 giây, vị trí tài xế 60 giây) làm dự phòng. Chưa có: FCM đẩy khi app đóng (xem docs/firebase-push.md).
 - Bản đồ trong app – hiện mở Google Maps ngoài app để chỉ đường (không cần API key).
 
 ## Test
