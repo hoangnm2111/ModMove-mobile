@@ -4,6 +4,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/widgets/app_widgets.dart';
 import '../../auth/presentation/auth_cubit.dart';
+import '../../auth/presentation/logout_button.dart';
 import '../data/customer_api.dart';
 import '../domain/entities/customer_models.dart';
 import '../domain/order_rules.dart';
@@ -18,10 +19,6 @@ class AccountScreen extends StatefulWidget {
 
 class _AccountScreenState extends State<AccountScreen> {
   late Future<Profile> _profile = context.read<CustomerApi>().profile();
-
-  Future<void> _logout() async {
-    await context.read<AuthCubit>().logout();
-  }
 
   @override
   Widget build(BuildContext context) => Scaffold(
@@ -81,14 +78,7 @@ class _AccountScreenState extends State<AccountScreen> {
             _tile('headphones', 'Gửi yêu cầu hỗ trợ', () => showSupportSheet(context, name: p.fullName, contact: p.email)),
             _tile('warning', 'Xoá tài khoản', () => _deleteAccount(context), color: AppColors.red),
             const SizedBox(height: 16),
-            OutlinedButton.icon(
-              onPressed: _logout,
-              icon: const AppIcon('arrow-left', size: 18, color: AppColors.red),
-              label: Text(
-                'Đăng xuất',
-                style: appText(color: AppColors.red, weight: FontWeight.w700),
-              ),
-            ),
+            const LogoutButton(),
           ],
         );
       },

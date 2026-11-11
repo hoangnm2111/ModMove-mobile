@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:modmove_mobile/core/theme/app_theme.dart';
 import 'package:modmove_mobile/core/widgets/app_widgets.dart';
+import '../../../auth/presentation/logout_button.dart';
 import '../../domain/entities/driver_application.dart';
 import '../controllers/driver_controller.dart';
 import '../models/document_display.dart';
@@ -141,6 +142,9 @@ class _DriverProfileScreenState extends State<DriverProfileScreen> {
               label: const Text('Cài đặt thông báo'),
             ),
           ],
+          const SizedBox(height: 12),
+          const LogoutButton(),
+          const SizedBox(height: 8),
         ],
       ),
     );
