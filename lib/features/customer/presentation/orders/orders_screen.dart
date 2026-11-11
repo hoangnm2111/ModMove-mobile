@@ -110,7 +110,11 @@ class _OrdersViewState extends State<_OrdersView> {
                   for (final e in _views.entries)
                     Padding(
                       padding: const EdgeInsets.only(right: 8),
-                      child: ChoiceChip(label: Text(e.value), selected: s.view == e.key, onSelected: (_) => cubit.load(view: e.key)),
+                      child: ChoiceChip(
+                        label: Text(e.value),
+                        selected: s.view == e.key,
+                        onSelected: (_) => cubit.load(view: e.key),
+                      ),
                     ),
                 ],
               ),
@@ -125,7 +129,10 @@ class _OrdersViewState extends State<_OrdersView> {
                     : s.items.isEmpty
                     ? ListView(
                         children: [
-                          EmptyView('Chưa có đơn hàng phù hợp.', action: SizedBox(width: 180, child: PrimaryButton('Đặt xe ngay', onPressed: widget.onBook))),
+                          EmptyView(
+                            'Chưa có đơn hàng phù hợp.',
+                            action: SizedBox(width: 180, child: PrimaryButton('Đặt xe ngay', onPressed: widget.onBook)),
+                          ),
                         ],
                       )
                     : NotificationListener<ScrollNotification>(
@@ -138,7 +145,9 @@ class _OrdersViewState extends State<_OrdersView> {
                           itemCount: s.items.length + (s.hasMore ? 1 : 0),
                           separatorBuilder: (_, _) => const SizedBox(height: 10),
                           itemBuilder: (_, i) => i >= s.items.length
-                              ? const Center(child: Padding(padding: EdgeInsets.all(12), child: CircularProgressIndicator()))
+                              ? const Center(
+                                  child: Padding(padding: EdgeInsets.all(12), child: CircularProgressIndicator()),
+                                )
                               : OrderCard(order: s.items[i], onTap: () => widget.onOpen(s.items[i].id)),
                         ),
                       ),
@@ -178,10 +187,7 @@ class OrderCard extends StatelessWidget {
           const SizedBox(height: 4),
           _addr('target', AppColors.green, o.dropoffAddress),
           const SizedBox(height: 6),
-          Text(
-            '${dateTime(o.createdAt)} • ${o.vehicleTypeName} • ${o.paymentMethod == 'PayOS' ? 'PayOS' : 'Tiền mặt'}',
-            style: appText(size: 11.5, color: AppColors.muted),
-          ),
+          Text('${dateTime(o.createdAt)} • ${o.vehicleTypeName} • ${o.paymentMethod == 'PayOS' ? 'PayOS' : 'Tiền mặt'}', style: appText(size: 11.5, color: AppColors.muted)),
         ],
       ),
     );
@@ -191,7 +197,14 @@ class OrderCard extends StatelessWidget {
     children: [
       AppIcon(icon, size: 15, color: color),
       const SizedBox(width: 6),
-      Expanded(child: Text(text, maxLines: 1, overflow: TextOverflow.ellipsis, style: appText(size: 12.5, color: AppColors.secondary))),
+      Expanded(
+        child: Text(
+          text,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: appText(size: 12.5, color: AppColors.secondary),
+        ),
+      ),
     ],
   );
 }

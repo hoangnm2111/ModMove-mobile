@@ -9,8 +9,7 @@ String _s(Object? v) => v as String? ?? '';
 DateTime _dt(Object? v) => DateTime.parse(v as String).toLocal();
 DateTime? _dtn(Object? v) => v == null ? null : DateTime.parse(v as String).toLocal();
 List<String> _sl(Object? v) => v == null ? const [] : (v as List).map((e) => '$e').toList();
-List<T> _list<T>(Object? v, T Function(Map<String, dynamic>) f) =>
-    v == null ? const [] : (v as List).map((e) => f(e as Map<String, dynamic>)).toList();
+List<T> _list<T>(Object? v, T Function(Map<String, dynamic>) f) => v == null ? const [] : (v as List).map((e) => f(e as Map<String, dynamic>)).toList();
 
 /// PagedResult `{ items, pageNumber, pageSize, totalCount }`.
 class Paged<T> {
@@ -19,8 +18,7 @@ class Paged<T> {
   final int pageNumber, pageSize, totalCount;
   bool get hasMore => pageNumber * pageSize < totalCount;
 
-  factory Paged.fromJson(Map<String, dynamic> j, T Function(Map<String, dynamic>) f) =>
-      Paged(_list(j['items'], f), _i(j['pageNumber']), _i(j['pageSize']), _i(j['totalCount']));
+  factory Paged.fromJson(Map<String, dynamic> j, T Function(Map<String, dynamic>) f) => Paged(_list(j['items'], f), _i(j['pageNumber']), _i(j['pageSize']), _i(j['totalCount']));
 }
 
 /// Các trạng thái đơn (backend enum là chuỗi).
@@ -83,22 +81,15 @@ class LookupItem {
   const LookupItem(this.code, this.name, this.description);
   final String code, name;
   final String? description;
-  factory LookupItem.fromJson(Map<String, dynamic> j) =>
-      LookupItem(_s(j['code']), _s(j['name']), j['description'] as String?);
+  factory LookupItem.fromJson(Map<String, dynamic> j) => LookupItem(_s(j['code']), _s(j['name']), j['description'] as String?);
 }
 
 class FareEstimate {
   const FareEstimate(this.distanceKm, this.durationMinutes, this.distanceFee, this.serviceFee, this.discountAmount, this.totalFee);
   final double distanceKm, distanceFee, serviceFee, discountAmount, totalFee;
   final int durationMinutes;
-  factory FareEstimate.fromJson(Map<String, dynamic> j) => FareEstimate(
-    _d(j['distanceKm']),
-    _i(j['durationMinutes']),
-    _d(j['distanceFee']),
-    _d(j['serviceFee']),
-    _d(j['discountAmount']),
-    _d(j['totalFee']),
-  );
+  factory FareEstimate.fromJson(Map<String, dynamic> j) =>
+      FareEstimate(_d(j['distanceKm']), _i(j['durationMinutes']), _d(j['distanceFee']), _d(j['serviceFee']), _d(j['discountAmount']), _d(j['totalFee']));
 }
 
 class AvailableCoupon {
@@ -107,13 +98,7 @@ class AvailableCoupon {
   final double discountValue, minimumOrderValue;
   final DateTime expiresAt;
   final int? remainingUses;
-  factory AvailableCoupon.fromJson(Map<String, dynamic> j) => AvailableCoupon(
-    _s(j['discountCode']),
-    _d(j['discountValue']),
-    _d(j['minimumOrderValue']),
-    _dt(j['expiresAt']),
-    _in(j['remainingUses']),
-  );
+  factory AvailableCoupon.fromJson(Map<String, dynamic> j) => AvailableCoupon(_s(j['discountCode']), _d(j['discountValue']), _d(j['minimumOrderValue']), _dt(j['expiresAt']), _in(j['remainingUses']));
 }
 
 /* ------------------------------------------------------------ Orders */
@@ -177,8 +162,7 @@ class OrderDriver {
   const OrderDriver(this.fullName, this.phoneNumber, this.licensePlate);
   final String fullName, phoneNumber;
   final String? licensePlate;
-  factory OrderDriver.fromJson(Map<String, dynamic> j) =>
-      OrderDriver(_s(j['fullName']), _s(j['phoneNumber']), j['licensePlate'] as String?);
+  factory OrderDriver.fromJson(Map<String, dynamic> j) => OrderDriver(_s(j['fullName']), _s(j['phoneNumber']), j['licensePlate'] as String?);
 }
 
 class OrderProof {
@@ -188,14 +172,8 @@ class OrderProof {
   final int submissionCount;
   final String? rejectionReason, deliveryPhotoUrl;
   final DateTime? deliveredAt;
-  factory OrderProof.fromJson(Map<String, dynamic> j) => OrderProof(
-    _sl(j['pickupPhotoUrls']),
-    _s(j['proofStatus']),
-    _i(j['pickupSubmissionCount']),
-    j['rejectionReason'] as String?,
-    j['deliveryPhotoUrl'] as String?,
-    _dtn(j['deliveredAt']),
-  );
+  factory OrderProof.fromJson(Map<String, dynamic> j) =>
+      OrderProof(_sl(j['pickupPhotoUrls']), _s(j['proofStatus']), _i(j['pickupSubmissionCount']), j['rejectionReason'] as String?, j['deliveryPhotoUrl'] as String?, _dtn(j['deliveredAt']));
 }
 
 class StatusHistory {
@@ -203,13 +181,7 @@ class StatusHistory {
   final String? fromStatus, note;
   final String toStatus, changedByRole;
   final DateTime changedAt;
-  factory StatusHistory.fromJson(Map<String, dynamic> j) => StatusHistory(
-    j['fromStatus'] as String?,
-    _s(j['toStatus']),
-    _s(j['changedByRole']),
-    j['note'] as String?,
-    _dt(j['changedAt']),
-  );
+  factory StatusHistory.fromJson(Map<String, dynamic> j) => StatusHistory(j['fromStatus'] as String?, _s(j['toStatus']), _s(j['changedByRole']), j['note'] as String?, _dt(j['changedAt']));
 }
 
 class OrderPayment {
@@ -218,13 +190,8 @@ class OrderPayment {
   final String? checkoutUrl;
   final DateTime? expiresAt, paidAt;
   final bool isExpired;
-  factory OrderPayment.fromJson(Map<String, dynamic> j) => OrderPayment(
-    _s(j['transactionStatus']),
-    j['checkoutUrl'] as String?,
-    _dtn(j['expiresAt']),
-    _dtn(j['paidAt']),
-    j['isExpired'] as bool? ?? false,
-  );
+  factory OrderPayment.fromJson(Map<String, dynamic> j) =>
+      OrderPayment(_s(j['transactionStatus']), j['checkoutUrl'] as String?, _dtn(j['expiresAt']), _dtn(j['paidAt']), j['isExpired'] as bool? ?? false);
 }
 
 class OrderDetail {
@@ -254,7 +221,11 @@ class OrderDetail {
     required this.history,
     required this.couponCode,
     required this.payment,
+    this.pendingDriverIncidentId,
   });
+
+  /// Sự cố do tài xế báo còn mở: chuyến tạm dừng, khách chưa duyệt được ảnh lấy hàng (null = không chặn).
+  final int? pendingDriverIncidentId;
   final int id, durationMin;
   final String code, status, pickupAddress, dropoffAddress, vehicleTypeName, receiverName, receiverPhone, paymentMethod, paymentStatus;
   final String? payerRole, couponCode;
@@ -268,6 +239,7 @@ class OrderDetail {
   final OrderPayment? payment;
 
   factory OrderDetail.fromJson(Map<String, dynamic> j) => OrderDetail(
+    pendingDriverIncidentId: j['pendingDriverIncidentId'] == null ? null : _i(j['pendingDriverIncidentId']),
     id: _i(j['id']),
     code: _s(j['orderCode']),
     status: _s(j['orderStatus']),
@@ -334,8 +306,7 @@ class PaymentSession {
   final String checkoutUrl;
   final double amount;
   final DateTime expiresAt;
-  factory PaymentSession.fromJson(Map<String, dynamic> j) =>
-      PaymentSession(_i(j['transactionId']), _s(j['checkoutUrl']), _d(j['amount']), _dt(j['expiresAt']));
+  factory PaymentSession.fromJson(Map<String, dynamic> j) => PaymentSession(_i(j['transactionId']), _s(j['checkoutUrl']), _d(j['amount']), _dt(j['expiresAt']));
 }
 
 /* ------------------------------------------------------------ Ratings / incidents / refunds */
@@ -345,15 +316,8 @@ class MyRating {
   final String orderCode, driverName;
   final String? comment;
   final DateTime createdAt;
-  factory MyRating.fromJson(Map<String, dynamic> j) => MyRating(
-    _i(j['id']),
-    _i(j['orderId']),
-    _s(j['orderCode']),
-    _i(j['ratingStars']),
-    j['reviewComment'] as String?,
-    _s(j['driverName']),
-    _dt(j['createdAt']),
-  );
+  factory MyRating.fromJson(Map<String, dynamic> j) =>
+      MyRating(_i(j['id']), _i(j['orderId']), _s(j['orderCode']), _i(j['ratingStars']), j['reviewComment'] as String?, _s(j['driverName']), _dt(j['createdAt']));
 }
 
 class MyIncident {
@@ -392,6 +356,48 @@ class MyIncident {
   );
 }
 
+/// Tài khoản nhận hoàn tiền như khách nhìn thấy: số tài khoản luôn bị che (BE: PayoutAccountView).
+class PayoutAccountView {
+  const PayoutAccountView(this.bankName, this.maskedAccountNumber, this.accountHolder);
+  final String bankName, maskedAccountNumber, accountHolder;
+  static PayoutAccountView? from(Object? json) {
+    if (json is! Map) return null;
+    final j = json.cast<String, dynamic>();
+    return PayoutAccountView(_s(j['bankName']), _s(j['maskedAccountNumber']), _s(j['accountHolder']));
+  }
+}
+
+/// Tài khoản nhận hoàn tiền khách nhập (BE: PayoutAccountInput). `bankCode` lấy từ lookups/banks.
+class PayoutAccountInput {
+  const PayoutAccountInput({required this.bankCode, required this.accountNumber, required this.accountHolder});
+  final String bankCode, accountNumber, accountHolder;
+
+  Map<String, Object?> toJson() => {'useSuggested': false, 'bankCode': bankCode, 'accountNumber': accountNumber, 'accountHolder': accountHolder};
+
+  /// Chữ in hoa không dấu, chỉ A–Z và dấu cách (yêu cầu của ngân hàng).
+  static String normalizeHolder(String text) {
+    const groups = {'a': 'àáạảãâầấậẩẫăằắặẳẵ', 'e': 'èéẹẻẽêềếệểễ', 'i': 'ìíịỉĩ', 'o': 'òóọỏõôồốộổỗơờớợởỡ', 'u': 'ùúụủũưừứựửữ', 'y': 'ỳýỵỷỹ', 'd': 'đ'};
+    final out = StringBuffer();
+    for (final ch in text.toLowerCase().split('')) {
+      var mapped = ch;
+      groups.forEach((plain, accented) {
+        if (accented.contains(ch)) mapped = plain;
+      });
+      out.write(mapped);
+    }
+    return out.toString().toUpperCase().replaceAll(RegExp(r'[^A-Z ]'), '');
+  }
+
+  /// Câu báo lỗi tiếng Việt hoặc null nếu hợp lệ (khớp validator của BE).
+  static String? validate({required String? bankCode, required String number, required String holder}) {
+    if (bankCode == null || bankCode.isEmpty) return 'Chọn ngân hàng nhận tiền hoàn.';
+    if (!RegExp(r'^\d{6,19}$').hasMatch(number)) return 'Số tài khoản gồm 6 đến 19 chữ số.';
+    final h = holder.trim();
+    if (h.length < 2 || h.length > 100) return 'Tên chủ tài khoản từ 2 đến 100 ký tự.';
+    return null;
+  }
+}
+
 class MyRefund {
   const MyRefund({
     required this.id,
@@ -408,7 +414,14 @@ class MyRefund {
     this.infoRequestNote,
     this.customerReply,
     this.processedAt,
+    this.needsPayoutAccount = false,
+    this.payoutAccount,
+    this.payoutFailureReason,
+    this.bankReferenceCode,
   });
+  final bool needsPayoutAccount;
+  final PayoutAccountView? payoutAccount;
+  final String? payoutFailureReason, bankReferenceCode;
   final int id, orderId;
   final String sourceType, status, reason;
   final double requestedAmount;
@@ -435,6 +448,10 @@ class MyRefund {
     infoRequestNote: j['infoRequestNote'] as String?,
     customerReply: j['customerReply'] as String?,
     processedAt: _dtn(j['processedAt']),
+    needsPayoutAccount: j['needsPayoutAccount'] as bool? ?? false,
+    payoutAccount: PayoutAccountView.from(j['payoutAccount']),
+    payoutFailureReason: j['payoutFailureReason'] as String?,
+    bankReferenceCode: j['bankReferenceCode'] as String?,
   );
 }
 
@@ -442,6 +459,5 @@ class Profile {
   const Profile(this.id, this.fullName, this.phoneNumber, this.email, this.role);
   final int id;
   final String fullName, phoneNumber, email, role;
-  factory Profile.fromJson(Map<String, dynamic> j) =>
-      Profile(_i(j['id']), _s(j['fullName']), _s(j['phoneNumber']), _s(j['email']), _s(j['role']));
+  factory Profile.fromJson(Map<String, dynamic> j) => Profile(_i(j['id']), _s(j['fullName']), _s(j['phoneNumber']), _s(j['email']), _s(j['role']));
 }

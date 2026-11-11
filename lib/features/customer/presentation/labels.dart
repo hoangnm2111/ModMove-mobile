@@ -30,25 +30,17 @@ const orderStatusTone = <String, Tone>{
 /// GB-31: đơn PayOS chưa thanh toán chưa được gửi tới tài xế.
 const awaitingPaymentTone = Tone('Chờ thanh toán', AppColors.red, AppColors.redBg);
 
-const paymentStatusTone = <String, Tone>{
-  'Unpaid': Tone('Chưa thanh toán', AppColors.red, AppColors.redBg),
-  'Paid': Tone('Đã thanh toán', AppColors.green, AppColors.greenBg),
-};
+const paymentStatusTone = <String, Tone>{'Unpaid': Tone('Chưa thanh toán', AppColors.red, AppColors.redBg), 'Paid': Tone('Đã thanh toán', AppColors.green, AppColors.greenBg)};
 
 const paymentMethodLabel = {'Cash': 'Tiền mặt', 'PayOS': 'PayOS (QR / chuyển khoản)'};
 const payerRoleLabel = {'Sender': 'Người gửi trả khi lấy hàng', 'Receiver': 'Người nhận trả khi giao hàng'};
 
-const incidentTypeLabel = {
-  'VehicleBreakdown': 'Hỏng xe',
-  'DamagedCargo': 'Hư hỏng hàng hoá',
-  'Accident': 'Tai nạn',
-  'Other': 'Khác (trễ, sai tuyến, vắng mặt…)',
-};
+const incidentTypeLabel = {'VehicleBreakdown': 'Hỏng xe', 'DamagedCargo': 'Hư hỏng hàng hoá', 'Accident': 'Tai nạn', 'Other': 'Khác (trễ, sai tuyến, vắng mặt…)'};
 const incidentStatusTone = <String, Tone>{
-  'Open': Tone('Mới', AppColors.red, AppColors.redBg),
-  'InProgress': Tone('Đang xử lý', AppColors.amber, AppColors.amberBg),
+  'Open': Tone('Đang chờ xử lý', AppColors.red, AppColors.redBg),
+  'InProgress': Tone('Điều phối viên đang xử lý', AppColors.amber, AppColors.amberBg),
   'Resolved': Tone('Đã xử lý', AppColors.green, AppColors.greenBg),
-  'Cancelled': Tone('Đã huỷ', _slate, _slateBg),
+  'Cancelled': Tone('Báo cáo đã bị hủy', _slate, _slateBg),
 };
 const incidentDecisionLabel = {'ContinueTrip': 'Tiếp tục chuyến', 'ReassignDriver': 'Đổi tài xế', 'CancelOrder': 'Huỷ đơn'};
 

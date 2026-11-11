@@ -11,18 +11,19 @@ abstract final class OrderRules {
   static const maxPhotoBytes = 5 * 1024 * 1024;
 
   /// GB-31: đơn PayOS chưa thanh toán vẫn ở Pending nhưng CHƯA gửi tới tài xế.
-  static bool awaitingPayment(String status, String paymentMethod, String paymentStatus) =>
-      status == OrderStatus.pending && paymentMethod == 'PayOS' && paymentStatus == 'Unpaid';
+  static bool awaitingPayment(String status, String paymentMethod, String paymentStatus) => status == OrderStatus.pending && paymentMethod == 'PayOS' && paymentStatus == 'Unpaid';
 
   /// GB-22: khách tự huỷ miễn phí khi Pending/Accepted.
   static bool canCancel(OrderDetail o) => o.status == OrderStatus.pending || o.status == OrderStatus.accepted;
 
   /// Khách báo sự cố khi Arrived/PickedUp/InTransit (2.2).
-  static bool canReportIncident(OrderDetail o) =>
-      [OrderStatus.arrived, OrderStatus.pickedUp, OrderStatus.inTransit].contains(o.status);
+  static bool canReportIncident(OrderDetail o) => [OrderStatus.arrived, OrderStatus.pickedUp, OrderStatus.inTransit].contains(o.status);
 
   /// GB-26: duyệt ảnh lấy hàng khi PickedUp và ảnh đang chờ duyệt.
   static bool pickupReviewPending(OrderDetail o) => o.status == OrderStatus.pickedUp && o.proof?.proofStatus == 'Pending';
+
+  /// Tài xế đang có sự cố mở: BE từ chối duyệt ảnh lấy hàng (INCIDENT_PENDING); từ chối ảnh thì vẫn được.
+  static bool canApprovePickup(OrderDetail o) => o.pendingDriverIncidentId == null;
 
   static DateTime? reachedAt(OrderDetail o, String status) {
     for (final h in o.history.reversed) {
@@ -45,8 +46,7 @@ abstract final class OrderRules {
   static bool canRequestIncidentRefund(OrderDetail o) => o.paymentMethod == 'PayOS' && o.paymentStatus == 'Paid';
 
   /// Khiếu nại đang mở = Requested hoặc Approved (7.3).
-  static bool hasOpenComplaint(Iterable<MyRefund> refunds) =>
-      refunds.any((r) => r.sourceType == 'Complaint' && (r.status == 'Requested' || r.status == 'Approved'));
+  static bool hasOpenComplaint(Iterable<MyRefund> refunds) => refunds.any((r) => r.sourceType == 'Complaint' && (r.status == 'Requested' || r.status == 'Approved'));
 
   /// Rút được khi còn Requested và không phải hoàn do huỷ.
   static bool canWithdrawRefund(MyRefund r) => r.status == 'Requested' && r.sourceType != 'Cancellation';

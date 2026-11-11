@@ -63,7 +63,13 @@ class _RatingsScreenState extends State<RatingsScreen> {
                     Row(
                       children: [
                         Text(r.orderCode, style: appText(weight: FontWeight.w800)),
-                        Expanded(child: Text(' • Tài xế ${r.driverName}', overflow: TextOverflow.ellipsis, style: appText(size: 12.5, color: AppColors.secondary))),
+                        Expanded(
+                          child: Text(
+                            ' • Tài xế ${r.driverName}',
+                            overflow: TextOverflow.ellipsis,
+                            style: appText(size: 12.5, color: AppColors.secondary),
+                          ),
+                        ),
                         Text(date(r.createdAt), style: appText(size: 11.5, color: AppColors.muted)),
                       ],
                     ),

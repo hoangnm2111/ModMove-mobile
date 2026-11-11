@@ -5,34 +5,39 @@ import 'package:image_picker/image_picker.dart';
 
 import '../../../../core/network/api_exception.dart';
 import '../../../../core/theme/app_theme.dart';
+import '../../../../core/widgets/notice_banner.dart';
 import '../../../../core/widgets/app_widgets.dart';
 import '../../domain/entities/customer_models.dart';
 import '../../domain/order_rules.dart';
 import '../labels.dart';
 
-/// Thông báo lỗi ngắn.
-void showSnack(BuildContext context, String text, {bool error = false}) {
-  ScaffoldMessenger.of(context)
-    ..hideCurrentSnackBar()
-    ..showSnackBar(
-      SnackBar(
-        content: Text(text),
-        backgroundColor: error ? AppColors.red : AppColors.ink,
-        behavior: SnackBarBehavior.floating,
-      ),
-    );
-}
+/// Câu ngắn của thao tác: hiện banner trên đỉnh màn (xem core/widgets/notice_banner.dart).
+void showSnack(BuildContext context, String text, {bool error = false}) => showNotice(context, text, error: error);
 
 String errorText(Object e) => e is ApiException ? e.message : 'Đã có lỗi xảy ra. Vui lòng thử lại.';
 
-/// Chạy thao tác, báo lỗi bằng snackbar; trả về true nếu thành công.
-Future<bool> runAction(BuildContext context, Future<void> Function() action, {String? success}) async {
+/// Chạy thao tác, báo kết quả bằng banner; trả về true nếu thành công.
+/// `notice` là mã trong danh mục thông báo ([noticeCatalog]); có thì hiện thông báo đó (kèm `data`, `noticeBody` thay chữ dự phòng),
+/// không thì hiện câu `success`. Lỗi mạng hiện NETWORK_ERROR, lỗi khác hiện câu của BE.
+Future<bool> runAction(BuildContext context, Future<void> Function() action, {String? success, String? notice, Map<String, String> data = const {}, String? noticeBody}) async {
   try {
     await action();
-    if (context.mounted && success != null) showSnack(context, success);
+    if (context.mounted) {
+      if (notice != null) {
+        notify(context, notice, data, noticeBody);
+      } else if (success != null) {
+        showSnack(context, success);
+      }
+    }
     return true;
   } catch (e) {
-    if (context.mounted) showSnack(context, errorText(e), error: true);
+    if (context.mounted) {
+      if (e is ApiException && e.code == 'NETWORK') {
+        notify(context, 'NETWORK_ERROR');
+      } else {
+        showSnack(context, errorText(e), error: true);
+      }
+    }
     return false;
   }
 }
@@ -44,7 +49,10 @@ class Pill extends StatelessWidget {
   Widget build(BuildContext context) => Container(
     padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 3),
     decoration: BoxDecoration(color: tone.bg, borderRadius: BorderRadius.circular(20)),
-    child: Text(tone.label, style: appText(size: 11.5, weight: FontWeight.w700, color: tone.fg, spacing: -0.1)),
+    child: Text(
+      tone.label,
+      style: appText(size: 11.5, weight: FontWeight.w700, color: tone.fg, spacing: -0.1),
+    ),
   );
 }
 
@@ -53,9 +61,7 @@ class StatusPill extends StatelessWidget {
   const StatusPill(this.status, {super.key, this.paymentMethod = '', this.paymentStatus = ''});
   final String status, paymentMethod, paymentStatus;
   @override
-  Widget build(BuildContext context) => Pill(
-    OrderRules.awaitingPayment(status, paymentMethod, paymentStatus) ? awaitingPaymentTone : toneOf(orderStatusTone, status),
-  );
+  Widget build(BuildContext context) => Pill(OrderRules.awaitingPayment(status, paymentMethod, paymentStatus) ? awaitingPaymentTone : toneOf(orderStatusTone, status));
 }
 
 class KvRow extends StatelessWidget {
@@ -70,7 +76,10 @@ class KvRow extends StatelessWidget {
     child: Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Expanded(flex: 4, child: Text(label, style: appText(size: 13, color: AppColors.secondary))),
+        Expanded(
+          flex: 4,
+          child: Text(label, style: appText(size: 13, color: AppColors.secondary)),
+        ),
         const SizedBox(width: 8),
         Expanded(
           flex: 6,
@@ -99,7 +108,12 @@ class SectionCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(children: [Expanded(child: SectionTitle(title, size: 15.5)), ?trailing]),
+          Row(
+            children: [
+              Expanded(child: SectionTitle(title, size: 15.5)),
+              ?trailing,
+            ],
+          ),
           const SizedBox(height: 10),
           child,
         ],
@@ -164,7 +178,11 @@ class EmptyView extends StatelessWidget {
         children: [
           const AppIcon('box', size: 40, color: AppColors.muted),
           const SizedBox(height: 10),
-          Text(text, textAlign: TextAlign.center, style: appText(color: AppColors.secondary)),
+          Text(
+            text,
+            textAlign: TextAlign.center,
+            style: appText(color: AppColors.secondary),
+          ),
           if (action != null) ...[const SizedBox(height: 14), action!],
         ],
       ),
@@ -185,7 +203,11 @@ class ErrorView extends StatelessWidget {
         children: [
           const AppIcon('warning', size: 36, color: AppColors.red),
           const SizedBox(height: 10),
-          Text(message, textAlign: TextAlign.center, style: appText(color: AppColors.red)),
+          Text(
+            message,
+            textAlign: TextAlign.center,
+            style: appText(color: AppColors.red),
+          ),
           const SizedBox(height: 12),
           OutlinedButton(onPressed: onRetry, child: const Text('Thử lại')),
         ],
@@ -196,14 +218,7 @@ class ErrorView extends StatelessWidget {
 
 /// Chọn ảnh (camera/thư viện) rồi upload; giữ danh sách URL. GB-06: JPG/PNG ≤ 5 MB.
 class PhotoPicker extends StatefulWidget {
-  const PhotoPicker({
-    super.key,
-    required this.urls,
-    required this.onChanged,
-    required this.upload,
-    this.max = OrderRules.maxCargoPhotos,
-    this.label,
-  });
+  const PhotoPicker({super.key, required this.urls, required this.onChanged, required this.upload, this.max = OrderRules.maxCargoPhotos, this.label});
   final List<String> urls;
   final ValueChanged<List<String>> onChanged;
   final Future<String> Function(File file) upload;
@@ -274,13 +289,20 @@ class _PhotoPickerState extends State<PhotoPicker> {
           for (final u in widget.urls)
             Stack(
               children: [
-                ClipRRect(borderRadius: BorderRadius.circular(8), child: Image.network(u, width: 72, height: 72, fit: BoxFit.cover)),
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(8),
+                  child: Image.network(u, width: 72, height: 72, fit: BoxFit.cover),
+                ),
                 Positioned(
                   right: 2,
                   top: 2,
                   child: InkWell(
                     onTap: () => widget.onChanged([...widget.urls]..remove(u)),
-                    child: const CircleAvatar(radius: 11, backgroundColor: Colors.white, child: AppIcon('close', size: 14, color: AppColors.red)),
+                    child: const CircleAvatar(
+                      radius: 11,
+                      backgroundColor: Colors.white,
+                      child: AppIcon('close', size: 14, color: AppColors.red),
+                    ),
                   ),
                 ),
               ],
@@ -298,9 +320,7 @@ class _PhotoPickerState extends State<PhotoPicker> {
                   color: AppColors.pale,
                 ),
                 child: Center(
-                  child: _busy
-                      ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2))
-                      : const AppIcon('camera', color: AppColors.secondary),
+                  child: _busy ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2)) : const AppIcon('camera', color: AppColors.secondary),
                 ),
               ),
             ),
@@ -339,7 +359,10 @@ class OrderProgress extends StatelessWidget {
                     backgroundColor: i <= idx ? AppColors.orange : AppColors.line,
                     child: i < idx
                         ? const AppIcon('check', size: 13, color: Colors.white)
-                        : Text('${i + 1}', style: appText(size: 10, weight: FontWeight.w700, color: i == idx ? Colors.white : AppColors.muted)),
+                        : Text(
+                            '${i + 1}',
+                            style: appText(size: 10, weight: FontWeight.w700, color: i == idx ? Colors.white : AppColors.muted),
+                          ),
                   ),
                   const SizedBox(height: 4),
                   Text(

@@ -56,10 +56,7 @@ class _BookingView extends StatelessWidget {
           if (!didPop) cubit.goTo(s.step - 1);
         },
         child: Scaffold(
-          appBar: AppHeader(
-            'Đặt xe vận chuyển',
-            onBack: () => s.step == 0 ? Navigator.pop(context) : cubit.goTo(s.step - 1),
-          ),
+          appBar: AppHeader('Đặt xe vận chuyển', onBack: () => s.step == 0 ? Navigator.pop(context) : cubit.goTo(s.step - 1)),
           bottomNavigationBar: _BottomBar(state: s, onNext: () => _next(context)),
           body: s.loadingLookups
               ? const Center(child: CircularProgressIndicator())
@@ -129,7 +126,10 @@ class _BottomBar extends StatelessWidget {
   Widget build(BuildContext context) {
     final e = state.estimate;
     return DecoratedBox(
-      decoration: const BoxDecoration(color: Colors.white, border: Border(top: BorderSide(color: AppColors.line))),
+      decoration: const BoxDecoration(
+        color: Colors.white,
+        border: Border(top: BorderSide(color: AppColors.line)),
+      ),
       child: SafeArea(
         top: false,
         child: Padding(
@@ -143,7 +143,11 @@ class _BottomBar extends StatelessWidget {
                   children: [
                     Text('Tạm tính', style: appText(size: 11.5, color: AppColors.secondary)),
                     Text(
-                      state.estimating ? 'Đang tính…' : e == null ? '—' : money(e.totalFee),
+                      state.estimating
+                          ? 'Đang tính…'
+                          : e == null
+                          ? '—'
+                          : money(e.totalFee),
                       style: appText(size: 19, weight: FontWeight.w800),
                     ),
                     if (e != null) Text('${e.distanceKm} km • ~${e.durationMinutes} phút', style: appText(size: 11, color: AppColors.muted)),
@@ -175,9 +179,22 @@ class _RouteStep extends StatelessWidget {
           title: 'Điểm lấy hàng',
           child: Column(
             children: [
-              _AddressField(label: 'Địa chỉ lấy hàng', value: d.pickupAddress, onChanged: (v) => cubit.update((x) => x.copyWith(pickupAddress: v))),
-              _Text(label: 'Tên người gửi', value: d.senderName, onChanged: (v) => cubit.update((x) => x.copyWith(senderName: v))),
-              _Text(label: 'SĐT người gửi', value: d.senderPhone, phone: true, onChanged: (v) => cubit.update((x) => x.copyWith(senderPhone: v))),
+              _AddressField(
+                label: 'Địa chỉ lấy hàng',
+                value: d.pickupAddress,
+                onChanged: (v) => cubit.update((x) => x.copyWith(pickupAddress: v)),
+              ),
+              _Text(
+                label: 'Tên người gửi',
+                value: d.senderName,
+                onChanged: (v) => cubit.update((x) => x.copyWith(senderName: v)),
+              ),
+              _Text(
+                label: 'SĐT người gửi',
+                value: d.senderPhone,
+                phone: true,
+                onChanged: (v) => cubit.update((x) => x.copyWith(senderPhone: v)),
+              ),
             ],
           ),
         ),
@@ -185,13 +202,26 @@ class _RouteStep extends StatelessWidget {
           title: 'Điểm giao hàng',
           child: Column(
             children: [
-              _AddressField(label: 'Địa chỉ giao hàng', value: d.dropoffAddress, onChanged: (v) => cubit.update((x) => x.copyWith(dropoffAddress: v))),
-              _Text(label: 'Tên người nhận', value: d.receiverName, onChanged: (v) => cubit.update((x) => x.copyWith(receiverName: v))),
-              _Text(label: 'SĐT người nhận', value: d.receiverPhone, phone: true, onChanged: (v) => cubit.update((x) => x.copyWith(receiverPhone: v))),
+              _AddressField(
+                label: 'Địa chỉ giao hàng',
+                value: d.dropoffAddress,
+                onChanged: (v) => cubit.update((x) => x.copyWith(dropoffAddress: v)),
+              ),
+              _Text(
+                label: 'Tên người nhận',
+                value: d.receiverName,
+                onChanged: (v) => cubit.update((x) => x.copyWith(receiverName: v)),
+              ),
+              _Text(
+                label: 'SĐT người nhận',
+                value: d.receiverPhone,
+                phone: true,
+                onChanged: (v) => cubit.update((x) => x.copyWith(receiverPhone: v)),
+              ),
             ],
           ),
         ),
-        const Notice('Một điểm lấy và một điểm giao (GB-05). Giá được tính theo quãng đường thực tế do hệ thống xác định.', icon: 'info'),
+        const Notice('Một điểm lấy và một điểm giao. Giá được tính theo quãng đường thực tế do hệ thống xác định.', icon: 'info'),
       ],
     );
   }
@@ -241,7 +271,11 @@ class _Text extends StatelessWidget {
     child: TextFormField(
       initialValue: value,
       onChanged: onChanged,
-      keyboardType: phone ? TextInputType.phone : number ? const TextInputType.numberWithOptions(decimal: true) : null,
+      keyboardType: phone
+          ? TextInputType.phone
+          : number
+          ? const TextInputType.numberWithOptions(decimal: true)
+          : null,
       inputFormatters: number ? [FilteringTextInputFormatter.allow(RegExp(r'[0-9.]'))] : null,
       decoration: InputDecoration(labelText: label),
     ),
@@ -278,10 +312,21 @@ class _CargoStep extends StatelessWidget {
           title: 'Thông tin hàng hoá',
           child: Column(
             children: [
-              _Text(label: 'Mô tả hàng hoá', value: d.description, onChanged: (v) => cubit.update((x) => x.copyWith(description: v))),
+              _Text(
+                label: 'Mô tả hàng hoá',
+                value: d.description,
+                onChanged: (v) => cubit.update((x) => x.copyWith(description: v)),
+              ),
               Row(
                 children: [
-                  Expanded(child: _Text(label: 'Số kiện', value: '${d.quantity}', number: true, onChanged: (v) => cubit.update((x) => x.copyWith(quantity: toInt(v))))),
+                  Expanded(
+                    child: _Text(
+                      label: 'Số kiện',
+                      value: '${d.quantity}',
+                      number: true,
+                      onChanged: (v) => cubit.update((x) => x.copyWith(quantity: toInt(v))),
+                    ),
+                  ),
                   const SizedBox(width: 10),
                   Expanded(
                     child: _Text(
@@ -293,18 +338,43 @@ class _CargoStep extends StatelessWidget {
                   ),
                 ],
               ),
-              Text('Kích thước món lớn nhất (cm) – để kiểm tra lọt thùng (GB-10)', style: appText(size: 12, color: AppColors.secondary)),
+              Text('Kích thước món lớn nhất (cm) – để kiểm tra lọt thùng', style: appText(size: 12, color: AppColors.secondary)),
               const SizedBox(height: 8),
               Row(
                 children: [
-                  Expanded(child: _Text(label: 'Dài', value: d.lengthCm == 0 ? '' : '${d.lengthCm}', number: true, onChanged: (v) => cubit.update((x) => x.copyWith(lengthCm: toInt(v))))),
+                  Expanded(
+                    child: _Text(
+                      label: 'Dài',
+                      value: d.lengthCm == 0 ? '' : '${d.lengthCm}',
+                      number: true,
+                      onChanged: (v) => cubit.update((x) => x.copyWith(lengthCm: toInt(v))),
+                    ),
+                  ),
                   const SizedBox(width: 8),
-                  Expanded(child: _Text(label: 'Rộng', value: d.widthCm == 0 ? '' : '${d.widthCm}', number: true, onChanged: (v) => cubit.update((x) => x.copyWith(widthCm: toInt(v))))),
+                  Expanded(
+                    child: _Text(
+                      label: 'Rộng',
+                      value: d.widthCm == 0 ? '' : '${d.widthCm}',
+                      number: true,
+                      onChanged: (v) => cubit.update((x) => x.copyWith(widthCm: toInt(v))),
+                    ),
+                  ),
                   const SizedBox(width: 8),
-                  Expanded(child: _Text(label: 'Cao', value: d.heightCm == 0 ? '' : '${d.heightCm}', number: true, onChanged: (v) => cubit.update((x) => x.copyWith(heightCm: toInt(v))))),
+                  Expanded(
+                    child: _Text(
+                      label: 'Cao',
+                      value: d.heightCm == 0 ? '' : '${d.heightCm}',
+                      number: true,
+                      onChanged: (v) => cubit.update((x) => x.copyWith(heightCm: toInt(v))),
+                    ),
+                  ),
                 ],
               ),
-              _Text(label: 'Ghi chú bốc xếp (dễ vỡ, không lật…)', value: d.specialNotes, onChanged: (v) => cubit.update((x) => x.copyWith(specialNotes: v))),
+              _Text(
+                label: 'Ghi chú bốc xếp (dễ vỡ, không lật…)',
+                value: d.specialNotes,
+                onChanged: (v) => cubit.update((x) => x.copyWith(specialNotes: v)),
+              ),
             ],
           ),
         ),
@@ -322,7 +392,7 @@ class _CargoStep extends StatelessWidget {
           controlAffinity: ListTileControlAffinity.leading,
           value: d.noProhibitedCargo,
           onChanged: (v) => cubit.update((x) => x.copyWith(noProhibitedCargo: v ?? false)),
-          title: Text('Tôi cam kết hàng hoá không thuộc danh mục hàng cấm (GB-07).', style: appText(size: 13)),
+          title: Text('Tôi cam kết hàng hoá không thuộc danh mục hàng cấm.', style: appText(size: 13)),
         ),
       ],
     );
@@ -363,7 +433,11 @@ class _VehicleCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final v = vehicle;
-    final image = v.maxLoadWeightKg <= 600 ? 'pickup' : v.maxLoadWeightKg <= 1200 ? 'van' : 'truck-orange';
+    final image = v.maxLoadWeightKg <= 600
+        ? 'pickup'
+        : v.maxLoadWeightKg <= 1200
+        ? 'van'
+        : 'truck-orange';
     return Opacity(
       opacity: fits ? 1 : 0.5,
       child: AppCard(
@@ -380,18 +454,14 @@ class _VehicleCard extends StatelessWidget {
                 children: [
                   Row(
                     children: [
-                      Flexible(child: Text(v.name, style: appText(size: 15, weight: FontWeight.w700))),
+                      Flexible(
+                        child: Text(v.name, style: appText(size: 15, weight: FontWeight.w700)),
+                      ),
                       if (!fits) ...[const SizedBox(width: 6), const Pill(Tone2.cannot)],
                     ],
                   ),
-                  Text(
-                    'Tải trọng ${v.maxLoadWeightKg.round()} kg • Thùng ${v.bedLengthCm}×${v.bedWidthCm}×${v.bedHeightCm} cm',
-                    style: appText(size: 11.5, color: AppColors.secondary),
-                  ),
-                  Text(
-                    'Mở cửa ${money(v.baseFare)} • ${money(v.pricePerKm)}/km • Tối thiểu ${money(v.minimumFare)}',
-                    style: appText(size: 11.5, color: AppColors.muted),
-                  ),
+                  Text('Tải trọng ${v.maxLoadWeightKg.round()} kg • Thùng ${v.bedLengthCm}×${v.bedWidthCm}×${v.bedHeightCm} cm', style: appText(size: 11.5, color: AppColors.secondary)),
+                  Text('Mở cửa ${money(v.baseFare)} • ${money(v.pricePerKm)}/km • Tối thiểu ${money(v.minimumFare)}', style: appText(size: 11.5, color: AppColors.muted)),
                 ],
               ),
             ),
@@ -440,7 +510,11 @@ class _PaymentStep extends StatelessWidget {
                   helperText: s.couponError == null && d.couponCode.isNotEmpty && e != null ? 'Đã áp dụng: -${money(e.discountAmount)}' : null,
                   suffixIcon: d.couponCode.isEmpty
                       ? null
-                      : IconButton(tooltip: 'Bỏ mã', icon: const Icon(Icons.close), onPressed: () => cubit.update((x) => x.copyWith(couponCode: ''))),
+                      : IconButton(
+                          tooltip: 'Bỏ mã',
+                          icon: const Icon(Icons.close),
+                          onPressed: () => cubit.update((x) => x.copyWith(couponCode: '')),
+                        ),
                 ),
               ),
               if (s.coupons.isNotEmpty) ...[
@@ -469,18 +543,8 @@ class _PaymentStep extends StatelessWidget {
             onChanged: (v) => cubit.update((x) => x.copyWith(paymentMethod: v)),
             child: Column(
               children: [
-                const RadioListTile(
-                  contentPadding: EdgeInsets.zero,
-                  value: 'PayOS',
-                  title: Text('Chuyển khoản PayOS'),
-                  subtitle: Text('Thanh toán trước, đơn chỉ gửi tới tài xế sau khi thanh toán (GB-31).'),
-                ),
-                const RadioListTile(
-                  contentPadding: EdgeInsets.zero,
-                  value: 'Cash',
-                  title: Text('Tiền mặt (COD)'),
-                  subtitle: Text('Trả tiền mặt cho tài xế; hệ thống tìm tài xế ngay.'),
-                ),
+                const RadioListTile(contentPadding: EdgeInsets.zero, value: 'PayOS', title: Text('Chuyển khoản PayOS'), subtitle: Text('Thanh toán trước, đơn chỉ gửi tới tài xế sau khi thanh toán.')),
+                const RadioListTile(contentPadding: EdgeInsets.zero, value: 'Cash', title: Text('Tiền mặt (COD)'), subtitle: Text('Trả tiền mặt cho tài xế; hệ thống tìm tài xế ngay.')),
                 if (d.paymentMethod == 'Cash')
                   SegmentedButton<String>(
                     segments: const [
@@ -513,7 +577,7 @@ class _PaymentStep extends StatelessWidget {
           controlAffinity: ListTileControlAffinity.leading,
           value: d.agreedWarranty,
           onChanged: (v) => cubit.update((x) => x.copyWith(agreedWarranty: v ?? false)),
-          title: Text('Tôi đồng ý với chính sách bảo hành & bồi thường (UC-GST-16).', style: appText(size: 13)),
+          title: Text('Tôi đồng ý với chính sách bảo hành & bồi thường.', style: appText(size: 13)),
         ),
       ],
     );

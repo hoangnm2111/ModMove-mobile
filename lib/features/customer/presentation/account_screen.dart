@@ -45,7 +45,14 @@ class _AccountScreenState extends State<AccountScreen> {
             AppCard(
               child: Row(
                 children: [
-                  CircleAvatar(radius: 26, backgroundColor: AppColors.orange, child: Text(p.fullName.isEmpty ? 'K' : p.fullName[0], style: appText(size: 20, weight: FontWeight.w800, color: Colors.white))),
+                  CircleAvatar(
+                    radius: 26,
+                    backgroundColor: AppColors.orange,
+                    child: Text(
+                      p.fullName.isEmpty ? 'K' : p.fullName[0],
+                      style: appText(size: 20, weight: FontWeight.w800, color: Colors.white),
+                    ),
+                  ),
                   const SizedBox(width: 12),
                   Expanded(
                     child: Column(
@@ -69,6 +76,7 @@ class _AccountScreenState extends State<AccountScreen> {
               }
             }),
             _tile('lock', 'Đổi mật khẩu', () => _sheet(context, const _ChangePassword())),
+            _tile('bell', 'Thông báo', () => Navigator.pushNamed(context, '/notifications')),
             _tile('shield', 'Chính sách & điều khoản', () => Navigator.push(context, MaterialPageRoute<void>(builder: (_) => const _PoliciesScreen()))),
             _tile('headphones', 'Gửi yêu cầu hỗ trợ', () => showSupportSheet(context, name: p.fullName, contact: p.email)),
             _tile('warning', 'Xoá tài khoản', () => _deleteAccount(context), color: AppColors.red),
@@ -76,7 +84,10 @@ class _AccountScreenState extends State<AccountScreen> {
             OutlinedButton.icon(
               onPressed: _logout,
               icon: const AppIcon('arrow-left', size: 18, color: AppColors.red),
-              label: Text('Đăng xuất', style: appText(color: AppColors.red, weight: FontWeight.w700)),
+              label: Text(
+                'Đăng xuất',
+                style: appText(color: AppColors.red, weight: FontWeight.w700),
+              ),
             ),
           ],
         );
@@ -92,7 +103,12 @@ class _AccountScreenState extends State<AccountScreen> {
         children: [
           AppIcon(icon, color: color == AppColors.ink ? AppColors.secondary : color, size: 22),
           const SizedBox(width: 12),
-          Expanded(child: Text(label, style: appText(weight: FontWeight.w600, color: color))),
+          Expanded(
+            child: Text(
+              label,
+              style: appText(weight: FontWeight.w600, color: color),
+            ),
+          ),
           const AppIcon('chevron-right', color: AppColors.muted, size: 20),
         ],
       ),
@@ -107,7 +123,11 @@ class _AccountScreenState extends State<AccountScreen> {
         content: const Text('Tài khoản sẽ bị vô hiệu hoá, lịch sử đơn được giữ lại. Không xoá được khi còn đơn hoặc yêu cầu hoàn tiền đang mở.'),
         actions: [
           TextButton(onPressed: () => Navigator.pop(c, false), child: const Text('Huỷ')),
-          FilledButton(style: FilledButton.styleFrom(backgroundColor: AppColors.red), onPressed: () => Navigator.pop(c, true), child: const Text('Xoá tài khoản')),
+          FilledButton(
+            style: FilledButton.styleFrom(backgroundColor: AppColors.red),
+            onPressed: () => Navigator.pop(c, true),
+            child: const Text('Xoá tài khoản'),
+          ),
         ],
       ),
     );
@@ -154,9 +174,16 @@ class _EditProfileState extends State<_EditProfile> {
     children: [
       const SectionTitle('Sửa hồ sơ'),
       const SizedBox(height: 12),
-      TextField(controller: _name, decoration: const InputDecoration(labelText: 'Họ và tên')),
+      TextField(
+        controller: _name,
+        decoration: const InputDecoration(labelText: 'Họ và tên'),
+      ),
       const SizedBox(height: 12),
-      TextField(controller: _phone, keyboardType: TextInputType.phone, decoration: const InputDecoration(labelText: 'Số điện thoại')),
+      TextField(
+        controller: _phone,
+        keyboardType: TextInputType.phone,
+        decoration: const InputDecoration(labelText: 'Số điện thoại'),
+      ),
       const SizedBox(height: 16),
       PrimaryButton(
         'Lưu',
@@ -198,11 +225,19 @@ class _ChangePasswordState extends State<_ChangePassword> {
     children: [
       const SectionTitle('Đổi mật khẩu'),
       const SizedBox(height: 6),
-      Text('Sau khi đổi, mọi thiết bị sẽ phải đăng nhập lại (GB-47).', style: appText(size: 12, color: AppColors.secondary)),
+      Text('Sau khi đổi, mọi thiết bị sẽ phải đăng nhập lại.', style: appText(size: 12, color: AppColors.secondary)),
       const SizedBox(height: 12),
-      TextField(controller: _current, obscureText: true, decoration: const InputDecoration(labelText: 'Mật khẩu hiện tại')),
+      TextField(
+        controller: _current,
+        obscureText: true,
+        decoration: const InputDecoration(labelText: 'Mật khẩu hiện tại'),
+      ),
       const SizedBox(height: 12),
-      TextField(controller: _next, obscureText: true, decoration: const InputDecoration(labelText: 'Mật khẩu mới (8–100 ký tự)')),
+      TextField(
+        controller: _next,
+        obscureText: true,
+        decoration: const InputDecoration(labelText: 'Mật khẩu mới (8–100 ký tự)'),
+      ),
       const SizedBox(height: 16),
       PrimaryButton(
         'Đổi mật khẩu',
@@ -240,7 +275,10 @@ class _PoliciesScreen extends StatelessWidget {
             for (final p in snap.data!)
               Card(
                 elevation: 0,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(9), side: const BorderSide(color: AppColors.line)),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(9),
+                  side: const BorderSide(color: AppColors.line),
+                ),
                 child: ExpansionTile(
                   title: Text(p.name, style: appText(weight: FontWeight.w700)),
                   childrenPadding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
@@ -293,11 +331,22 @@ class _SupportFormState extends State<_SupportForm> {
     children: [
       const SectionTitle('Gửi yêu cầu hỗ trợ'),
       const SizedBox(height: 12),
-      TextField(controller: _name, decoration: const InputDecoration(labelText: 'Họ và tên')),
+      TextField(
+        controller: _name,
+        decoration: const InputDecoration(labelText: 'Họ và tên'),
+      ),
       const SizedBox(height: 10),
-      TextField(controller: _contact, decoration: const InputDecoration(labelText: 'Email hoặc số điện thoại')),
+      TextField(
+        controller: _contact,
+        decoration: const InputDecoration(labelText: 'Email hoặc số điện thoại'),
+      ),
       const SizedBox(height: 10),
-      TextField(controller: _content, maxLines: 4, maxLength: 2000, decoration: const InputDecoration(labelText: 'Nội dung cần hỗ trợ')),
+      TextField(
+        controller: _content,
+        maxLines: 4,
+        maxLength: 2000,
+        decoration: const InputDecoration(labelText: 'Nội dung cần hỗ trợ'),
+      ),
       const SizedBox(height: 8),
       PrimaryButton(
         'Gửi',
@@ -305,11 +354,7 @@ class _SupportFormState extends State<_SupportForm> {
         onPressed: () async {
           if ([_name, _contact, _content].any((c) => c.text.trim().isEmpty)) return showSnack(context, 'Nhập đủ họ tên, liên hệ và nội dung.', error: true);
           setState(() => _busy = true);
-          final ok = await runAction(
-            context,
-            () => widget.api.supportRequest(_name.text.trim(), _contact.text.trim(), _content.text.trim()),
-            success: 'Đã gửi yêu cầu. ModMove sẽ liên hệ lại.',
-          );
+          final ok = await runAction(context, () => widget.api.supportRequest(_name.text.trim(), _contact.text.trim(), _content.text.trim()), success: 'Đã gửi yêu cầu. ModMove sẽ liên hệ lại.');
           if (!context.mounted) return;
           setState(() => _busy = false);
           if (ok) Navigator.pop(context);
