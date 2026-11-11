@@ -25,17 +25,10 @@ class ApiException implements Exception {
       return ApiException(withDetail ? '$known ($detail)' : known, code: code, status: status);
     }
     final fallback = (body?['detail'] ?? body?['title']) as String?;
-    return ApiException(
-      fallback ?? (status == 401 ? errorMessages['UNAUTHORIZED']! : 'Đã có lỗi xảy ra (HTTP $status).'),
-      code: code,
-      status: status,
-    );
+    return ApiException(fallback ?? (status == 401 ? errorMessages['UNAUTHORIZED']! : 'Đã có lỗi xảy ra (HTTP $status).'), code: code, status: status);
   }
 
-  static const network = ApiException(
-    'Không kết nối được tới máy chủ. Kiểm tra mạng hoặc địa chỉ API rồi thử lại.',
-    code: 'NETWORK',
-  );
+  static const network = ApiException('Không kết nối được tới máy chủ. Kiểm tra mạng hoặc địa chỉ API rồi thử lại.', code: 'NETWORK');
 }
 
 /// Bảng mã lỗi → câu tiếng Việt (ModMove-backend/docs/api/README.md "Mã lỗi").
@@ -63,6 +56,7 @@ const errorMessages = <String, String>{
   'COMPLAINT_WINDOW_CLOSED': 'Chỉ khiếu nại được khi đơn đã giao và trong vòng 24 giờ.',
   'REFUND_AMOUNT_INVALID': 'Số tiền yêu cầu phải lớn hơn 0 và không vượt tổng cước đơn.',
   'REFUND_TOTAL_EXCEEDED': 'Tổng các khoản hoàn của đơn sẽ vượt tổng cước.',
+  'INCIDENT_PENDING': 'Tài xế đã báo sự cố, chuyến đang tạm dừng chờ điều phối viên.',
   'INCIDENT_NOT_ALLOWED': 'Chỉ báo sự cố khi đơn đang Đã đến / Đã lấy hàng / Đang giao.',
   'TOO_MANY_PHOTOS': 'Tối đa 5 ảnh bằng chứng.',
   'NO_INFO_REQUEST': 'Chưa có yêu cầu bổ sung thông tin nào để trả lời.',
