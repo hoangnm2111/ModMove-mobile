@@ -26,10 +26,11 @@ class ValidateDriverApplication {
   }
 
   Map<String, String> personal(Map<String, String> fields) => {
-    if (!RegExp(r'^\d{12}$').hasMatch((fields['citizenId'] ?? '').trim()))
-      'citizenId': 'CCCD cần đủ 12 chữ số.',
-    if (!RegExp(r'^\d{12}$').hasMatch((fields['license'] ?? '').trim()))
-      'license': 'GPLX cần đủ 12 chữ số.',
+    // Khớp validator của BE: CCCD 9–12 chữ số; GPLX 8–20 chữ hoặc số.
+    if (!RegExp(r'^\d{9,12}$').hasMatch((fields['citizenId'] ?? '').trim()))
+      'citizenId': 'CCCD cần 9 đến 12 chữ số.',
+    if (!RegExp(r'^[0-9A-Za-z]{8,20}$').hasMatch((fields['license'] ?? '').trim()))
+      'license': 'GPLX cần 8 đến 20 chữ hoặc số.',
   };
 
   Map<String, String> vehicle(Map<String, String> fields) {
@@ -52,7 +53,7 @@ class ValidateDriverApplication {
     DriverApplication application, {
     bool personalOnly = false,
   }) => DocumentKind.values
-      .where((kind) => !personalOnly || kind.index < 4)
+      .where((kind) => !personalOnly || kind.index < 2)
       .where(
         (kind) =>
             !(application.documents[kind]?.hasImage ?? false) ||

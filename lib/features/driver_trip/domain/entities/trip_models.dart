@@ -11,11 +11,177 @@ enum CargoPhotoSource { camera, gallery, sample }
 
 enum PaymentMethod { payos, cashSender, cashReceiver }
 
+/// Loại sự cố tài xế được báo (BE: VehicleBreakdown | DamagedCargo | Accident | Other).
+enum IncidentType {
+  vehicleBreakdown('VehicleBreakdown', 'Xe hỏng / chết máy'),
+  damagedCargo('DamagedCargo', 'Hàng hư hỏng'),
+  accident('Accident', 'Tai nạn'),
+  other('Other', 'Sự cố khác');
+
+  const IncidentType(this.apiValue, this.label);
+  final String apiValue, label;
+}
+
 class TripFailure implements Exception {
   const TripFailure(this.message);
   final String message;
   @override
   String toString() => message;
+}
+
+/// Trạng thái sự cố (BE: IncidentResolutionStatus) kèm nhãn tiếng Việt dùng chung web và app.
+enum IncidentStatus {
+  open('Đang chờ xử lý'),
+  inProgress('Điều phối viên đang xử lý'),
+  resolved('Đã xử lý'),
+  cancelled('Báo cáo đã bị hủy');
+
+  const IncidentStatus(this.label);
+  final String label;
+
+  static IncidentStatus parse(Object? value) => switch ('$value') {
+    'InProgress' => inProgress,
+    'Resolved' => resolved,
+    'Cancelled' => cancelled,
+    _ => open,
+  };
+}
+
+/// Sự cố trên chuyến (BE: DriverIncidentResponse / `incidents[]` của chi tiết chuyến).
+/// `reportedByYou = false` là sự cố do khách báo: mô tả chỉ là câu chung, không có ảnh.
+class TripIncident {
+  const TripIncident({
+    required this.id,
+    required this.orderId,
+    required this.orderCode,
+    required this.type,
+    required this.description,
+    required this.reportedByYou,
+    required this.status,
+    required this.createdAt,
+    this.photoUrls = const [],
+    this.decision,
+    this.note,
+    this.resolvedAt,
+    this.latitude,
+    this.longitude,
+    this.orderStatus,
+  });
+  final int id, orderId;
+  final String orderCode, description;
+  final IncidentType type;
+  final List<String> photoUrls;
+  final bool reportedByYou;
+  final IncidentStatus status;
+
+  /// ContinueTrip | ReassignDriver | CancelOrder (chỉ có khi Đã xử lý).
+  final String? decision, note, orderStatus;
+  final DateTime createdAt;
+  final DateTime? resolvedAt;
+  final double? latitude, longitude;
+
+  bool get isOpen => status == IncidentStatus.open || status == IncidentStatus.inProgress;
+
+  /// Luật: sự cố do chính tài xế báo còn mở thì chuyến tạm dừng. Sự cố do khách báo không chặn.
+  bool get blocksTrip => reportedByYou && isOpen;
+
+  static const decisionLabels = {
+    'ContinueTrip': 'Tiếp tục chuyến',
+    'ReassignDriver': 'Đổi tài xế',
+    'CancelOrder': 'Hủy đơn',
+  };
+  String? get decisionLabel => decision == null ? null : (decisionLabels[decision] ?? decision);
+
+  TripIncident copyWith({IncidentStatus? status, String? decision, String? note, DateTime? resolvedAt}) => TripIncident(
+    id: id,
+    orderId: orderId,
+    orderCode: orderCode,
+    type: type,
+    description: description,
+    reportedByYou: reportedByYou,
+    status: status ?? this.status,
+    createdAt: createdAt,
+    photoUrls: photoUrls,
+    decision: decision ?? this.decision,
+    note: note ?? this.note,
+    resolvedAt: resolvedAt ?? this.resolvedAt,
+    latitude: latitude,
+    longitude: longitude,
+    orderStatus: orderStatus,
+  );
+
+  factory TripIncident.fromJson(Map<String, dynamic> j, {int? orderId, String? orderCode}) {
+    double? number(Object? v) => v is num ? v.toDouble() : null;
+    return TripIncident(
+      id: (j['id'] as num).toInt(),
+      orderId: ((j['orderId'] ?? orderId) as num?)?.toInt() ?? 0,
+      orderCode: (j['orderCode'] as String?) ?? orderCode ?? '',
+      type: IncidentType.values.firstWhere((t) => t.apiValue == j['incidentType'], orElse: () => IncidentType.other),
+      description: (j['description'] as String?) ?? '',
+      photoUrls: ((j['photoUrls'] as List?) ?? const []).cast<String>(),
+      reportedByYou: j['reportedByYou'] == true,
+      status: IncidentStatus.parse(j['resolutionStatus']),
+      decision: j['resolutionDecision'] as String?,
+      note: j['resolutionNote'] as String?,
+      createdAt: DateTime.tryParse('${j['createdAt'] ?? ''}')?.toLocal() ?? DateTime.now(),
+      resolvedAt: DateTime.tryParse('${j['resolvedAt'] ?? ''}')?.toLocal(),
+      latitude: number(j['latitude']),
+      longitude: number(j['longitude']),
+      orderStatus: j['orderStatus'] as String?,
+    );
+  }
+}
+
+/// Nội dung tài xế gửi khi báo sự cố. Ảnh được tải lên khi gửi (JPG/PNG ≤ 5 MB, tối đa 5 ảnh).
+class IncidentDraft {
+  const IncidentDraft({
+    required this.type,
+    required this.description,
+    this.photos = const [],
+    this.latitude,
+    this.longitude,
+  });
+  final IncidentType type;
+  final String description;
+  final List<CargoPhoto> photos;
+
+  /// Không có GPS thì để trống: BE tự lấy vị trí cuối của tài xế.
+  final double? latitude, longitude;
+}
+
+/// Kết quả xử lý sự cố cần báo cho tài xế (một lần): hiện hộp thoại rồi gọi `acknowledgeOutcome`.
+enum IncidentOutcomeKind { continueTrip, dismissed, reassignedAway, orderCancelled }
+
+class IncidentOutcome {
+  const IncidentOutcome(this.kind, {required this.orderCode, this.incidentId, this.note});
+  final IncidentOutcomeKind kind;
+  final String orderCode;
+  final int? incidentId;
+  final String? note;
+
+  /// Ghi chú huỷ đơn có dạng `... [Cargo: ReturnToPickup|Keep]`.
+  String? get cargoHint {
+    final match = RegExp(r'\[Cargo: (\w+)\]').firstMatch(note ?? '');
+    return match?.group(1);
+  }
+
+  String get title => switch (kind) {
+    IncidentOutcomeKind.continueTrip => 'Điều phối viên: tiếp tục chuyến',
+    IncidentOutcomeKind.dismissed => 'Báo cáo sự cố đã bị hủy',
+    IncidentOutcomeKind.reassignedAway => 'Đơn $orderCode đã chuyển cho tài xế khác',
+    IncidentOutcomeKind.orderCancelled => 'Đơn $orderCode đã bị hủy do sự cố',
+  };
+
+  String get message {
+    final clean = (note ?? '').replaceAll(RegExp(r'\s*\[Cargo: \w+\]'), '').trim();
+    final hint = switch (cargoHint) {
+      'ReturnToPickup' => 'Hãy đưa hàng về điểm lấy.',
+      'Keep' => 'Bạn tiếp tục giữ hàng theo hướng dẫn của điều phối viên.',
+      final other? => other,
+      null => null,
+    };
+    return [if (clean.isNotEmpty) clean, ?hint].join('\n');
+  }
 }
 
 class GeoPoint {
@@ -66,8 +232,13 @@ class DeliveryJob {
     this.vehicle = 'Xe tải 1 tấn',
     this.customerName = 'Anh Hùng',
     this.customerPhone = '0900000321',
+    this.code,
   });
   final String id, pickup, dropoff, vehicle, customerName, customerPhone;
+
+  /// Mã đơn hiển thị cho người dùng (BE: orderCode); [id] là khoá gọi API.
+  final String? code;
+  String get label => code ?? id;
   final GeoPoint pickupPoint, dropoffPoint;
   final DateTime createdAt;
   final double distanceKm;
@@ -114,7 +285,9 @@ class ActiveTrip {
     this.cashCollected = false,
     this.note = '',
     List<UploadedEvidence> evidence = const [],
-  }) : evidence = List.unmodifiable(evidence);
+    List<TripIncident> incidents = const [],
+  }) : evidence = List.unmodifiable(evidence),
+       incidents = List.unmodifiable(incidents);
   final DeliveryJob job;
   final TripStage stage;
   final EvidenceReview review;
@@ -124,6 +297,13 @@ class ActiveTrip {
   final DateTime? arrivedAt, submittedAt;
   final bool cashCollected;
   final List<UploadedEvidence> evidence;
+  final List<TripIncident> incidents;
+
+  /// Sự cố do tài xế báo còn mở: chuyến tạm dừng, khóa các bước của chuyến.
+  TripIncident? get blockingIncident => incidents.where((i) => i.blocksTrip).firstOrNull;
+
+  /// Sự cố do khách báo còn mở: chỉ nhắc, không khóa nút.
+  TripIncident? get customerOpenIncident => incidents.where((i) => i.isOpen && !i.reportedByYou).firstOrNull;
   bool get editable =>
       (stage == TripStage.arrived ||
           stage == TripStage.pickedUp && review == EvidenceReview.rejected) &&
@@ -139,6 +319,7 @@ class ActiveTrip {
     bool? cashCollected,
     String? note,
     List<UploadedEvidence>? evidence,
+    List<TripIncident>? incidents,
   }) => ActiveTrip(
     job: job,
     stage: stage ?? this.stage,
@@ -150,6 +331,7 @@ class ActiveTrip {
     cashCollected: cashCollected ?? this.cashCollected,
     note: note ?? this.note,
     evidence: evidence ?? this.evidence,
+    incidents: incidents ?? this.incidents,
   );
 }
 
@@ -176,7 +358,16 @@ class DriverSession {
     this.pings = 0,
     List<DeliveryJob> jobs = const [],
     this.notice,
+    this.requiredDeposit = 200000,
+    this.missingDeposit = 0,
+    this.incidentOutcome,
   }) : jobs = List.unmodifiable(jobs);
+
+  /// Kết quả xử lý sự cố chưa báo cho tài xế (null khi không có).
+  final IncidentOutcome? incidentOutcome;
+
+  /// Ký quỹ tối thiểu để nhận mọi đơn (BE: REQUIRED_DEPOSIT) và phần còn thiếu.
+  final int requiredDeposit, missingDeposit;
   final bool online, gpsEnabled, mapAvailable;
   final GpsFix? fix;
   final JobOffer? offer;

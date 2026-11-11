@@ -12,11 +12,16 @@ class ActiveTripState {
     this.busy = false,
     this.error,
     this.receipt,
+    this.delivered = false,
   });
   final DriverSession session;
   final DateTime now;
-  final bool busy;
+  final bool busy, delivered;
   final String? error, receipt;
+  /// Sự cố do tài xế báo còn mở: khóa các bước của chuyến. Sự cố do khách báo chỉ nhắc, không khóa.
+  TripIncident? get blockingIncident => session.trip?.blockingIncident;
+  TripIncident? get customerIncident => session.trip?.customerOpenIncident;
+  bool get paused => blockingIncident != null;
   bool get fresh => session.gpsEnabled && (session.fix?.freshAt(now) ?? false);
   double get distance => session.trip == null || session.fix == null
       ? double.infinity
@@ -25,6 +30,7 @@ class ActiveTripState {
       fresh &&
       distance <= 500 &&
       session.trip?.stage == TripStage.accepted &&
+      !paused &&
       !busy;
 }
 
@@ -42,8 +48,17 @@ class CustomerCalled extends ActiveTripEvent {}
 class ExternalNavigationOpened extends ActiveTripEvent {}
 
 class IncidentReported extends ActiveTripEvent {
-  IncidentReported(this.message);
-  final String message;
+  IncidentReported(this.draft);
+  final IncidentDraft draft;
+}
+
+class DropoffArrived extends ActiveTripEvent {}
+
+class CashCollected extends ActiveTripEvent {}
+
+class DeliveryCompleted extends ActiveTripEvent {
+  DeliveryCompleted(this.proof);
+  final CargoPhoto proof;
 }
 
 class ActiveTripBloc extends Bloc<ActiveTripEvent, ActiveTripState> {
@@ -104,14 +119,23 @@ class ActiveTripBloc extends Bloc<ActiveTripEvent, ActiveTripState> {
         );
       }
       String? receipt;
+      var delivered = false;
       if (event is IncidentReported) {
-        receipt = await actions.repository.reportIncident(event.message);
+        final id = await actions.repository.reportIncident(event.draft);
+        receipt = 'Đã gửi sự cố #$id';
+      }
+      if (event is DropoffArrived) await actions.repository.arriveDropoff();
+      if (event is CashCollected) await actions.repository.collectCash();
+      if (event is DeliveryCompleted) {
+        await actions.repository.deliver(event.proof);
+        delivered = true;
       }
       emit(
         ActiveTripState(
           actions.repository.current,
           actions.repository.now,
           receipt: receipt,
+          delivered: delivered,
         ),
       );
     } catch (e) {

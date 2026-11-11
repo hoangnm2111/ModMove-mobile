@@ -134,6 +134,7 @@ class PickupNavigationScreen extends StatelessWidget {
                       ),
                     ),
                     const SizedBox(height: 18),
+                    IncidentBanner(trip),
                     Row(
                       children: [
                         Container(
@@ -187,7 +188,7 @@ class PickupNavigationScreen extends StatelessWidget {
                     if (state.error != null) TripError(state.error!),
                     if (state.receipt != null)
                       Notice(
-                        'Yêu cầu ${state.receipt} đã được gửi đến điều phối.',
+                        state.receipt!,
                         icon: 'check',
                       ),
                     const Notice(

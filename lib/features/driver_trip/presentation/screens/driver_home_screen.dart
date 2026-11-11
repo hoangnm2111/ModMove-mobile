@@ -6,6 +6,7 @@ import '../../../../core/widgets/app_widgets.dart';
 import '../../domain/entities/trip_models.dart';
 import '../../domain/entities/driver_matching_policy.dart';
 import '../bloc/driver_home_bloc.dart';
+import '../../../notifications/notifications_screen.dart';
 import '../widgets/driver_map.dart';
 import '../widgets/trip_components.dart';
 
@@ -29,15 +30,7 @@ class DriverHomeScreen extends StatelessWidget {
           automaticallyImplyLeading: false,
           title: const Text('Trang chủ tài xế'),
           actions: [
-            IconButton(
-              tooltip: 'Thông báo',
-              onPressed: () => showInfoSheet(
-                context,
-                'Thông báo',
-                session.notice ?? 'Bạn chưa có thông báo mới.',
-              ),
-              icon: const AppIcon('bell'),
-            ),
+            NotificationBell(onTap: () => Navigator.pushNamed(context, '/inbox')),
           ],
         ),
         bottomNavigationBar: AppBottomNav(
@@ -45,24 +38,15 @@ class DriverHomeScreen extends StatelessWidget {
           selected: 0,
           onSelect: (i) {
             if (i == 3) Navigator.pushNamed(context, '/profile');
+            // Đơn hàng: chuyến đang chạy → màn chuyến; ngược lại → danh sách chuyến (BE).
             if (i == 1) {
               if (session.trip?.ongoing ?? false) {
                 onActiveTrip?.call();
               } else {
-                showInfoSheet(
-                  context,
-                  'Đơn hàng',
-                  'Chưa có chuyến đang thực hiện. Bật hoạt động để nhận đơn gần bạn.',
-                );
+                Navigator.pushNamed(context, '/driver-trips');
               }
             }
-            if (i == 2) {
-              showInfoSheet(
-                context,
-                'Số dư ví',
-                'Ký quỹ: ${vnd(session.deposit)}\nThu nhập: ${vnd(session.earnings)}',
-              );
-            }
+            if (i == 2) Navigator.pushNamed(context, '/driver-wallet');
           },
         ),
         body: RefreshIndicator(
@@ -180,7 +164,7 @@ class DriverHomeScreen extends StatelessWidget {
                             const SizedBox(width: 12),
                             Expanded(
                               child: Text(
-                                '#${session.trip!.job.id}\n${session.trip!.job.pickup}',
+                                '#${session.trip!.job.label}\n${session.trip!.job.pickup}',
                                 style: appText(
                                   size: 13,
                                   weight: FontWeight.w600,
@@ -244,11 +228,12 @@ class DriverHomeScreen extends StatelessWidget {
                         ),
                       ),
                     ],
-                    if (session.deposit < 200000)
-                      const Padding(
-                        padding: EdgeInsets.only(bottom: 8),
+                    if (session.deposit < session.requiredDeposit)
+                      Padding(
+                        padding: const EdgeInsets.only(bottom: 8),
                         child: Notice(
-                          'Ký quỹ dưới 200.000đ: tạm ẩn các đơn tiền mặt.',
+                          'Ký quỹ dưới ${vnd(session.requiredDeposit)}: tạm ẩn mọi đơn. '
+                          'Nạp thêm ít nhất ${vnd(session.missingDeposit > 0 ? session.missingDeposit : session.requiredDeposit - session.deposit)} để nhận đơn.',
                           peach: true,
                         ),
                       ),
@@ -279,7 +264,9 @@ class DriverHomeScreen extends StatelessWidget {
                               const SizedBox(width: 5),
                               _summary(
                                 'chart-bar',
-                                '${session.shift.acceptanceRate}%',
+                                session.shift.acceptanceRate == 0
+                                    ? '—'
+                                    : '${session.shift.acceptanceRate}%',
                                 'Tỷ lệ nhận',
                               ),
                             ],
@@ -293,6 +280,22 @@ class DriverHomeScreen extends StatelessWidget {
                         _balance('shield', 'Ký quỹ', session.deposit),
                         const SizedBox(width: 8),
                         _balance('wallet', 'Thu nhập', session.earnings),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                    Row(
+                      children: [
+                        _link(context, 'orders', 'Chuyến của tôi', '/driver-trips'),
+                        const SizedBox(width: 8),
+                        _link(context, 'target', 'Đánh giá', '/driver-ratings'),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                    Row(
+                      children: [
+                        _link(context, 'warning', 'Sự cố của tôi', '/driver-incidents'),
+                        const SizedBox(width: 8),
+                        const Spacer(),
                       ],
                     ),
                     Row(
@@ -322,6 +325,22 @@ class DriverHomeScreen extends StatelessWidget {
       );
     },
   );
+  Widget _link(BuildContext context, String icon, String label, String route) =>
+      Expanded(
+        child: AppCard(
+          onTap: () => Navigator.pushNamed(context, route),
+          child: Row(
+            children: [
+              AppIcon(icon, size: 20, color: AppColors.orange),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(label, style: appText(size: 13, weight: FontWeight.w600)),
+              ),
+              const AppIcon('chevron-right', size: 15),
+            ],
+          ),
+        ),
+      );
   Widget _summary(String icon, String value, String label) => Expanded(
     child: AppCard(
       padding: const EdgeInsets.all(8),

@@ -269,3 +269,79 @@ class PickupStepper extends StatelessWidget {
     ),
   );
 }
+
+/// Banner sự cố trên màn chuyến. Sự cố do tài xế báo còn mở: chuyến tạm dừng (banner đỏ/xanh, bấm xem chi tiết).
+/// Sự cố do khách báo: chỉ nhắc, không khóa nút.
+class IncidentBanner extends StatelessWidget {
+  const IncidentBanner(this.trip, {super.key});
+  final ActiveTrip trip;
+
+  @override
+  Widget build(BuildContext context) {
+    final blocking = trip.blockingIncident;
+    final customer = trip.customerOpenIncident;
+    if (blocking == null && customer == null) return const SizedBox.shrink();
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        if (blocking != null)
+          _banner(
+            context,
+            key: const Key('incident-banner-blocking'),
+            incident: blocking,
+            text: blocking.status == IncidentStatus.inProgress
+                ? 'Điều phối viên đang xử lý sự cố #${blocking.id}'
+                : 'Đã gửi sự cố #${blocking.id} · Đang chờ điều phối viên',
+            sub: 'Chuyến tạm dừng: các bước đến nơi, lấy hàng, giao hàng bị khóa.',
+            color: blocking.status == IncidentStatus.inProgress ? AppColors.peach : AppColors.redBg,
+            border: blocking.status == IncidentStatus.inProgress ? AppColors.orange : AppColors.red,
+          ),
+        if (customer != null)
+          _banner(
+            context,
+            key: const Key('incident-banner-customer'),
+            incident: customer,
+            text: 'Khách đã báo sự cố, điều phối viên đang xử lý',
+            sub: 'Bạn vẫn tiếp tục chuyến bình thường.',
+            color: AppColors.pale,
+            border: AppColors.line,
+          ),
+        const SizedBox(height: 8),
+      ],
+    );
+  }
+
+  Widget _banner(
+    BuildContext context, {
+    required Key key,
+    required TripIncident incident,
+    required String text,
+    required String sub,
+    required Color color,
+    required Color border,
+  }) => Padding(
+    padding: const EdgeInsets.only(bottom: 6),
+    child: AppCard(
+      key: key,
+      color: color,
+      borderColor: border,
+      onTap: () => Navigator.pushNamed(context, '/driver-incident', arguments: incident.id),
+      child: Row(
+        children: [
+          const AppIcon('warning', size: 22, color: AppColors.orange),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(text, style: appText(size: 13, weight: FontWeight.w700)),
+                Text(sub, style: appText(size: 11.5, color: AppColors.secondary)),
+              ],
+            ),
+          ),
+          const AppIcon('chevron-right', size: 16),
+        ],
+      ),
+    ),
+  );
+}

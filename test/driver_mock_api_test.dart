@@ -64,7 +64,7 @@ void main() {
         (await repository.history()).single,
       );
       await expectLater(
-        repository.upload(DocumentKind.citizenFront, photo),
+        repository.upload(DocumentKind.licenseFront, photo),
         throwsA(isA<ApplicationFailure>()),
       );
       final license = await repository.upload(DocumentKind.licenseBack, photo);

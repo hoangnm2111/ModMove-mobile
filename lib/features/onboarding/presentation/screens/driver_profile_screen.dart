@@ -135,6 +135,11 @@ class _DriverProfileScreenState extends State<DriverProfileScreen> {
                 icon: const Icon(Icons.history),
                 label: const Text('Lịch sử các lần gửi'),
               ),
+            TextButton.icon(
+              onPressed: () => Navigator.pushNamed(context, '/notifications'),
+              icon: const Icon(Icons.notifications_none),
+              label: const Text('Cài đặt thông báo'),
+            ),
           ],
         ],
       ),
@@ -371,7 +376,6 @@ class _DriverProfileScreenState extends State<DriverProfileScreen> {
       child: Column(
         children: [
           for (final kind in [
-            DocumentKind.citizenFront,
             DocumentKind.licenseFront,
             DocumentKind.registration,
             DocumentKind.vehicle,
@@ -387,7 +391,7 @@ class _DriverProfileScreenState extends State<DriverProfileScreen> {
                     const SizedBox(width: 18),
                     Expanded(
                       child: Text(
-                        kind == DocumentKind.citizenFront ? 'CCCD' : kind.label,
+                        kind.label,
                         style: appText(size: 12.5),
                       ),
                     ),

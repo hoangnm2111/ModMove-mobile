@@ -1,3 +1,4 @@
+import '../../../../core/widgets/notice_banner.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:modmove_mobile/core/theme/app_theme.dart';
@@ -34,9 +35,7 @@ class _VerificationScreenState extends State<VerificationScreen> {
 
   void _showError(String message) {
     setState(() => error = message);
-    ScaffoldMessenger.of(
-      context,
-    ).showSnackBar(SnackBar(content: Text(message)));
+    showNotice(context, message, error: true);
   }
 
   Future<void> _choose(DocumentKind kind) async {
@@ -92,8 +91,10 @@ class _VerificationScreenState extends State<VerificationScreen> {
     if (!mounted) return;
     if (message != null) {
       _showError(message);
+      notify(context, 'DOCUMENT_UPLOAD_FAILED', {'document': kind.label});
     } else {
       setState(() => error = null);
+      notify(context, 'DOCUMENT_UPLOADED', {'document': kind.label});
     }
   }
 
@@ -116,6 +117,7 @@ class _VerificationScreenState extends State<VerificationScreen> {
           _showError(message);
           return;
         }
+        notify(context, 'DRIVER_DRAFT_SAVED');
       }
       setState(() {
         step = 1;
@@ -130,6 +132,7 @@ class _VerificationScreenState extends State<VerificationScreen> {
       _showError(message);
       return;
     }
+    notify(context, 'DRIVER_APPLICATION_SUBMITTED');
     if (widget.onSubmitted != null) {
       widget.onSubmitted!();
     } else {
@@ -152,6 +155,7 @@ class _VerificationScreenState extends State<VerificationScreen> {
       return false;
     }
     setState(() => error = null);
+    notify(context, 'DRIVER_DRAFT_SAVED');
     return true;
   }
 
@@ -285,15 +289,17 @@ class _VerificationScreenState extends State<VerificationScreen> {
     String label, {
     String? hint,
     TextInputType? keyboard,
+    bool derived = false,
   }) => Column(
     crossAxisAlignment: CrossAxisAlignment.start,
     children: [
       Text(label, style: appText(size: 13)),
       const SizedBox(height: 5),
       TextFormField(
-        key: ValueKey('field-$key'),
+        // Ô do BE quyết định (kích thước thùng theo loại xe): đổi loại xe thì hiển thị lại.
+        key: ValueKey(derived ? 'field-$key-${driver.fields[key]}' : 'field-$key'),
         initialValue: driver.fields[key],
-        readOnly: driver.status != ApprovalStatus.draft || driver.busy,
+        readOnly: derived || driver.status != ApprovalStatus.draft || driver.busy,
         keyboardType: keyboard,
         style: appText(size: 14),
         onChanged: (value) => driver.setField(key, value),
@@ -335,21 +341,6 @@ class _VerificationScreenState extends State<VerificationScreen> {
       keyboard: TextInputType.number,
     ),
     const SizedBox(height: 16),
-    const SectionTitle('Căn cước công dân', size: 16),
-    const SizedBox(height: 6),
-    Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Expanded(
-          child: _tile(driver, DocumentKind.citizenFront, 'Mặt trước', 136),
-        ),
-        const SizedBox(width: 12),
-        Expanded(
-          child: _tile(driver, DocumentKind.citizenBack, 'Mặt sau', 136),
-        ),
-      ],
-    ),
-    const SizedBox(height: 12),
     const SectionTitle('Giấy phép lái xe', size: 16),
     const SizedBox(height: 6),
     Row(
@@ -376,20 +367,31 @@ class _VerificationScreenState extends State<VerificationScreen> {
     const SizedBox(height: 12),
     Text('Loại xe', style: appText(size: 13)),
     const SizedBox(height: 5),
-    DropdownButtonFormField<String>(
-      initialValue: driver.fields['vehicleType'],
-      style: appText(size: 14),
-      isExpanded: true,
-      icon: const AppIcon('chevron-down', size: 17, color: AppColors.secondary),
-      decoration: const InputDecoration(
-        contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-      ),
-      items: ['Xe tải 1 tấn', 'Xe van 500 kg', 'Xe bán tải']
-          .map((value) => DropdownMenuItem(value: value, child: Text(value)))
-          .toList(),
-      onChanged: driver.status == ApprovalStatus.draft && !driver.busy
-          ? (value) => driver.setField('vehicleType', value!)
-          : null,
+    Builder(
+      builder: (_) {
+        final names = driver.vehicleTypes.isEmpty
+            ? const ['Xe tải 1 tấn', 'Xe van 500 kg', 'Xe bán tải']
+            : [for (final type in driver.vehicleTypes) type.name];
+        final current = driver.fields['vehicleType'];
+        return DropdownButtonFormField<String>(
+          key: ValueKey('vehicle-type-${driver.fields['vehicleType']}'),
+          initialValue: names.contains(current) ? current : null,
+          style: appText(size: 14),
+          isExpanded: true,
+          icon: const AppIcon('chevron-down', size: 17, color: AppColors.secondary),
+          decoration: const InputDecoration(
+            contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+          ),
+          items: names
+              .map((value) => DropdownMenuItem(value: value, child: Text(value)))
+              .toList(),
+          onChanged: driver.status == ApprovalStatus.draft && !driver.busy
+              ? (value) => driver.vehicleTypes.isNotEmpty
+                    ? driver.selectVehicleType(value!)
+                    : driver.setField('vehicleType', value!)
+              : null,
+        );
+      },
     ),
     const SizedBox(height: 10),
     Row(
@@ -419,6 +421,7 @@ class _VerificationScreenState extends State<VerificationScreen> {
             'length',
             'Dài',
             keyboard: const TextInputType.numberWithOptions(decimal: true),
+            derived: driver.vehicleTypes.isNotEmpty,
           ),
         ),
         const SizedBox(width: 12),
@@ -428,6 +431,7 @@ class _VerificationScreenState extends State<VerificationScreen> {
             'width',
             'Rộng',
             keyboard: const TextInputType.numberWithOptions(decimal: true),
+            derived: driver.vehicleTypes.isNotEmpty,
           ),
         ),
         const SizedBox(width: 12),
@@ -437,6 +441,7 @@ class _VerificationScreenState extends State<VerificationScreen> {
             'height',
             'Cao',
             keyboard: const TextInputType.numberWithOptions(decimal: true),
+            derived: driver.vehicleTypes.isNotEmpty,
           ),
         ),
       ],

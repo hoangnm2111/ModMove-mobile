@@ -13,8 +13,8 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(find.text('Tiếp tục'));
     await tester.pumpAndSettle();
-    expect(find.text('CCCD cần đủ 12 chữ số.'), findsOneWidget);
-    expect(find.text('GPLX cần đủ 12 chữ số.'), findsOneWidget);
+    expect(find.text('CCCD cần 9 đến 12 chữ số.'), findsOneWidget);
+    expect(find.text('GPLX cần 8 đến 20 chữ hoặc số.'), findsOneWidget);
     expect(find.text('Giấy tờ cá nhân'), findsOneWidget);
   });
   testWidgets(

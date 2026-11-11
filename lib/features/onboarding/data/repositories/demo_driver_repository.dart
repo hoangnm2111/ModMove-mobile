@@ -40,7 +40,7 @@ class DemoDriverRepository implements DriverRepository {
         for (final kind in DocumentKind.values)
           kind: VerificationDocument(
             remoteReference:
-                complete || kind == DocumentKind.citizenFront || kind.index >= 4
+                complete || kind == DocumentKind.licenseFront || kind.index >= 2
                 ? 'demo://${kind.name}'
                 : null,
             accepted:

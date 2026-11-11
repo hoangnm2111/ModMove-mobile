@@ -2,6 +2,7 @@ import 'dart:io';
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:modmove_mobile/core/widgets/notice_banner.dart';
 import 'package:modmove_mobile/app/app.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:modmove_mobile/features/driver_trip/domain/repositories/driver_trip_repository.dart';
@@ -60,6 +61,11 @@ DriverController controller(
 }
 
 Future<void> click(WidgetTester tester, Finder finder) async {
+  // Banner thông báo nằm trên đỉnh màn và nhận chạm: vuốt lên đóng trước khi bấm tiếp.
+  if (find.byType(NoticeBanner).evaluate().isNotEmpty) {
+    await tester.fling(find.byType(NoticeBanner), const Offset(0, -300), 1000);
+    await tester.pumpAndSettle();
+  }
   if (finder.evaluate().isEmpty) {
     await tester.scrollUntilVisible(
       finder,
@@ -93,22 +99,22 @@ void main() {
       await driver.failNext('upload');
       expect(
         await driver.pickDocument(
-          DocumentKind.citizenFront,
+          DocumentKind.licenseFront,
           PhotoSource.sample,
         ),
         isNotNull,
       );
-      expect(driver.documents[DocumentKind.citizenFront]!.bytes, isNotNull);
+      expect(driver.documents[DocumentKind.licenseFront]!.bytes, isNotNull);
       expect(
-        driver.documents[DocumentKind.citizenFront]!.remoteReference,
+        driver.documents[DocumentKind.licenseFront]!.remoteReference,
         isNull,
       );
       await driver.refresh();
-      expect(driver.uploadErrors, contains(DocumentKind.citizenFront));
-      expect(await driver.retryUpload(DocumentKind.citizenFront), isNull);
+      expect(driver.uploadErrors, contains(DocumentKind.licenseFront));
+      expect(await driver.retryUpload(DocumentKind.licenseFront), isNull);
       expect(driver.uploadErrors, isEmpty);
       expect(
-        driver.documents[DocumentKind.citizenFront]!.remoteReference,
+        driver.documents[DocumentKind.licenseFront]!.remoteReference,
         startsWith('mock://'),
       );
     },
@@ -214,7 +220,7 @@ void main() {
         find.byKey(const ValueKey('field-license')),
         '790123456789',
       );
-      for (final kind in DocumentKind.values.take(4)) {
+      for (final kind in DocumentKind.values.take(2)) {
         await chooseSample(tester, kind, 'Tải ảnh lên');
         expect(driver.documents[kind]!.remoteReference, isNotNull);
       }
@@ -230,7 +236,7 @@ void main() {
         await tester.ensureVisible(field);
         await tester.enterText(field, entry.value);
       }
-      for (final kind in DocumentKind.values.skip(4)) {
+      for (final kind in DocumentKind.values.skip(2)) {
         await chooseSample(tester, kind, 'Tải ảnh');
       }
       await click(tester, find.text('Gửi hồ sơ xét duyệt'));

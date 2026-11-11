@@ -51,6 +51,16 @@ class ManageDriverProfile {
   Future<List<DriverApplication>> history() => repository.history();
   Future<DriverApplication> setAvailability(bool value) =>
       repository.setAvailability(value);
+  Future<List<VehicleTypeOption>> vehicleTypes() async {
+    final Object catalog = repository;
+    return catalog is VehicleTypeCatalog ? catalog.vehicleTypes() : const [];
+  }
+
+  void clearLocal() {
+    final Object cache = repository;
+    if (cache is ProfileLocalCache) cache.clear();
+  }
+
   Future<VerificationDocument> upload(DocumentKind kind, SelectedPhoto photo) {
     final error = const ValidateDriverApplication().image(
       photo.name,
