@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'dart:io';
 import 'package:path_provider/path_provider.dart';
 import 'app/app.dart';
+import 'core/config/app_config.dart';
 import 'core/session/session_store.dart';
 import 'features/onboarding/data/services/mock_driver_api.dart';
 import 'features/onboarding/data/services/profile_mock_store.dart';
@@ -22,6 +23,12 @@ Future<void> main() async {
   // Reference fixtures remain isolated; the ordinary app restores its mock data.
   if (screen != 'home' && screen != 'driver-onboarding') {
     runApp(const ModMoveApp());
+    return;
+  }
+  // Chạy thường: hồ sơ/nhận đơn/chuyến của tài xế gọi BE thật (api/driver/*).
+  // `--dart-define=USE_MOCK_DRIVER=true` quay lại dữ liệu mô phỏng trong máy.
+  if (screen == 'home' && !AppConfig.useMockDriver) {
+    runApp(ModMoveApp(sessions: sessions));
     return;
   }
   try {
