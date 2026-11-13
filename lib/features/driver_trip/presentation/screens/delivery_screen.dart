@@ -74,7 +74,7 @@ class _DeliveryScreenState extends State<DeliveryScreen> {
     final job = trip.job;
     final needCash = job.cash && !trip.cashCollected;
     final paused = state.paused;
-    final canFinish = _proof != null && !needCash && !state.busy && !paused;
+    final canFinish = _proof != null && !needCash && !state.busy && !paused && state.atDropoff;
     return BlocListener<ActiveTripBloc, ActiveTripState>(
       listenWhen: (previous, next) => next.delivered && !previous.delivered,
       listener: (context, _) {
@@ -196,9 +196,20 @@ class _DeliveryScreenState extends State<DeliveryScreen> {
                 const SizedBox(height: 10),
                 Notice(state.receipt!, icon: 'check'),
               ],
-              const SizedBox(height: 16),
+              const SizedBox(height: 10),
+              if (!state.fresh)
+                const TripError(
+                  'Vị trí không khả dụng hoặc quá 30 giây. Bật lại GPS để hoàn tất giao hàng.',
+                ),
+              const Notice(
+                'Chỉ hoàn tất khi cách điểm giao không quá 500 m.',
+                icon: 'warning',
+                peach: true,
+              ),
+              const SizedBox(height: 12),
               PrimaryButton(
                 'Hoàn tất giao hàng',
+                key: const Key('finish-delivery'),
                 icon: 'check',
                 busy: state.busy,
                 onPressed: canFinish

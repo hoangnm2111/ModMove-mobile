@@ -26,9 +26,18 @@ class ActiveTripState {
   double get distance => session.trip == null || session.fix == null
       ? double.infinity
       : session.fix!.point.distanceTo(session.trip!.job.pickupPoint);
+  /// GB-52 (D-02): bán kính xác nhận đến điểm lấy hàng / hoàn tất giao hàng. Chỉ app kiểm tra, BE không kiểm tra lại.
+  static const arrivalRadiusM = 500.0;
+
+  /// GPS mới (nên đã có vị trí) và cách điểm giao không quá [arrivalRadiusM].
+  bool get atDropoff =>
+      fresh &&
+      session.trip != null &&
+      session.fix!.point.distanceTo(session.trip!.job.dropoffPoint) <=
+          arrivalRadiusM;
   bool get canArrive =>
       fresh &&
-      distance <= 500 &&
+      distance <= arrivalRadiusM &&
       session.trip?.stage == TripStage.accepted &&
       !paused &&
       !busy;
