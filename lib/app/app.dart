@@ -14,6 +14,7 @@ import 'driver_trip_scope.dart';
 import 'push_host.dart';
 import 'realtime_host.dart';
 import '../core/notifications/app_notice.dart';
+import '../core/notifications/notice_catalog.dart';
 import '../core/notifications/notification_cubit.dart';
 import '../core/notifications/realtime_source.dart';
 import '../core/widgets/notice_banner.dart';
@@ -178,10 +179,30 @@ class ModMoveApp extends StatelessWidget {
         providers: [
           BlocProvider(create: (_) => NotificationCubit()),
           BlocProvider(
-            create: (c) => PushCubit(
-              pushDevice ?? FirebasePushDevice(),
-              RemotePushTokenRepository(c.read<ApiClient>()),
-            ),
+            create: (c) {
+              final notices = c.read<NotificationCubit>();
+              return PushCubit(
+                pushDevice ?? FirebasePushDevice(),
+                RemotePushTokenRepository(c.read<ApiClient>()),
+                // App đang mở: hiện banner trong app thay cho thông báo hệ thống. SignalR gửi cùng nội dung,
+                // NotificationCubit chống trùng theo (type, orderId) nên chỉ hiện một lần.
+                onForeground: (message) {
+                  if (!message.actionable) return false;
+                  notices.push(
+                    noticeFor(
+                      message.type,
+                      data: {
+                        for (final e in message.data.entries)
+                          e.key: '${e.value}',
+                      },
+                      title: message.title,
+                      body: message.body,
+                    ),
+                  );
+                  return true;
+                },
+              );
+            },
           ),
           BlocProvider(
             create: (c) {
@@ -216,9 +237,14 @@ class ModMoveApp extends StatelessWidget {
   Widget _app(BuildContext context) {
     return BlocListener<AuthCubit, Session?>(
       listenWhen: (prev, next) => prev != null && next == null,
-      // Đăng xuất / phiên hết hạn → đóng các màn đang mở, về trang gốc
-      listener: (_, _) =>
-          navigatorKey.currentState?.popUntil((route) => route.isFirst),
+      // Đăng xuất / phiên hết hạn → bỏ mọi màn đang mở và dựng lại trang chủ công khai.
+      // Không dùng popUntil(isFirst): nhiều luồng tài xế đặt màn tài xế làm màn gốc
+      // (pushNamedAndRemoveUntil('/driver-home', ...)), khi đó đăng xuất vẫn ở lại màn tài xế
+      // và các API trả "phiên hết hạn". '/home' luôn đi qua _gate nên khách vãng lai thấy trang công khai.
+      listener: (_, _) => navigatorKey.currentState?.pushNamedAndRemoveUntil(
+        '/home',
+        (_) => false,
+      ),
       child: DriverTripScope(
         useBackend: _useBackend,
         navigatorKey: navigatorKey,
@@ -386,7 +412,14 @@ class ModMoveApp extends StatelessWidget {
   /// Chạm banner hoặc một mục trong hộp thông báo: mở màn hình liên quan. Mã lạ hoặc thiếu `orderId` thì không làm gì.
   void _openNotice(AppNotice notice) {
     final navigator = navigatorKey.currentState;
-    if (navigator == null) return;
+    final context = navigatorKey.currentContext;
+    if (navigator == null || context == null) return;
+    // ORDER_CANCELLED, ORDER_COMPLETED, INCIDENT_* tới cả khách và tài xế: tài xế không có màn chi tiết đơn
+    // của khách (api/customer/* trả 403), nên mở màn của tài xế.
+    if (context.read<AuthCubit>().state?.isDriver == true) {
+      _openDriverNotice(navigator, context, notice);
+      return;
+    }
     switch (notice.target) {
       case NoticeTarget.order || NoticeTarget.refund:
         final id = notice.orderId;
@@ -405,17 +438,61 @@ class ModMoveApp extends StatelessWidget {
     }
   }
 
-  /// Khách đã đăng nhập → app khách; còn lại → trang chủ công khai.
+  void _openDriverNotice(
+    NavigatorState navigator,
+    BuildContext context,
+    AppNotice notice,
+  ) {
+    final ongoing =
+        context.read<DriverTripRepository>().current.trip?.ongoing ?? false;
+    final incidentId = int.tryParse(notice.data['incidentId'] ?? '');
+    switch (notice.type) {
+      case 'NEW_MATCHING_ORDER':
+        navigator.pushNamedAndRemoveUntil('/driver-home', (_) => false);
+      case 'INCIDENT_REPORTED' || 'INCIDENT_IN_PROGRESS' || 'INCIDENT_DECIDED':
+        if (incidentId == null) {
+          navigator.pushNamed('/driver-incidents');
+        } else {
+          navigator.pushNamed('/driver-incident', arguments: incidentId);
+        }
+      case 'PICKUP_APPROVED' || 'PICKUP_REJECTED' || 'CASH_COLLECTED':
+        navigator.pushNamed(ongoing ? '/active-trip' : '/driver-trips');
+      case 'ORDER_CANCELLED' || 'ORDER_COMPLETED':
+        navigator.pushNamed('/driver-trips');
+      case 'RATING_RECEIVED':
+        navigator.pushNamed('/driver-ratings');
+      case 'WITHDRAWAL_DECIDED':
+        navigator.pushNamed('/driver-wallet');
+      case 'DRIVER_APPLICATION_APPROVED' ||
+          'DRIVER_APPLICATION_REJECTED' ||
+          'DRIVER_APPLICATION_SUBMITTED':
+        navigator.pushNamed('/profile');
+    }
+  }
+
+  /// Khách đã đăng nhập → app khách; tài xế đã đăng nhập → trang chủ tài xế (đã duyệt)
+  /// hoặc hồ sơ tài xế; chưa đăng nhập → trang chủ công khai.
+  /// (Trước đây tài xế rơi về trang công khai có nút "Đăng nhập" → trông như bị đăng xuất.)
   Widget _gate(BuildContext context) => BlocBuilder<AuthCubit, Session?>(
-    builder: (context, session) =>
-        session?.isCustomer == true ? const CustomerShell() : _home(context),
+    builder: (context, session) {
+      if (session?.isCustomer == true) return const CustomerShell();
+      if (session?.isDriver == true && _useBackend) {
+        return BlocBuilder<DriverController, DriverPresentationState>(
+          builder: (context, _) =>
+              context.read<DriverController>().canGoOnline
+                  ? const DriverDashboard()
+                  : _profile(context),
+        );
+      }
+      return _home(context);
+    },
   );
 
   /// Đăng nhập; tài xế vào luồng hồ sơ/nhận đơn hiện có, khách tự vào app khách.
-  Future<Session?> _login(BuildContext context) async {
+  Future<Session?> _login(BuildContext context, {bool registerDriver = false}) async {
     final session = await Navigator.push<Session>(
       context,
-      MaterialPageRoute(builder: (_) => const LoginScreen()),
+      MaterialPageRoute(builder: (_) => LoginScreen(startAsDriver: registerDriver)),
     );
     if (session != null && session.isDriver && context.mounted) {
       Navigator.pushNamed(context, '/profile');
@@ -427,7 +504,7 @@ class ModMoveApp extends StatelessWidget {
     onRegister: () async {
       // Nộp/xem hồ sơ cần tài khoản Driver trên BE: chưa đăng nhập thì đăng nhập trước.
       if (_useBackend && context.read<AuthCubit>().state?.isDriver != true) {
-        await _login(context);
+        await _login(context, registerDriver: context.read<AuthCubit>().state == null);
         return;
       }
       if (!context.mounted) return;
@@ -438,13 +515,19 @@ class ModMoveApp extends StatelessWidget {
             : '/profile',
       );
     },
-    onAccount: () => _login(context),
+    // Chế độ mô phỏng không có tài khoản BE: "Tài khoản" mở thẳng hồ sơ tài xế mô phỏng (như trước khi nối BE).
+    onAccount: () => _useBackend
+        ? _login(context)
+        : Navigator.pushNamed(context, '/profile'),
     onDeliver: () => _login(context),
   );
 
   Widget _profile(BuildContext context) => DriverProfileScreen(
     onDemo: () => Navigator.pushNamed(context, '/driver-demo'),
     onHistory: () => Navigator.pushNamed(context, '/driver-history'),
+    onWallet: _useBackend
+        ? () => Navigator.pushNamed(context, '/driver-wallet')
+        : null,
     onOrders: () {
       final trip = context.read<DriverTripRepository>().current.trip;
       if (trip?.ongoing ?? false) {
