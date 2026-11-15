@@ -184,17 +184,6 @@ class _RouteStep extends StatelessWidget {
                 value: d.pickupAddress,
                 onChanged: (v) => cubit.update((x) => x.copyWith(pickupAddress: v)),
               ),
-              _Text(
-                label: 'Tên người gửi',
-                value: d.senderName,
-                onChanged: (v) => cubit.update((x) => x.copyWith(senderName: v)),
-              ),
-              _Text(
-                label: 'SĐT người gửi',
-                value: d.senderPhone,
-                phone: true,
-                onChanged: (v) => cubit.update((x) => x.copyWith(senderPhone: v)),
-              ),
             ],
           ),
         ),
@@ -213,7 +202,7 @@ class _RouteStep extends StatelessWidget {
                 onChanged: (v) => cubit.update((x) => x.copyWith(receiverName: v)),
               ),
               _Text(
-                label: 'SĐT người nhận',
+                label: 'Số điện thoại người nhận',
                 value: d.receiverPhone,
                 phone: true,
                 onChanged: (v) => cubit.update((x) => x.copyWith(receiverPhone: v)),
