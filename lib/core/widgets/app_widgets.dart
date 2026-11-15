@@ -389,3 +389,32 @@ Future<void> showInfoSheet(
     ),
   ),
 );
+
+/// Một dòng trong danh sách cài đặt/tài khoản: icon + nhãn + mũi tên, bọc trong thẻ.
+class MenuTile extends StatelessWidget {
+  const MenuTile(this.icon, this.label, {super.key, this.onTap, this.color = AppColors.ink, this.leading});
+  final IconData icon;
+  final String label;
+  final VoidCallback? onTap;
+  final Color color;
+
+  /// Thay icon (vd. vòng xoay khi đang xử lý).
+  final Widget? leading;
+
+  @override
+  Widget build(BuildContext context) => Padding(
+    padding: const EdgeInsets.only(bottom: 8),
+    child: AppCard(
+      onTap: onTap,
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
+      child: Row(
+        children: [
+          leading ?? Icon(icon, size: 22, color: color == AppColors.ink ? AppColors.secondary : color),
+          const SizedBox(width: 12),
+          Expanded(child: Text(label, style: appText(weight: FontWeight.w600, color: color))),
+          const AppIcon('chevron-right', color: AppColors.muted, size: 20),
+        ],
+      ),
+    ),
+  );
+}
