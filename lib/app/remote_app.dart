@@ -16,6 +16,7 @@ import '../features/driver_trip/data/repositories/device_driver_location.dart';
 import '../features/driver_trip/data/repositories/remote_driver_trip_repository.dart';
 import '../features/driver_trip/data/services/driver_tracking_connection.dart';
 import 'app.dart';
+import 'customer_app.dart';
 import 'payment_return_cubit.dart';
 import '../features/notifications/data/firebase_push_device.dart';
 import '../features/notifications/data/remote_push_token_repository.dart';
@@ -91,7 +92,16 @@ class _RemoteAppState extends State<RemoteApp> with WidgetsBindingObserver {
       BlocProvider.value(value: _push),
     ],
     child: BlocBuilder<AuthCubit, AuthState>(
-      builder: (context, state) => state.stage == AuthStage.signedIn
+      builder: (context, state) =>
+          state.stage == AuthStage.guest ||
+              (state.stage == AuthStage.signedIn &&
+                  _api.session?.role == 'Customer')
+          ? CustomerApp(
+              key: ValueKey(_api.session?.userId ?? 'guest'),
+              api: _api,
+              guest: state.stage == AuthStage.guest,
+            )
+          : state.stage == AuthStage.signedIn
           ? _DriverSessionApp(
               key: ValueKey(_api.session!.userId),
               api: _api,

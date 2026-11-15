@@ -28,18 +28,21 @@ class ApiSession {
     this.accessToken,
     this.refreshToken,
     this.userId,
-    this.fullName,
-  );
+    this.fullName, {
+    this.role = 'Driver',
+  });
   final String accessToken, refreshToken, userId, fullName;
+  final String role;
   factory ApiSession.fromJson(Map<String, dynamic> json) {
-    if (json['role'] != 'Driver') {
-      throw const ApiFailure('Ứng dụng này dành cho tài khoản tài xế.');
+    if (!['Driver', 'Customer'].contains(json['role'])) {
+      throw const ApiFailure('Ứng dụng dành cho khách hàng và tài xế.');
     }
     return ApiSession(
       json['accessToken'] as String,
       json['refreshToken'] as String,
       '${json['userId']}',
       json['fullName'] as String,
+      role: json['role'] as String,
     );
   }
   Map<String, dynamic> toJson() => {
@@ -47,7 +50,7 @@ class ApiSession {
     'refreshToken': refreshToken,
     'userId': userId,
     'fullName': fullName,
-    'role': 'Driver',
+    'role': role,
   };
 }
 
@@ -273,6 +276,7 @@ class ApiClient {
   }
 
   static String _message(int status, String code) => switch (code) {
+    'OTP_INVALID' => 'Mã OTP không đúng hoặc đã hết hạn. Kiểm tra email hoặc yêu cầu gửi lại mã.',
     'EMAIL_NOT_VERIFIED' =>
       'Email chưa xác minh. Hãy xác minh OTP trước khi đăng nhập.',
     'VERIFY_PASSWORD_MISMATCH' =>

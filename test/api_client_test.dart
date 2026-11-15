@@ -4,7 +4,6 @@ import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 import 'package:modmove_mobile/core/network/api_client.dart';
 import 'package:modmove_mobile/features/auth/data/remote_auth_repository.dart';
-import 'package:modmove_mobile/features/auth/domain/auth_repository.dart';
 import 'support/remote_fixtures.dart';
 
 void main() {
@@ -91,20 +90,22 @@ void main() {
       ]);
     },
   );
-  test('customer login cannot enter the driver application', () async {
-    final api = ApiClient(
-      store: MemorySessionStore(),
-      client: MockClient(
-        (_) async => jsonResponse(tokens('access', 'Customer')),
-      ),
-    );
-    addTearDown(api.close);
-    await expectLater(
-      RemoteAuthRepository(api).login('x@y.z', 'password'),
-      throwsA(isA<AuthFailure>()),
-    );
-    expect(api.session, isNull);
-  });
+  test(
+    'customer session preserves its role for the customer application',
+    () async {
+      final api = ApiClient(
+        store: MemorySessionStore(),
+        client: MockClient(
+          (_) async => jsonResponse(tokens('access', 'Customer')),
+        ),
+      );
+      addTearDown(api.close);
+      await RemoteAuthRepository(api).login('x@y.z', 'password');
+      expect(api.session!.role, 'Customer');
+      await api.restore();
+      expect(api.session!.role, 'Customer');
+    },
+  );
   test(
     'ProblemDetails status/code is preserved without exposing server internals',
     () async {

@@ -31,6 +31,11 @@ Cross-platform mobile application built with **Flutter (Android)** supporting tw
 
 ## Run and review the mobile UI
 
+Customer accounts now open a separate BLoC application using the real backend: booking,
+payment, order tracking, pickup review, receipt confirmation, ratings, incidents and refunds.
+Registration lets the user choose Customer or Driver. See the [Customer API walkthrough](docs/customer-api.md)
+for all 18 tasks, backend rules and the live verification limits (MapVina, Cloudinary and Google Maps configuration).
+
 The app defaults to the real local backend at `http://10.0.2.2:5133` on Android Emulator. Start the backend, then run `flutter run` from this repository. See [backend API setup and sequential driver testing](docs/backend-api.md) for all 11 Driver tasks and the remaining Cloudinary/PayOS verification.
 
 The UI fixture commands below describe the earlier demo. Add `--dart-define=USE_MOCK_API=true` when reviewing those mock screens; `SCREEN` does not bypass authentication in real API mode.
