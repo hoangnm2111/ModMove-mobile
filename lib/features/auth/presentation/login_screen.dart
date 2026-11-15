@@ -1,9 +1,12 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
+import '../../../core/network/api_exception.dart';
 import '../../../core/session/session_store.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/widgets/app_widgets.dart';
+import '../../../core/widgets/brand_logo.dart';
 import '../../customer/domain/order_rules.dart';
 import '../../customer/presentation/widgets/customer_widgets.dart';
 import 'auth_cubit.dart';
@@ -11,14 +14,18 @@ import 'auth_cubit.dart';
 /// SCR-02/03/04 – Đăng nhập, đăng ký khách (UC-GST-01), quên mật khẩu (UC-CUS-02).
 /// Trả về [Session] khi đăng nhập thành công (Navigator.pop).
 class LoginScreen extends StatefulWidget {
-  const LoginScreen({super.key, this.startWithRegister = false});
+  const LoginScreen({super.key, this.startWithRegister = false, this.startAsDriver = false});
   final bool startWithRegister;
+
+  /// Mở sẵn tab đăng ký với vai trò tài xế (từ mục "Trở thành tài xế" ở trang chủ).
+  final bool startAsDriver;
   @override
   State<LoginScreen> createState() => _LoginScreenState();
 }
 
 class _LoginScreenState extends State<LoginScreen> {
-  late bool _register = widget.startWithRegister;
+  late bool _register = widget.startWithRegister || widget.startAsDriver;
+  late bool _asDriver = widget.startAsDriver;
   final _email = TextEditingController();
   final _password = TextEditingController();
   final _name = TextEditingController();
@@ -43,10 +50,9 @@ class _LoginScreenState extends State<LoginScreen> {
       if (mounted) Navigator.pop<Session>(context, session);
     } catch (e) {
       if (!mounted) return;
-      final msg = errorText(e);
-      showSnack(context, msg, error: true);
-      // Chưa xác minh email → mở bước OTP luôn
-      if (msg == 'Email chưa được xác minh. Vui lòng nhập mã OTP đã gửi tới email.') {
+      showSnack(context, errorText(e), error: true);
+      // Tài khoản cũ chưa xác minh email → mở bước OTP luôn (rẽ nhánh theo mã lỗi, không theo câu chữ).
+      if (e is ApiException && e.code == 'EMAIL_NOT_VERIFIED') {
         await _otp(purpose: 'Register');
       }
     } finally {
@@ -54,18 +60,40 @@ class _LoginScreenState extends State<LoginScreen> {
     }
   }
 
+  /// Kiểm tra form đăng ký; trả về false và báo lỗi nếu còn thiếu.
+  bool _registerFormValid() {
+    final error = _name.text.trim().isEmpty
+        ? 'Nhập họ tên.'
+        : !InputRules.phone(_phone.text)
+        ? 'Số điện thoại không hợp lệ.'
+        : !InputRules.email(_email.text)
+        ? 'Email không hợp lệ (không dùng dấu tiếng Việt).'
+        : !InputRules.password(_password.text)
+        ? 'Mật khẩu từ 8 đến 100 ký tự.'
+        : null;
+    if (error != null) showSnack(context, error, error: true);
+    return error == null;
+  }
+
   Future<void> _doRegister() async {
-    if (_name.text.trim().isEmpty) return showSnack(context, 'Nhập họ tên.', error: true);
-    if (!InputRules.phone(_phone.text)) return showSnack(context, 'Số điện thoại không hợp lệ.', error: true);
-    if (!InputRules.email(_email.text)) return showSnack(context, 'Email không hợp lệ.', error: true);
-    if (!InputRules.password(_password.text)) return showSnack(context, 'Mật khẩu từ 8 đến 100 ký tự.', error: true);
+    if (!_registerFormValid()) return;
     setState(() => _busy = true);
+    // BE chỉ gửi OTP ở bước này; tài khoản được tạo khi xác minh thành công.
     final ok = await runAction(
       context,
-      () => context.read<AuthCubit>().api.register(fullName: _name.text, phone: _phone.text, email: _email.text, password: _password.text),
+      () => context.read<AuthCubit>().api.register(fullName: _name.text, phone: _phone.text, email: _email.text, password: _password.text, asDriver: _asDriver),
+      success: 'Đã gửi mã OTP tới email. Nhập mã để hoàn tất đăng ký.',
     );
     if (mounted) setState(() => _busy = false);
     if (ok && mounted) await _otp(purpose: 'Register');
+  }
+
+  /// Đã đăng ký và có mã nhưng lỡ đóng bước OTP: mở lại mà không gửi thêm mã (BE giới hạn số lần gửi).
+  Future<void> _haveCode() async {
+    if (!InputRules.email(_email.text) || !InputRules.password(_password.text)) {
+      return showSnack(context, 'Nhập email và mật khẩu đã dùng khi đăng ký.', error: true);
+    }
+    await _otp(purpose: 'Register');
   }
 
   /// Nhập OTP 6 số (GB-25): xác minh email rồi tự đăng nhập.
@@ -90,15 +118,21 @@ class _LoginScreenState extends State<LoginScreen> {
 
   @override
   Widget build(BuildContext context) => Scaffold(
-    appBar: AppHeader(_register ? 'Đăng ký khách hàng' : 'Đăng nhập'),
+    appBar: AppHeader(_register ? (_asDriver ? 'Đăng ký tài xế' : 'Đăng ký khách hàng') : 'Đăng nhập'),
     body: SafeArea(
       child: ListView(
         padding: const EdgeInsets.fromLTRB(20, 8, 20, 24),
         children: [
-          Text('ModMove', style: appText(size: 30, weight: FontWeight.w800, color: AppColors.orange, spacing: -1)),
+          Row(
+            children: [
+              const BrandLogo(size: 40),
+              const SizedBox(width: 10),
+              Text('ModMove', style: appText(size: 30, weight: FontWeight.w800, color: AppColors.orange, spacing: -1)),
+            ],
+          ),
           const SizedBox(height: 4),
           Text(
-            _register ? 'Tạo tài khoản để đặt xe và theo dõi đơn hàng.' : 'Dùng chung cho khách hàng và tài xế.',
+            _register ? (_asDriver ? 'Tạo tài khoản tài xế, sau đó nộp hồ sơ để được duyệt.' : 'Tạo tài khoản để đặt xe và theo dõi đơn hàng.') : 'Dùng chung cho khách hàng và tài xế.',
             style: appText(color: AppColors.secondary),
           ),
           const SizedBox(height: 20),
@@ -110,6 +144,18 @@ class _LoginScreenState extends State<LoginScreen> {
             selected: {_register},
             onSelectionChanged: (s) => setState(() => _register = s.first),
           ),
+          if (_register) ...[
+            const SizedBox(height: 12),
+            SegmentedButton<bool>(
+              key: const Key('register-role'),
+              segments: const [
+                ButtonSegment(value: false, label: Text('Khách hàng'), icon: Icon(Icons.person_outline)),
+                ButtonSegment(value: true, label: Text('Tài xế'), icon: Icon(Icons.local_shipping_outlined)),
+              ],
+              selected: {_asDriver},
+              onSelectionChanged: (s) => setState(() => _asDriver = s.first),
+            ),
+          ],
           const SizedBox(height: 18),
           if (_register) ...[
             _field(_name, 'Họ và tên', icon: Icons.person_outline),
@@ -138,11 +184,20 @@ class _LoginScreenState extends State<LoginScreen> {
           else
             const SizedBox(height: 16),
           PrimaryButton(_register ? 'Đăng ký' : 'Đăng nhập', busy: _busy, onPressed: _register ? _doRegister : _login),
+          if (_register)
+            Align(
+              child: TextButton(key: const Key('register-have-code'), onPressed: _busy ? null : _haveCode, child: const Text('Tôi đã có mã OTP')),
+            ),
           const SizedBox(height: 16),
           if (_register)
-            const Notice('Mật khẩu 8–100 ký tự. Mã OTP 6 số được gửi tới email, hiệu lực 5 phút.', icon: 'info')
+            Notice(
+              _asDriver
+                  ? 'Mật khẩu 8–100 ký tự. Mã OTP 6 số gửi tới email, hiệu lực 5 phút. Sau khi xác minh, bạn nộp giấy phép lái xe và giấy tờ xe để được duyệt.'
+                  : 'Mật khẩu 8–100 ký tự. Mã OTP 6 số được gửi tới email, hiệu lực 5 phút.',
+              icon: 'info',
+            )
           else
-            const Notice('Tài xế đăng ký tài khoản trong mục "Trở thành tài xế ModMove" ở trang chủ.', icon: 'info'),
+            const Notice('Chưa có tài khoản? Chọn "Đăng ký" rồi chọn Khách hàng hoặc Tài xế.', icon: 'info'),
         ],
       ),
     ),
@@ -198,6 +253,7 @@ class _OtpSheetState extends State<_OtpSheet> {
         TextField(
           controller: _code,
           keyboardType: TextInputType.number,
+          inputFormatters: [FilteringTextInputFormatter.digitsOnly],
           maxLength: 6,
           textAlign: TextAlign.center,
           style: appText(size: 22, weight: FontWeight.w700, spacing: 6),
@@ -268,7 +324,7 @@ class _ForgotSheetState extends State<_ForgotSheet> {
         TextField(controller: _email, keyboardType: TextInputType.emailAddress, decoration: const InputDecoration(labelText: 'Email')),
         if (_sent) ...[
           const SizedBox(height: 12),
-          TextField(controller: _code, keyboardType: TextInputType.number, maxLength: 6, decoration: const InputDecoration(labelText: 'Mã OTP', counterText: '')),
+          TextField(controller: _code, keyboardType: TextInputType.number, inputFormatters: [FilteringTextInputFormatter.digitsOnly], maxLength: 6, decoration: const InputDecoration(labelText: 'Mã OTP', counterText: '')),
           const SizedBox(height: 12),
           TextField(controller: _password, obscureText: true, decoration: const InputDecoration(labelText: 'Mật khẩu mới')),
         ],

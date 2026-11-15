@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../../core/theme/app_theme.dart';
+import '../../../core/widgets/brand_logo.dart';
 import '../../../core/widgets/notice_banner.dart';
 import '../../notifications/notifications_screen.dart';
 import '../../../core/widgets/app_widgets.dart';
@@ -122,6 +123,8 @@ class _HomeTabState extends State<_HomeTab> {
           children: [
             Row(
               children: [
+                const BrandLogo(size: 40),
+                const SizedBox(width: 12),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -171,11 +174,12 @@ class _HomeTabState extends State<_HomeTab> {
             FutureBuilder<Paged<OrderSummary>>(
               future: _active,
               builder: (_, snap) {
-                if (snap.connectionState != ConnectionState.done)
+                if (snap.connectionState != ConnectionState.done) {
                   return const Padding(
                     padding: EdgeInsets.all(20),
                     child: Center(child: CircularProgressIndicator()),
                   );
+                }
                 if (snap.hasError) {
                   return ErrorView(
                     errorText(snap.error!),
