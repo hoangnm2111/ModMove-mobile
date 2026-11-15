@@ -3,6 +3,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../../core/session/session_store.dart';
 import '../../../core/theme/app_theme.dart';
+import '../../../core/widgets/notice_banner.dart';
 import 'auth_cubit.dart';
 
 /// Nút "Đăng xuất" dùng chung cho khách và tài xế: hỏi lại, gọi `POST /account/Logout`
@@ -37,8 +38,10 @@ class _LogoutButtonState extends State<LogoutButton> {
     );
     if (ok != true || !mounted) return;
     setState(() => _busy = true);
+    final notices = maybeNotices(context);
     try {
       await auth.logout();
+      if (notices != null) notifyAfterSignOut(notices, 'LOGGED_OUT');
     } finally {
       if (mounted) setState(() => _busy = false);
     }
