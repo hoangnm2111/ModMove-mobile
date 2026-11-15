@@ -93,10 +93,12 @@ class RealtimeBridge {
 
   /// Đăng xuất / hết phiên: ngắt kết nối, bỏ nghe và xoá hộp thông báo.
   Future<void> stop() async {
+    // Xoá ngay (đồng bộ) trước khi chờ ngắt kết nối: thông báo "đã đăng xuất / đã xoá tài khoản" đẩy sau đó
+    // không bị lệnh xoá đến muộn cuốn mất.
+    _cubit.clear();
     await _subscription?.cancel();
     _subscription = null;
     await _source.stop();
-    _cubit.clear();
   }
 
   void _onPayload(Map<String, Object?> payload) {

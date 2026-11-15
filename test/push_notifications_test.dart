@@ -185,6 +185,29 @@ void main() {
     expect(device.shown, 1);
   });
 
+  test('app đang mở và đã tự hiện banner thì không tạo thêm thông báo hệ thống (tránh trùng với SignalR)', () async {
+    final handled = <String>[];
+    final own = PushCubit(
+      device,
+      registration,
+      onForeground: (message) {
+        handled.add(message.type);
+        return message.type != 'UNKNOWN_TYPE';
+      },
+    );
+    addTearDown(own.close);
+    await own.initialize();
+    await own.attach('8');
+    device.foreground.add(decided);
+    await flush();
+    expect(handled, ['INCIDENT_DECIDED']);
+    expect(device.shown, 0);
+    // App không tự hiện được (trả false) thì vẫn rơi về thông báo hệ thống, không mất thông báo.
+    device.foreground.add(const PushMessage(id: 'x', data: {'type': 'UNKNOWN_TYPE'}));
+    await flush();
+    expect(device.shown, 1);
+  });
+
   test('phiên hết hạn huỷ lần gắn đang chờ dọn máy', () async {
     await push.initialize();
     device.clearGate = Completer<void>();

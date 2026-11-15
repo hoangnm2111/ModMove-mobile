@@ -31,6 +31,22 @@ void notify(BuildContext context, String type, [Map<String, String> data = const
   _fallbackSnack(context, notice.body.isEmpty ? notice.title : notice.body, error: notice.kind == NoticeKind.error);
 }
 
+/// Báo kết quả của thao tác làm mất phiên đăng nhập (đăng xuất, xoá tài khoản). Khi phiên kết thúc app xoá sạch
+/// hộp thông báo và màn hiện tại bị đóng, nên phải lấy [cubit] trước khi thao tác và đẩy ở khung hình kế tiếp.
+void notifyAfterSignOut(NotificationCubit cubit, String type, {String? body}) {
+  WidgetsBinding.instance.addPostFrameCallback((_) => cubit.push(noticeFor(type, body: body)));
+  WidgetsBinding.instance.scheduleFrame();
+}
+
+/// [NotificationCubit] nếu có (màn dựng riêng trong test thì không có).
+NotificationCubit? maybeNotices(BuildContext context) {
+  try {
+    return context.read<NotificationCubit>();
+  } on ProviderNotFoundException {
+    return null;
+  }
+}
+
 /// Câu ngắn của thao tác (kết quả hoặc lỗi nhập liệu): hiện banner trên đỉnh màn, thay cho SnackBar.
 void showNotice(BuildContext context, String text, {bool error = false}) => notify(context, error ? 'ACTION_ERROR' : 'ACTION_DONE', const {}, text);
 
