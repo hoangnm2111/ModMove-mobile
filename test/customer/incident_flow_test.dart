@@ -36,10 +36,28 @@ Map<String, dynamic> _incident(int id, {required bool byYou, String status = 'Op
   'resolvedAt': null,
 };
 
+Map<String, dynamic> _refund(int id, String source, {int? incidentId, String status = 'Requested', String reason = 'Lý do hoàn tiền'}) => {
+  'id': id,
+  'orderId': 8,
+  'orderCode': 'MM20261104008',
+  'incidentId': incidentId,
+  'sourceType': source,
+  'refundStatus': status,
+  'reason': reason,
+  'requestedAmount': 100000,
+  'approvedAmount': null,
+  'decisionReason': null,
+  'waitingForYourReply': false,
+  'needsPayoutAccount': true,
+  'evidenceUrls': <String>[],
+  'createdAt': '2026-11-11T14:00:00Z',
+};
+
 class _Backend {
-  _Backend({this.pendingId, this.incidents = const []});
+  _Backend({this.pendingId, this.incidents = const [], this.refunds = const []});
   int? pendingId;
   List<Map<String, dynamic>> incidents;
+  List<Map<String, dynamic>> refunds;
   final calls = <String>[];
   final bodies = <String, Object?>{};
   bool approveFails = false;
@@ -60,7 +78,10 @@ class _Backend {
     }
     if (p.endsWith('/customer/Incidents') && req.method == 'GET') return _json(paged(incidents));
     if (p.endsWith('/customer/Incidents') && req.method == 'POST') return _json({'incidentId': 99}, 201);
-    if (p.endsWith('/customer/Refunds') || p.endsWith('/customer/Ratings')) return _json(paged([]));
+    if (p.endsWith('/customer/Refunds') && req.method == 'GET') return _json(paged(refunds));
+    final detail = RegExp(r'/customer/Refunds/(\d+)$').firstMatch(p);
+    if (detail != null) return _json(refunds.firstWhere((r) => r['id'] == int.parse(detail.group(1)!)));
+    if (p.endsWith('/customer/Ratings')) return _json(paged([]));
     return _json({'code': 'NOT_FOUND'}, 404);
   }
 }
@@ -120,6 +141,54 @@ void main() {
     expect(find.textContaining('Báo cáo đã bị hủy: Trùng báo cáo'), findsOneWidget);
   });
 
+  testWidgets('khoản hoàn của sự cố nằm trong thẻ sự cố; chỉ khiếu nại / hoàn huỷ đơn ở thẻ Hoàn tiền; còn khoản mở thì ẩn nút gửi thêm', (tester) async {
+    tester.view.physicalSize = const Size(420, 2600);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+    final backend = _Backend(
+      incidents: [
+        _incident(22, byYou: true),
+        _incident(23, byYou: true, status: 'Resolved', decision: 'ContinueTrip', note: 'Đã kiểm tra'),
+      ],
+      refunds: [
+        _refund(5, 'Incident', incidentId: 22, reason: 'Bồi thường vỏ thùng móp'),
+        _refund(6, 'Complaint', reason: 'Giao trễ 2 giờ'),
+      ],
+    );
+    await tester.pumpWidget(_app(backend, (_) => const OrderDetailScreen(orderId: 8)));
+    await tester.pumpAndSettle();
+    await tester.scrollUntilVisible(find.text('BẠN BÁO'), 300, scrollable: find.byType(Scrollable).first);
+
+    // Thẻ sự cố #22 chứa khoản hoàn #5; thẻ riêng chỉ còn khiếu nại #6.
+    expect(find.text('Hoàn do sự cố #5'), findsOneWidget);
+    expect(find.text('Bồi thường vỏ thùng móp'), findsOneWidget);
+    expect(find.text('Sự cố (2)'), findsOneWidget);
+    await tester.scrollUntilVisible(find.text('Hoàn tiền & khiếu nại (1)'), 300, scrollable: find.byType(Scrollable).first);
+    expect(find.text('Hoàn tiền & khiếu nại (1)'), findsOneWidget);
+    expect(find.text('Khiếu nại #6'), findsOneWidget);
+    expect(find.text('Giao trễ 2 giờ'), findsOneWidget);
+
+    // Sự cố #22 đang có khoản hoàn mở nên không có nút gửi thêm; sự cố #23 chưa có thì còn nút.
+    expect(find.text('Yêu cầu hoàn tiền cho sự cố này'), findsOneWidget);
+  });
+
+  testWidgets('Dispatcher huỷ đơn vì sự cố: khoản hoàn (Cancellation + incidentId) nằm trong thẻ sự cố, không lặp ở thẻ Hoàn tiền', (tester) async {
+    tester.view.physicalSize = const Size(420, 2600);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+    final backend = _Backend(
+      incidents: [_incident(22, byYou: true, status: 'Resolved', decision: 'CancelOrder', note: 'Chấp nhận')],
+      refunds: [_refund(7, 'Cancellation', incidentId: 22, reason: 'Chấp Nhận')],
+    );
+    await tester.pumpWidget(_app(backend, (_) => const OrderDetailScreen(orderId: 8)));
+    await tester.pumpAndSettle();
+    await tester.scrollUntilVisible(find.text('BẠN BÁO'), 300, scrollable: find.byType(Scrollable).first);
+
+    expect(find.text('Hoàn do huỷ đơn #7'), findsOneWidget);
+    expect(find.textContaining('Hoàn tiền & khiếu nại'), findsNothing);
+    expect(find.text('Yêu cầu hoàn tiền cho sự cố này'), findsNothing);
+  });
+
   testWidgets('không có sự cố chặn: nút duyệt bấm được', (tester) async {
     tester.view.physicalSize = const Size(420, 1800);
     tester.view.devicePixelRatio = 1;
@@ -148,7 +217,7 @@ void main() {
     expect(_approve(tester).onPressed, isNull);
   });
 
-  testWidgets('form báo sự cố: lý do nhanh chọn đúng loại và điền câu mở đầu rồi gửi lên BE', (tester) async {
+  testWidgets('form báo sự cố của khách: chỉ điền mô tả, loại luôn là Other, gửi đúng chữ khách nhập', (tester) async {
     tester.view.physicalSize = const Size(420, 1800);
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.reset);
@@ -158,16 +227,23 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.textContaining('Tài xế chỉ nhận thông báo chung'), findsOneWidget);
 
-    await tester.tap(find.byKey(const ValueKey('incident-reason-Hàng hư hỏng')));
-    await tester.pump();
+    // Không có nút "Lý do nhanh" và không có ô chọn loại; mô tả để trống.
+    expect(find.text('Lý do nhanh'), findsNothing);
+    expect(find.text('Loại sự cố'), findsNothing);
+    expect(find.byType(ChoiceChip), findsNothing);
     final field = tester.widget<TextField>(find.byKey(const Key('customer-incident-description')));
-    expect(field.controller!.text, startsWith('Hàng bị hư hỏng'));
+    expect(field.controller!.text, isEmpty);
 
-    await tester.enterText(find.byKey(const Key('customer-incident-description')), 'Hàng bị hư hỏng: thùng số 2 bị móp');
+    // Gửi trống bị chặn, không gọi BE.
+    await tester.tap(find.text('Gửi báo cáo'));
+    await tester.pumpAndSettle();
+    expect(backend.bodies['POST /customer/Incidents'], isNull);
+
+    await tester.enterText(find.byKey(const Key('customer-incident-description')), 'Thùng số 2 bị móp khi bốc lên xe');
     await tester.tap(find.text('Gửi báo cáo'));
     await tester.pumpAndSettle();
     final body = backend.bodies['POST /customer/Incidents'] as Map?;
-    expect(body?['incidentType'], 'DamagedCargo');
-    expect(body?['description'], 'Hàng bị hư hỏng: thùng số 2 bị móp');
+    expect(body?['incidentType'], 'Other');
+    expect(body?['description'], 'Thùng số 2 bị móp khi bốc lên xe');
   });
 }

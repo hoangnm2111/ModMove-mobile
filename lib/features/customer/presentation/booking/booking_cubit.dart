@@ -11,8 +11,6 @@ import '../../domain/order_rules.dart';
 class BookingDraft {
   const BookingDraft({
     this.pickupAddress = '',
-    this.senderName = '',
-    this.senderPhone = '',
     this.dropoffAddress = '',
     this.receiverName = '',
     this.receiverPhone = '',
@@ -34,7 +32,8 @@ class BookingDraft {
     this.agreedWarranty = false,
   });
 
-  final String pickupAddress, senderName, senderPhone, dropoffAddress, receiverName, receiverPhone;
+  /// Người gửi là chính tài khoản đang đặt (BE không có trường người gửi riêng) nên không hỏi lại.
+  final String pickupAddress, dropoffAddress, receiverName, receiverPhone;
   final String cargoType, description, specialNotes, couponCode, paymentMethod, payerRole;
   final int quantity, lengthCm, widthCm, heightCm;
   final double weightKg;
@@ -44,8 +43,6 @@ class BookingDraft {
 
   BookingDraft copyWith({
     String? pickupAddress,
-    String? senderName,
-    String? senderPhone,
     String? dropoffAddress,
     String? receiverName,
     String? receiverPhone,
@@ -68,8 +65,6 @@ class BookingDraft {
     bool? agreedWarranty,
   }) => BookingDraft(
     pickupAddress: pickupAddress ?? this.pickupAddress,
-    senderName: senderName ?? this.senderName,
-    senderPhone: senderPhone ?? this.senderPhone,
     dropoffAddress: dropoffAddress ?? this.dropoffAddress,
     receiverName: receiverName ?? this.receiverName,
     receiverPhone: receiverPhone ?? this.receiverPhone,
@@ -192,7 +187,6 @@ class BookingCubit extends Cubit<BookingState> {
     switch (step) {
       case 0:
         if (!InputRules.address(d.pickupAddress)) return 'Nhập điểm lấy hàng cụ thể.';
-        if (d.senderName.trim().isEmpty || !InputRules.phone(d.senderPhone)) return 'Nhập tên và số điện thoại người gửi hợp lệ.';
         if (!InputRules.address(d.dropoffAddress)) return 'Nhập điểm giao hàng cụ thể.';
         if (d.receiverName.trim().isEmpty || !InputRules.phone(d.receiverPhone)) return 'Nhập tên và số điện thoại người nhận hợp lệ.';
         return null;
@@ -202,6 +196,7 @@ class BookingCubit extends Cubit<BookingState> {
         if (d.lengthCm <= 0 || d.widthCm <= 0 || d.heightCm <= 0) return 'Nhập kích thước món lớn nhất.';
         if (d.photos.length < OrderRules.minCargoPhotos) return 'Thêm ít nhất 1 ảnh hàng hoá.';
         if (!d.noProhibitedCargo) return 'Vui lòng cam kết không gửi hàng cấm.';
+        if ((_notes(d) ?? '').length > OrderRules.maxSpecialNotes) return 'Mô tả và ghi chú tối đa ${OrderRules.maxSpecialNotes} ký tự.';
         return null;
       case 2:
         final v = state.vehicle;
@@ -237,32 +232,45 @@ class BookingCubit extends Cubit<BookingState> {
     final seq = ++_estimateSeq;
     final d = state.draft;
     emit(state.copyWith(estimating: true, clearErrors: true));
+    Future<FareEstimate> call(String coupon) => api.fareEstimate(
+      vehicleTypeId: d.vehicleTypeId!,
+      pickupAddress: d.pickupAddress.trim(),
+      dropoffAddress: d.dropoffAddress.trim(),
+      weightKg: d.weightKg,
+      lengthCm: d.lengthCm,
+      widthCm: d.widthCm,
+      heightCm: d.heightCm,
+      hasLoadingService: d.loadingService,
+      couponCode: coupon,
+    );
     try {
-      final e = await api.fareEstimate(
-        vehicleTypeId: d.vehicleTypeId!,
-        pickupAddress: d.pickupAddress.trim(),
-        dropoffAddress: d.dropoffAddress.trim(),
-        weightKg: d.weightKg,
-        lengthCm: d.lengthCm,
-        widthCm: d.widthCm,
-        heightCm: d.heightCm,
-        hasLoadingService: d.loadingService,
-        couponCode: d.couponCode.trim(),
-      );
+      final e = await call(d.couponCode.trim());
       if (seq == _estimateSeq && !isClosed) emit(state.copyWith(estimate: e, estimating: false));
     } catch (e) {
       if (seq != _estimateSeq || isClosed) return;
       final code = e is ApiException ? e.code : null;
       final msg = e is ApiException ? e.message : 'Không tính được giá.';
-      emit(
-        state.copyWith(
-          estimating: false,
-          clearEstimate: true,
-          couponError: code != null && code.startsWith('COUPON_') ? msg : null,
-          estimateError: code != null && code.startsWith('COUPON_') ? null : msg,
-        ),
-      );
+      if (code != null && code.startsWith('COUPON_')) {
+        // Mã không dùng được (ví dụ chưa đủ giá trị tối thiểu): vẫn báo giá KHÔNG có mã để khách thấy số tiền và hiểu vì sao,
+        // thay vì hiện 0 ₫. Lỗi mã vẫn chặn nút đặt đơn (xem validate bước 3) cho tới khi bỏ hoặc đổi mã.
+        FareEstimate? base;
+        try {
+          base = await call('');
+        } catch (_) {
+          base = null;
+        }
+        if (seq != _estimateSeq || isClosed) return;
+        emit(state.copyWith(estimating: false, estimate: base, clearEstimate: base == null, couponError: msg));
+        return;
+      }
+      emit(state.copyWith(estimating: false, clearEstimate: true, estimateError: msg));
     }
+  }
+
+  /// BE chỉ có một ô ghi chú (≤ 500 ký tự): gộp mô tả hàng và ghi chú đặc biệt; trống thì gửi null.
+  static String? _notes(BookingDraft d) {
+    final text = [d.description.trim(), d.specialNotes.trim()].where((s) => s.isNotEmpty).join(' • ');
+    return text.isEmpty ? null : text;
   }
 
   /// UC-GST-17: POST /customer/Orders kèm expectedTotalFee (FARE_CHANGED nếu giá đổi).
@@ -284,9 +292,7 @@ class BookingCubit extends Cubit<BookingState> {
           'widthCm': d.widthCm,
           'heightCm': d.heightCm,
           'photoUrls': d.photos,
-          'specialNotes': [d.description.trim(), d.specialNotes.trim()].where((s) => s.isNotEmpty).join(' • ').isEmpty
-              ? null
-              : [d.description.trim(), d.specialNotes.trim()].where((s) => s.isNotEmpty).join(' • '),
+          'specialNotes': _notes(d),
         },
         'hasLoadingService': d.loadingService,
         'couponCode': d.couponCode.trim().isEmpty ? null : d.couponCode.trim(),

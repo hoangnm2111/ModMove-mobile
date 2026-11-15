@@ -369,10 +369,16 @@ class PayoutAccountView {
 
 /// Tài khoản nhận hoàn tiền khách nhập (BE: PayoutAccountInput). `bankCode` lấy từ lookups/banks.
 class PayoutAccountInput {
-  const PayoutAccountInput({required this.bankCode, required this.accountNumber, required this.accountHolder});
-  final String bankCode, accountNumber, accountHolder;
+  const PayoutAccountInput({required this.bankCode, required this.accountNumber, required this.accountHolder}) : useSuggested = false;
 
-  Map<String, Object?> toJson() => {'useSuggested': false, 'bankCode': bankCode, 'accountNumber': accountNumber, 'accountHolder': accountHolder};
+  /// FE-07: dùng tài khoản đã thanh toán PayOS cho đơn (BE tự chép, app không gửi lại số tài khoản).
+  const PayoutAccountInput.suggested() : bankCode = '', accountNumber = '', accountHolder = '', useSuggested = true;
+  final String bankCode, accountNumber, accountHolder;
+  final bool useSuggested;
+
+  Map<String, Object?> toJson() => useSuggested
+      ? {'useSuggested': true, 'bankCode': null, 'accountNumber': null, 'accountHolder': null}
+      : {'useSuggested': false, 'bankCode': bankCode, 'accountNumber': accountNumber, 'accountHolder': accountHolder};
 
   /// Chữ in hoa không dấu, chỉ A–Z và dấu cách (yêu cầu của ngân hàng).
   static String normalizeHolder(String text) {
@@ -418,9 +424,17 @@ class MyRefund {
     this.payoutAccount,
     this.payoutFailureReason,
     this.bankReferenceCode,
+    this.suggestedPayoutAccount,
+    this.incidentId,
   });
+
+  /// Chỉ có ở chi tiết khoản hoàn (GET /customer/Refunds/{id}): sự cố mà khoản hoàn do sự cố thuộc về.
+  final int? incidentId;
   final bool needsPayoutAccount;
   final PayoutAccountView? payoutAccount;
+
+  /// Tài khoản đã thanh toán PayOS cho đơn (số đã che), BE gợi ý khi khoản hoàn cần tài khoản nhận.
+  final PayoutAccountView? suggestedPayoutAccount;
   final String? payoutFailureReason, bankReferenceCode;
   final int id, orderId;
   final String sourceType, status, reason;
@@ -452,7 +466,12 @@ class MyRefund {
     payoutAccount: PayoutAccountView.from(j['payoutAccount']),
     payoutFailureReason: j['payoutFailureReason'] as String?,
     bankReferenceCode: j['bankReferenceCode'] as String?,
+    suggestedPayoutAccount: PayoutAccountView.from(j['suggestedPayoutAccount']),
+    incidentId: j['incidentId'] == null ? null : _i(j['incidentId']),
   );
+
+  /// Khoản hoàn còn đang xử lý (BE chỉ cho một yêu cầu mở cho mỗi sự cố).
+  bool get isOpen => status == 'Requested' || status == 'Approved' || status == 'Failed';
 }
 
 class Profile {

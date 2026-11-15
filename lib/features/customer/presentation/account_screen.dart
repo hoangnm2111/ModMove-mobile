@@ -3,6 +3,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../../core/theme/app_theme.dart';
 import '../../../core/widgets/app_widgets.dart';
+import '../../../core/widgets/notice_banner.dart';
 import '../../auth/presentation/auth_cubit.dart';
 import '../../auth/presentation/logout_button.dart';
 import '../data/customer_api.dart';
@@ -74,7 +75,16 @@ class _AccountScreenState extends State<AccountScreen> {
             }),
             _tile('lock', 'Đổi mật khẩu', () => _sheet(context, const _ChangePassword())),
             _tile('bell', 'Thông báo', () => Navigator.pushNamed(context, '/notifications')),
-            _tile('shield', 'Chính sách & điều khoản', () => Navigator.push(context, MaterialPageRoute<void>(builder: (_) => const _PoliciesScreen()))),
+            _tile(
+              'info',
+              'Giới thiệu ModMove',
+              () => Navigator.push(context, MaterialPageRoute<void>(builder: (_) => _InfoListScreen(title: 'Giới thiệu ModMove', load: context.read<CustomerApi>().serviceInfo))),
+            ),
+            _tile(
+              'shield',
+              'Chính sách & điều khoản',
+              () => Navigator.push(context, MaterialPageRoute<void>(builder: (_) => _InfoListScreen(title: 'Chính sách & điều khoản', load: context.read<CustomerApi>().policies))),
+            ),
             _tile('headphones', 'Gửi yêu cầu hỗ trợ', () => showSupportSheet(context, name: p.fullName, contact: p.email)),
             _tile('warning', 'Xoá tài khoản', () => _deleteAccount(context), color: AppColors.red),
             const SizedBox(height: 16),
@@ -123,7 +133,12 @@ class _AccountScreenState extends State<AccountScreen> {
     );
     if (ok != true || !context.mounted) return;
     final auth = context.read<AuthCubit>();
-    if (await runAction(context, () => context.read<CustomerApi>().deleteAccount(), success: 'Tài khoản đã được xoá.')) await auth.expire();
+    final notices = maybeNotices(context);
+    if (await runAction(context, () => context.read<CustomerApi>().deleteAccount())) {
+      await auth.expire();
+      // Phiên kết thúc thì hộp thông báo bị xoá: báo kết quả sau khi đã về trang chủ.
+      if (notices != null) notifyAfterSignOut(notices, 'ACTION_DONE', body: 'Tài khoản đã được vô hiệu hoá.');
+    }
   }
 }
 
@@ -249,16 +264,27 @@ class _ChangePasswordState extends State<_ChangePassword> {
   );
 }
 
-class _PoliciesScreen extends StatelessWidget {
-  const _PoliciesScreen();
+/// Danh sách nội dung công khai do Admin nhập (chính sách hoặc giới thiệu dịch vụ): mỗi mục mở ra để đọc.
+class _InfoListScreen extends StatefulWidget {
+  const _InfoListScreen({required this.title, required this.load});
+  final String title;
+  final Future<List<LookupItem>> Function() load;
+  @override
+  State<_InfoListScreen> createState() => _InfoListScreenState();
+}
+
+class _InfoListScreenState extends State<_InfoListScreen> {
+  late Future<List<LookupItem>> _items = widget.load();
+
   @override
   Widget build(BuildContext context) => Scaffold(
-    appBar: const AppHeader('Chính sách & điều khoản'),
+    appBar: AppHeader(widget.title),
     body: FutureBuilder<List<LookupItem>>(
-      future: context.read<CustomerApi>().policies(),
+      future: _items,
       builder: (_, snap) {
         if (snap.connectionState != ConnectionState.done) return const Center(child: CircularProgressIndicator());
-        if (snap.hasError) return Center(child: Text(errorText(snap.error!)));
+        if (snap.hasError) return ErrorView(errorText(snap.error!), onRetry: () => setState(() => _items = widget.load()));
+        if (snap.data!.isEmpty) return const EmptyView('Chưa có nội dung.');
         return ListView(
           padding: const EdgeInsets.all(14),
           children: [
@@ -272,7 +298,8 @@ class _PoliciesScreen extends StatelessWidget {
                 child: ExpansionTile(
                   title: Text(p.name, style: appText(weight: FontWeight.w700)),
                   childrenPadding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-                  children: [Text(p.description ?? 'Chưa có nội dung.', style: appText(size: 13.5, color: AppColors.secondary))],
+                  expandedCrossAxisAlignment: CrossAxisAlignment.start,
+                  children: [Text((p.description ?? '').trim().isEmpty ? 'Nội dung đang được cập nhật.' : p.description!, style: appText(size: 13.5, color: AppColors.secondary))],
                 ),
               ),
           ],

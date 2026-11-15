@@ -148,6 +148,8 @@ class PayoutAccountSheet extends StatefulWidget {
 
 class _PayoutAccountSheetState extends State<PayoutAccountSheet> {
   final _payout = _PayoutController();
+  // Có gợi ý từ lần thanh toán PayOS và chưa từng chuyển khoản lỗi thì chọn sẵn tài khoản đó.
+  late bool _useSuggested = widget.refund.suggestedPayoutAccount != null && widget.refund.payoutFailureReason == null;
   @override
   void dispose() {
     _payout.dispose();
@@ -159,18 +161,45 @@ class _PayoutAccountSheetState extends State<PayoutAccountSheet> {
     title: 'Tài khoản nhận hoàn tiền – khoản #${widget.refund.id}',
     submitLabel: 'Lưu tài khoản',
     onSubmit: () async {
-      final error = _payout.validate();
-      if (error != null) {
-        showSnack(context, error, error: true);
-        return false;
+      if (!_useSuggested) {
+        final error = _payout.validate();
+        if (error != null) {
+          showSnack(context, error, error: true);
+          return false;
+        }
       }
-      return runAction(context, () => widget.api.setRefundPayoutAccount(widget.refund.id, _payout.input), success: 'Đã lưu tài khoản nhận hoàn tiền.');
+      final input = _useSuggested ? const PayoutAccountInput.suggested() : _payout.input;
+      return runAction(context, () => widget.api.setRefundPayoutAccount(widget.refund.id, input), success: 'Đã lưu tài khoản nhận hoàn tiền.');
     },
     children: [
       if (widget.refund.payoutFailureReason != null)
         Notice('Lần chuyển khoản trước bị lỗi: ${widget.refund.payoutFailureReason}. Hãy nhập tài khoản khác hoặc kiểm tra lại.', icon: 'warning', peach: true),
       if (widget.refund.payoutFailureReason != null) _gap(),
-      _PayoutFields(api: widget.api, controller: _payout),
+      if (widget.refund.suggestedPayoutAccount case final s?) ...[
+        RadioGroup<bool>(
+          groupValue: _useSuggested,
+          onChanged: (v) => setState(() => _useSuggested = v ?? false),
+          child: Column(
+            children: [
+              RadioListTile<bool>(
+                key: const Key('payout-use-suggested'),
+                contentPadding: EdgeInsets.zero,
+                value: true,
+                title: const Text('Dùng tài khoản đã thanh toán đơn này'),
+                subtitle: Text('${s.bankName} • ${s.maskedAccountNumber} • ${s.accountHolder}'),
+              ),
+              const RadioListTile<bool>(
+                key: Key('payout-enter-other'),
+                contentPadding: EdgeInsets.zero,
+                value: false,
+                title: Text('Nhập tài khoản khác'),
+              ),
+            ],
+          ),
+        ),
+        _gap(),
+      ],
+      if (!_useSuggested) _PayoutFields(api: widget.api, controller: _payout),
     ],
   );
 }
@@ -394,19 +423,9 @@ class IncidentSheet extends StatefulWidget {
   State<IncidentSheet> createState() => _IncidentSheetState();
 }
 
-/// Lý do nhanh của khách: bấm thì chọn loại sự cố và điền câu mở đầu (trễ, sai tuyến, vắng mặt đều ghi là `Other`).
-const incidentQuickReasons = <({String label, String type, String starter})>[
-  (label: 'Hàng hư hỏng', type: 'DamagedCargo', starter: 'Hàng bị hư hỏng: '),
-  (label: 'Tài xế đến trễ', type: 'Other', starter: 'Tài xế đến trễ: '),
-  (label: 'Đi sai tuyến', type: 'Other', starter: 'Tài xế đi sai tuyến: '),
-  (label: 'Không liên lạc được tài xế / tài xế vắng mặt', type: 'Other', starter: 'Không liên lạc được với tài xế: '),
-  (label: 'Tai nạn', type: 'Accident', starter: 'Tai nạn trên đường: '),
-  (label: 'Khác', type: 'Other', starter: ''),
-];
-
 class _IncidentSheetState extends State<IncidentSheet> {
-  String _type = 'Other';
-  String _quick = 'Khác';
+  // Khách chỉ mô tả sự việc: loại luôn là Other (DECISIONS 7.1), điều phối viên đọc mô tả để phân loại.
+  static const _type = 'Other';
   final _desc = TextEditingController();
   List<String> _photos = const [];
 
@@ -414,19 +433,6 @@ class _IncidentSheetState extends State<IncidentSheet> {
   void dispose() {
     _desc.dispose();
     super.dispose();
-  }
-
-  void _pick(({String label, String type, String starter}) reason) {
-    setState(() {
-      _quick = reason.label;
-      _type = reason.type;
-      // Chỉ thay câu mở đầu khi khách chưa tự viết thêm.
-      final current = _desc.text.trim();
-      if (current.isEmpty || incidentQuickReasons.any((r) => r.starter.isNotEmpty && r.starter.trim() == current)) {
-        _desc.text = reason.starter;
-        _desc.selection = TextSelection.collapsed(offset: _desc.text.length);
-      }
-    });
   }
 
   @override
@@ -453,20 +459,12 @@ class _IncidentSheetState extends State<IncidentSheet> {
         icon: 'info',
       ),
       _gap(),
-      Text('Lý do nhanh', style: appText(size: 13, weight: FontWeight.w700)),
-      const SizedBox(height: 6),
-      Wrap(
-        spacing: 8,
-        runSpacing: 8,
-        children: [for (final r in incidentQuickReasons) ChoiceChip(key: ValueKey('incident-reason-${r.label}'), label: Text(r.label), selected: _quick == r.label, onSelected: (_) => _pick(r))],
-      ),
-      _gap(),
       TextField(
         key: const Key('customer-incident-description'),
         controller: _desc,
         maxLines: 3,
         maxLength: 1000,
-        decoration: const InputDecoration(labelText: 'Mô tả sự cố'),
+        decoration: const InputDecoration(labelText: 'Mô tả sự cố *', hintText: 'Chuyện gì đã xảy ra? Ghi rõ để điều phối viên xử lý đúng.'),
       ),
       PhotoPicker(label: 'Ảnh minh chứng', urls: _photos, max: OrderRules.maxEvidencePhotos, upload: widget.api.upload, onChanged: (p) => setState(() => _photos = p)),
     ],
@@ -664,23 +662,35 @@ class PayOsSheet extends StatefulWidget {
   State<PayOsSheet> createState() => _PayOsSheetState();
 }
 
-class _PayOsSheetState extends State<PayOsSheet> {
+class _PayOsSheetState extends State<PayOsSheet> with WidgetsBindingObserver {
+  /// Sau khi mở trang PayOS, cứ 5 giây hỏi lại BE một lần để tự đóng khi webhook đã ghi nhận tiền.
+  static const _autoCheckEvery = Duration(seconds: 5);
+
   PaymentSession? _session;
   String? _error;
-  bool _creating = false, _checking = false;
-  Timer? _tick;
+  bool _creating = false, _checking = false, _inFlight = false, _opened = false, _closed = false;
+  Timer? _tick, _auto;
 
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _create();
     _tick = Timer.periodic(const Duration(seconds: 1), (_) => mounted ? setState(() {}) : null);
   }
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _tick?.cancel();
+    _auto?.cancel();
     super.dispose();
+  }
+
+  /// Quay lại app từ trang PayOS (deep link hoặc nút Back): kiểm tra ngay, trả xong thì tự đóng.
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed && _opened) _check(auto: true);
   }
 
   Future<void> _create() async {
@@ -699,19 +709,37 @@ class _PayOsSheetState extends State<PayOsSheet> {
     final url = _session?.checkoutUrl;
     if (url == null) return;
     final ok = await launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication);
-    if (!ok && mounted) showSnack(context, 'Không mở được trang thanh toán.', error: true);
+    if (!mounted) return;
+    if (!ok) {
+      showSnack(context, 'Không mở được trang thanh toán.', error: true);
+      return;
+    }
+    _opened = true;
+    _auto ??= Timer.periodic(_autoCheckEvery, (_) => _check(auto: true));
   }
 
-  Future<void> _check() async {
-    setState(() => _checking = true);
-    final paid = await widget.onCheck();
-    if (!mounted) return;
-    setState(() => _checking = false);
+  /// [auto] = tự kiểm tra (quay lại app, định kỳ): đã trả thì đóng sheet, chưa trả thì im lặng.
+  Future<void> _check({bool auto = false}) async {
+    if (_inFlight || _closed || !mounted) return;
+    _inFlight = true;
+    // Chỉ lần bấm tay mới đổi nút sang "Đang kiểm tra…"; lần tự kiểm tra chạy ngầm.
+    if (!auto) setState(() => _checking = true);
+    bool paid;
+    try {
+      paid = await widget.onCheck();
+    } catch (_) {
+      paid = false;
+    }
+    _inFlight = false;
+    if (!mounted || _closed) return;
+    if (!auto) setState(() => _checking = false);
     final data = {'orderId': '${widget.order.id}', 'orderCode': widget.order.code, 'amount': money(widget.order.totalFee)};
     if (paid) {
+      _closed = true;
+      _auto?.cancel();
       notify(context, 'PAYMENT_CONFIRMED', data);
       Navigator.pop(context, true);
-    } else {
+    } else if (!auto) {
       // Chưa có tiền: phân biệt hết hạn, thất bại, bị hủy và chưa trả (đang chờ).
       final latest = widget.latestPayment?.call();
       final expired = latest?.isExpired == true || (_session?.expiresAt.isBefore(DateTime.now()) ?? false);
@@ -793,12 +821,6 @@ Future<void> openDirections(BuildContext context, GeoPoint to, {GeoPoint? from})
   final params = {'api': '1', 'destination': '${to.latitude},${to.longitude}', if (from != null) 'origin': '${from.latitude},${from.longitude}'};
   final ok = await launchUrl(Uri.https('www.google.com', '/maps/dir/', params), mode: LaunchMode.externalApplication);
   if (!ok && context.mounted) showSnack(context, 'Không mở được bản đồ.', error: true);
-}
-
-/// Gọi điện.
-Future<void> callPhone(BuildContext context, String phone) async {
-  final ok = await launchUrl(Uri(scheme: 'tel', path: phone));
-  if (!ok && context.mounted) showSnack(context, 'Không gọi được $phone.', error: true);
 }
 
 /// Nhãn dùng chung trong chi tiết đơn.

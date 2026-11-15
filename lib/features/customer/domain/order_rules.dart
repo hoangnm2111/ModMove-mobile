@@ -9,6 +9,7 @@ abstract final class OrderRules {
   static const maxCargoPhotos = 5, minCargoPhotos = 1; // GB-06
   static const maxEvidencePhotos = 5; // GB-43
   static const maxPhotoBytes = 5 * 1024 * 1024;
+  static const maxSpecialNotes = 500; // validator tạo đơn của BE
 
   /// GB-31: đơn PayOS chưa thanh toán vẫn ở Pending nhưng CHƯA gửi tới tài xế.
   static bool awaitingPayment(String status, String paymentMethod, String paymentStatus) => status == OrderStatus.pending && paymentMethod == 'PayOS' && paymentStatus == 'Unpaid';
@@ -56,7 +57,8 @@ abstract final class OrderRules {
 abstract final class InputRules {
   static final _phone = RegExp(r'^(0|\+84)[0-9]{9,10}$');
   static bool phone(String v) => _phone.hasMatch(v.replaceAll(' ', ''));
-  static bool email(String v) => RegExp(r'^[^@\s]+@[^@\s]+\.[^@\s]+$').hasMatch(v.trim());
+  /// BE chỉ nhận email gồm ký tự ASCII in được (không dấu tiếng Việt).
+  static bool email(String v) => RegExp(r'^[\x21-\x3F\x41-\x7E]+@[\x21-\x3F\x41-\x7E]+\.[\x21-\x3F\x41-\x7E]+$').hasMatch(v.trim());
 
   /// Địa chỉ: backend tự geocode bằng MapVina, chỉ cần đủ cụ thể.
   static bool address(String v) => v.trim().length >= 5;

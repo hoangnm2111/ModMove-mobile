@@ -21,6 +21,9 @@ class CustomerApi {
   Future<List<LookupItem>> complaintReasons() async => _items(await _api.get('/public/Lookups/complaint-reasons'), LookupItem.fromJson);
   Future<List<LookupItem>> policies() async => _items(await _api.get('/public/Policies'), LookupItem.fromJson);
 
+  /// Giới thiệu, khu vực phục vụ, lợi ích (Admin nhập ở master data SERVICE_INFO).
+  Future<List<LookupItem>> serviceInfo() async => _items(await _api.get('/public/ServiceInfo'), LookupItem.fromJson);
+
   Future<void> supportRequest(String fullName, String contact, String content) => _api.post('/public/SupportRequests', {'fullName': fullName, 'contact': contact, 'content': content});
 
   Future<FareEstimate> fareEstimate({

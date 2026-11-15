@@ -12,14 +12,23 @@ import '../../domain/order_rules.dart';
 import '../labels.dart';
 
 /// Câu ngắn của thao tác: hiện banner trên đỉnh màn (xem core/widgets/notice_banner.dart).
-void showSnack(BuildContext context, String text, {bool error = false}) => showNotice(context, text, error: error);
+void showSnack(BuildContext context, String text, {bool error = false}) =>
+    showNotice(context, text, error: error);
 
-String errorText(Object e) => e is ApiException ? e.message : 'Đã có lỗi xảy ra. Vui lòng thử lại.';
+String errorText(Object e) =>
+    e is ApiException ? e.message : 'Đã có lỗi xảy ra. Vui lòng thử lại.';
 
 /// Chạy thao tác, báo kết quả bằng banner; trả về true nếu thành công.
 /// `notice` là mã trong danh mục thông báo ([noticeCatalog]); có thì hiện thông báo đó (kèm `data`, `noticeBody` thay chữ dự phòng),
 /// không thì hiện câu `success`. Lỗi mạng hiện NETWORK_ERROR, lỗi khác hiện câu của BE.
-Future<bool> runAction(BuildContext context, Future<void> Function() action, {String? success, String? notice, Map<String, String> data = const {}, String? noticeBody}) async {
+Future<bool> runAction(
+  BuildContext context,
+  Future<void> Function() action, {
+  String? success,
+  String? notice,
+  Map<String, String> data = const {},
+  String? noticeBody,
+}) async {
   try {
     await action();
     if (context.mounted) {
@@ -48,24 +57,47 @@ class Pill extends StatelessWidget {
   @override
   Widget build(BuildContext context) => Container(
     padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 3),
-    decoration: BoxDecoration(color: tone.bg, borderRadius: BorderRadius.circular(20)),
+    decoration: BoxDecoration(
+      color: tone.bg,
+      borderRadius: BorderRadius.circular(20),
+    ),
     child: Text(
       tone.label,
-      style: appText(size: 11.5, weight: FontWeight.w700, color: tone.fg, spacing: -0.1),
+      style: appText(
+        size: 11.5,
+        weight: FontWeight.w700,
+        color: tone.fg,
+        spacing: -0.1,
+      ),
     ),
   );
 }
 
 /// Trạng thái đơn, tự hiện "Chờ thanh toán" cho đơn PayOS chưa trả.
 class StatusPill extends StatelessWidget {
-  const StatusPill(this.status, {super.key, this.paymentMethod = '', this.paymentStatus = ''});
+  const StatusPill(
+    this.status, {
+    super.key,
+    this.paymentMethod = '',
+    this.paymentStatus = '',
+  });
   final String status, paymentMethod, paymentStatus;
   @override
-  Widget build(BuildContext context) => Pill(OrderRules.awaitingPayment(status, paymentMethod, paymentStatus) ? awaitingPaymentTone : toneOf(orderStatusTone, status));
+  Widget build(BuildContext context) => Pill(
+    OrderRules.awaitingPayment(status, paymentMethod, paymentStatus)
+        ? awaitingPaymentTone
+        : toneOf(orderStatusTone, status),
+  );
 }
 
 class KvRow extends StatelessWidget {
-  const KvRow(this.label, this.value, {super.key, this.strong = false, this.valueColor});
+  const KvRow(
+    this.label,
+    this.value, {
+    super.key,
+    this.strong = false,
+    this.valueColor,
+  });
   final String label;
   final String value;
   final bool strong;
@@ -78,7 +110,10 @@ class KvRow extends StatelessWidget {
       children: [
         Expanded(
           flex: 4,
-          child: Text(label, style: appText(size: 13, color: AppColors.secondary)),
+          child: Text(
+            label,
+            style: appText(size: 13, color: AppColors.secondary),
+          ),
         ),
         const SizedBox(width: 8),
         Expanded(
@@ -86,7 +121,11 @@ class KvRow extends StatelessWidget {
           child: Text(
             value,
             textAlign: TextAlign.right,
-            style: appText(size: strong ? 15 : 13, weight: strong ? FontWeight.w800 : FontWeight.w600, color: valueColor ?? AppColors.ink),
+            style: appText(
+              size: strong ? 15 : 13,
+              weight: strong ? FontWeight.w800 : FontWeight.w600,
+              color: valueColor ?? AppColors.ink,
+            ),
           ),
         ),
       ],
@@ -96,7 +135,12 @@ class KvRow extends StatelessWidget {
 
 /// Thẻ có tiêu đề.
 class SectionCard extends StatelessWidget {
-  const SectionCard({super.key, required this.title, required this.child, this.trailing});
+  const SectionCard({
+    super.key,
+    required this.title,
+    required this.child,
+    this.trailing,
+  });
   final String title;
   final Widget child;
   final Widget? trailing;
@@ -124,13 +168,20 @@ class SectionCard extends StatelessWidget {
 
 /// Dải ảnh mạng; bấm để phóng to.
 class PhotoStrip extends StatelessWidget {
-  const PhotoStrip(this.urls, {super.key, this.size = 72, this.emptyText = 'Chưa có ảnh'});
+  const PhotoStrip(
+    this.urls, {
+    super.key,
+    this.size = 72,
+    this.emptyText = 'Chưa có ảnh',
+  });
   final List<String> urls;
   final double size;
   final String emptyText;
   @override
   Widget build(BuildContext context) {
-    if (urls.isEmpty) return Text(emptyText, style: appText(size: 12, color: AppColors.muted));
+    if (urls.isEmpty) {
+      return Text(emptyText, style: appText(size: 12, color: AppColors.muted));
+    }
     return Wrap(
       spacing: 8,
       runSpacing: 8,
@@ -141,7 +192,9 @@ class PhotoStrip extends StatelessWidget {
               context: context,
               builder: (_) => Dialog(
                 insetPadding: const EdgeInsets.all(12),
-                child: InteractiveViewer(child: Image.network(u, fit: BoxFit.contain)),
+                child: InteractiveViewer(
+                  child: Image.network(u, fit: BoxFit.contain),
+                ),
               ),
             ),
             child: ClipRRect(
@@ -155,7 +208,10 @@ class PhotoStrip extends StatelessWidget {
                   width: size,
                   height: size,
                   color: AppColors.pale,
-                  child: const Icon(Icons.broken_image_outlined, color: AppColors.muted),
+                  child: const Icon(
+                    Icons.broken_image_outlined,
+                    color: AppColors.muted,
+                  ),
                 ),
               ),
             ),
@@ -218,7 +274,14 @@ class ErrorView extends StatelessWidget {
 
 /// Chọn ảnh (camera/thư viện) rồi upload; giữ danh sách URL. GB-06: JPG/PNG ≤ 5 MB.
 class PhotoPicker extends StatefulWidget {
-  const PhotoPicker({super.key, required this.urls, required this.onChanged, required this.upload, this.max = OrderRules.maxCargoPhotos, this.label});
+  const PhotoPicker({
+    super.key,
+    required this.urls,
+    required this.onChanged,
+    required this.upload,
+    this.max = OrderRules.maxCargoPhotos,
+    this.label,
+  });
   final List<String> urls;
   final ValueChanged<List<String>> onChanged;
   final Future<String> Function(File file) upload;
@@ -233,12 +296,20 @@ class _PhotoPickerState extends State<PhotoPicker> {
   bool _busy = false;
 
   Future<void> _pick(ImageSource source) async {
-    final picked = await ImagePicker().pickImage(source: source, maxWidth: 1920, imageQuality: 82);
+    final picked = await ImagePicker().pickImage(
+      source: source,
+      maxWidth: 1920,
+      imageQuality: 82,
+    );
     if (picked == null) return;
     final file = File(picked.path);
     final lower = picked.path.toLowerCase();
-    if (!(lower.endsWith('.jpg') || lower.endsWith('.jpeg') || lower.endsWith('.png'))) {
-      if (mounted) showSnack(context, 'Chỉ nhận ảnh JPG hoặc PNG.', error: true);
+    if (!(lower.endsWith('.jpg') ||
+        lower.endsWith('.jpeg') ||
+        lower.endsWith('.png'))) {
+      if (mounted) {
+        showSnack(context, 'Chỉ nhận ảnh JPG hoặc PNG.', error: true);
+      }
       return;
     }
     if (await file.length() > OrderRules.maxPhotoBytes) {
@@ -264,8 +335,16 @@ class _PhotoPickerState extends State<PhotoPicker> {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            ListTile(leading: const AppIcon('camera'), title: const Text('Chụp ảnh'), onTap: () => Navigator.pop(c, ImageSource.camera)),
-            ListTile(leading: const AppIcon('image'), title: const Text('Chọn từ thư viện'), onTap: () => Navigator.pop(c, ImageSource.gallery)),
+            ListTile(
+              leading: const AppIcon('camera'),
+              title: const Text('Chụp ảnh'),
+              onTap: () => Navigator.pop(c, ImageSource.camera),
+            ),
+            ListTile(
+              leading: const AppIcon('image'),
+              title: const Text('Chọn từ thư viện'),
+              onTap: () => Navigator.pop(c, ImageSource.gallery),
+            ),
           ],
         ),
       ),
@@ -280,7 +359,10 @@ class _PhotoPickerState extends State<PhotoPicker> {
       if (widget.label != null)
         Padding(
           padding: const EdgeInsets.only(bottom: 6),
-          child: Text('${widget.label} (${widget.urls.length}/${widget.max})', style: appText(size: 13, weight: FontWeight.w600)),
+          child: Text(
+            '${widget.label} (${widget.urls.length}/${widget.max})',
+            style: appText(size: 13, weight: FontWeight.w600),
+          ),
         ),
       Wrap(
         spacing: 8,
@@ -291,7 +373,12 @@ class _PhotoPickerState extends State<PhotoPicker> {
               children: [
                 ClipRRect(
                   borderRadius: BorderRadius.circular(8),
-                  child: Image.network(u, width: 72, height: 72, fit: BoxFit.cover),
+                  child: Image.network(
+                    u,
+                    width: 72,
+                    height: 72,
+                    fit: BoxFit.cover,
+                  ),
                 ),
                 Positioned(
                   right: 2,
@@ -320,31 +407,54 @@ class _PhotoPickerState extends State<PhotoPicker> {
                   color: AppColors.pale,
                 ),
                 child: Center(
-                  child: _busy ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2)) : const AppIcon('camera', color: AppColors.secondary),
+                  child: _busy
+                      ? const SizedBox(
+                          width: 20,
+                          height: 20,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : const AppIcon('camera', color: AppColors.secondary),
                 ),
               ),
             ),
         ],
       ),
       const SizedBox(height: 4),
-      Text('JPG/PNG, tối đa 5 MB mỗi ảnh.', style: appText(size: 11, color: AppColors.muted)),
+      Text(
+        'JPG/PNG, tối đa 5 MB mỗi ảnh.',
+        style: appText(size: 11, color: AppColors.muted),
+      ),
     ],
   );
 }
 
 /// Mức trên cùng của cây trạng thái đơn – thanh tiến trình.
 class OrderProgress extends StatelessWidget {
-  const OrderProgress(this.order, {super.key});
+  const OrderProgress(this.order, {super.key, this.dropoffArrivedAt});
   final OrderDetail order;
+
+  /// Tài xế đã báo đến điểm giao (đơn đang giao): bước "Đang giao" hiện thành "Đã đến điểm giao".
+  final DateTime? dropoffArrivedAt;
   @override
   Widget build(BuildContext context) {
     if (order.status == OrderStatus.cancelled) {
       final at = OrderRules.reachedAt(order, OrderStatus.cancelled);
-      final note = order.history.where((h) => h.toStatus == OrderStatus.cancelled).map((h) => h.note).lastOrNull;
-      return Notice('Đơn đã huỷ${at == null ? '' : ' lúc ${_hm(at)}'}${note == null ? '' : ' – Lý do: $note'}', icon: 'warning', peach: true);
+      final note = order.history
+          .where((h) => h.toStatus == OrderStatus.cancelled)
+          .map((h) => h.note)
+          .lastOrNull;
+      return Notice(
+        'Đơn đã huỷ${at == null ? '' : ' lúc ${_hm(at)}'}${note == null ? '' : ' – Lý do: $note'}',
+        icon: 'warning',
+        peach: true,
+      );
     }
     final idx = OrderStatus.flow.indexOf(order.status);
-    final awaiting = OrderRules.awaitingPayment(order.status, order.paymentMethod, order.paymentStatus);
+    final awaiting = OrderRules.awaitingPayment(
+      order.status,
+      order.paymentMethod,
+      order.paymentStatus,
+    );
     return AppCard(
       padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 6),
       child: Row(
@@ -356,19 +466,36 @@ class OrderProgress extends StatelessWidget {
                 children: [
                   CircleAvatar(
                     radius: 11,
-                    backgroundColor: i <= idx ? AppColors.orange : AppColors.line,
+                    backgroundColor: i <= idx
+                        ? AppColors.orange
+                        : AppColors.line,
                     child: i < idx
                         ? const AppIcon('check', size: 13, color: Colors.white)
                         : Text(
                             '${i + 1}',
-                            style: appText(size: 10, weight: FontWeight.w700, color: i == idx ? Colors.white : AppColors.muted),
+                            style: appText(
+                              size: 10,
+                              weight: FontWeight.w700,
+                              color: i == idx ? Colors.white : AppColors.muted,
+                            ),
                           ),
                   ),
                   const SizedBox(height: 4),
                   Text(
-                    i == 0 && awaiting ? 'Chờ thanh toán' : toneOf(orderStatusTone, OrderStatus.flow[i]).label,
+                    i == 0 && awaiting
+                        ? 'Chờ thanh toán'
+                        : OrderStatus.flow[i] == OrderStatus.inTransit &&
+                              dropoffArrivedAt != null
+                        ? 'Đã đến điểm giao'
+                        : toneOf(orderStatusTone, OrderStatus.flow[i]).label,
                     textAlign: TextAlign.center,
-                    style: appText(size: 9, weight: i <= idx ? FontWeight.w700 : FontWeight.w400, color: i <= idx ? AppColors.ink : AppColors.muted, height: 1.15, spacing: -0.2),
+                    style: appText(
+                      size: 9,
+                      weight: i <= idx ? FontWeight.w700 : FontWeight.w400,
+                      color: i <= idx ? AppColors.ink : AppColors.muted,
+                      height: 1.15,
+                      spacing: -0.2,
+                    ),
                   ),
                 ],
               ),
@@ -378,5 +505,6 @@ class OrderProgress extends StatelessWidget {
     );
   }
 
-  static String _hm(DateTime d) => '${d.hour.toString().padLeft(2, '0')}:${d.minute.toString().padLeft(2, '0')} ${d.day}/${d.month}';
+  static String _hm(DateTime d) =>
+      '${d.hour.toString().padLeft(2, '0')}:${d.minute.toString().padLeft(2, '0')} ${d.day}/${d.month}';
 }
