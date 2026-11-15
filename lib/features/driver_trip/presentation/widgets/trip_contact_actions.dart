@@ -29,30 +29,6 @@ Future<void> showTripIncident(
   if (draft != null && context.mounted) bloc.add(IncidentReported(draft));
 }
 
-/// Lý do nhanh: bấm thì chọn loại sự cố và điền câu mở đầu (đều dùng loại `Other`).
-const _quickReasons = <({String label, IncidentType type, String starter})>[
-  (
-    label: 'Khách vắng mặt',
-    type: IncidentType.other,
-    starter: 'Khách vắng mặt tại điểm lấy hàng: ',
-  ),
-  (
-    label: 'Không liên lạc được khách',
-    type: IncidentType.other,
-    starter: 'Không liên lạc được với khách: ',
-  ),
-  (
-    label: 'Hàng không đúng mô tả',
-    type: IncidentType.other,
-    starter: 'Hàng không đúng mô tả: ',
-  ),
-  (
-    label: 'Không lấy được hàng',
-    type: IncidentType.other,
-    starter: 'Không lấy được hàng: ',
-  ),
-];
-
 class IncidentFormSheet extends StatefulWidget {
   const IncidentFormSheet({
     super.key,
@@ -70,7 +46,7 @@ class _IncidentFormSheetState extends State<IncidentFormSheet> {
   final _text = TextEditingController();
   final _photos = <CargoPhoto>[];
   IncidentType _type = IncidentType.other;
-  String? _quick, _error;
+  String? _error;
 
   @override
   void dispose() {
@@ -78,23 +54,7 @@ class _IncidentFormSheetState extends State<IncidentFormSheet> {
     super.dispose();
   }
 
-  void _chooseType(IncidentType type) => setState(() {
-    _type = type;
-    _quick = null;
-  });
-
-  void _chooseQuick(({String label, IncidentType type, String starter}) reason) {
-    setState(() {
-      _quick = reason.label;
-      _type = reason.type;
-      // Chỉ thay câu mở đầu khi tài xế chưa tự viết thêm.
-      final current = _text.text.trim();
-      if (current.isEmpty || _quickReasons.any((r) => r.starter.trim() == current)) {
-        _text.text = reason.starter;
-        _text.selection = TextSelection.collapsed(offset: _text.text.length);
-      }
-    });
-  }
+  void _chooseType(IncidentType type) => setState(() => _type = type);
 
   Future<void> _addPhoto() async {
     if (_photos.length >= 5) return;
@@ -173,24 +133,8 @@ class _IncidentFormSheetState extends State<IncidentFormSheet> {
                   ChoiceChip(
                     key: ValueKey('incident-type-${type.apiValue}'),
                     label: Text(type.label),
-                    selected: _quick == null && _type == type,
+                    selected: _type == type,
                     onSelected: (_) => _chooseType(type),
-                  ),
-              ],
-            ),
-            const SizedBox(height: 10),
-            Text('Lý do nhanh', style: appText(size: 13, weight: FontWeight.w700)),
-            const SizedBox(height: 6),
-            Wrap(
-              spacing: 8,
-              runSpacing: 4,
-              children: [
-                for (final reason in _quickReasons)
-                  ChoiceChip(
-                    key: ValueKey('incident-quick-${reason.label}'),
-                    label: Text(reason.label),
-                    selected: _quick == reason.label,
-                    onSelected: (_) => _chooseQuick(reason),
                   ),
               ],
             ),

@@ -122,7 +122,7 @@ void main() {
       await repo.setOnline(true);
       expect(repo.current.jobs, hasLength(2));
       await repo.simulate(TripSimulation.lowDeposit);
-      // BE (ký quỹ tối thiểu áp dụng cho mọi đơn): thiếu ký quỹ thì không thấy đơn nào.
+      // BE (tiền cọc tối thiểu áp dụng cho mọi đơn): thiếu tiền cọc thì không thấy đơn nào.
       expect(repo.current.jobs, isEmpty);
       repo.updateAccess(const DriverAccess(approved: true, active: false));
       expect(repo.current.online, isFalse);

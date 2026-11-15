@@ -62,7 +62,8 @@ class MockDriverTripRepository implements DriverTripRepository, TripSimulator {
           DriverMatchingPolicy.searchRadiusMeters &&
       job.weightKg <= 1000 &&
       job.vehicle == 'Xe tải 1 tấn' &&
-      _deposit >= 200000 && (job.cash ? _deposit >= job.commission : job.paid);
+      _deposit >= 200000 &&
+      (job.cash ? _deposit >= job.commission : job.paid);
   @override
   DriverSession get current {
     final jobs = _jobs.where(_eligible).toList()
@@ -398,7 +399,9 @@ class MockDriverTripRepository implements DriverTripRepository, TripSimulator {
     final trip = _requireTrip();
     final text = draft.description.trim();
     if (text.isEmpty) throw const TripFailure('Nhập mô tả sự cố.');
-    if (text.length > 1000) throw const TripFailure('Mô tả sự cố tối đa 1000 ký tự.');
+    if (text.length > 1000) {
+      throw const TripFailure('Mô tả sự cố tối đa 1000 ký tự.');
+    }
     for (final photo in draft.photos) {
       const ValidateCargoPhoto()(photo);
     }
@@ -415,11 +418,14 @@ class MockDriverTripRepository implements DriverTripRepository, TripSimulator {
           reportedByYou: true,
           status: IncidentStatus.open,
           createdAt: now,
-          photoUrls: [for (final p in draft.photos) 'mock://incident/${p.name}'],
+          photoUrls: [
+            for (final p in draft.photos) 'mock://incident/${p.name}',
+          ],
         ),
       ],
     );
-    _notice = 'Đã gửi sự cố #$id. Chuyến tạm dừng cho tới khi điều phối viên xử lý.';
+    _notice =
+        'Đã gửi sự cố #$id. Chuyến tạm dừng cho tới khi điều phối viên xử lý.';
     _publish();
     return id;
   }
@@ -434,14 +440,19 @@ class MockDriverTripRepository implements DriverTripRepository, TripSimulator {
   /// Sự cố mở đầu tiên của chuyến (ưu tiên sự cố của tài xế) để giả lập thao tác của điều phối viên.
   TripIncident _openIncident() {
     final trip = _requireTrip();
-    final open = trip.incidents.where((i) => i.isOpen).toList()..sort((a, b) => (b.reportedByYou ? 1 : 0) - (a.reportedByYou ? 1 : 0));
+    final open = trip.incidents.where((i) => i.isOpen).toList()
+      ..sort((a, b) => (b.reportedByYou ? 1 : 0) - (a.reportedByYou ? 1 : 0));
     if (open.isEmpty) throw const TripFailure('Chưa có sự cố nào đang mở.');
     return open.first;
   }
 
   void _replaceIncident(TripIncident updated) {
     final trip = _requireTrip();
-    _trip = trip.copyWith(incidents: [for (final i in trip.incidents) i.id == updated.id ? updated : i]);
+    _trip = trip.copyWith(
+      incidents: [
+        for (final i in trip.incidents) i.id == updated.id ? updated : i,
+      ],
+    );
   }
 
   @override
@@ -450,7 +461,7 @@ class MockDriverTripRepository implements DriverTripRepository, TripSimulator {
     if (_requireTrip().stage != TripStage.inTransit) {
       throw const TripFailure('Chuyến chưa ở giai đoạn giao hàng.');
     }
-    _notice = 'Đã báo cho khách biết bạn đã đến điểm giao.';
+    _trip = _requireTrip().copyWith(dropoffNotified: true);
     _publish();
   }
 
@@ -471,7 +482,9 @@ class MockDriverTripRepository implements DriverTripRepository, TripSimulator {
       throw const TripFailure('Chuyến chưa ở giai đoạn giao hàng.');
     }
     if (trip.job.cash && !trip.cashCollected) {
-      throw const TripFailure('Xác nhận đã thu tiền mặt trước khi hoàn tất giao hàng.');
+      throw const TripFailure(
+        'Xác nhận đã thu tiền mặt trước khi hoàn tất giao hàng.',
+      );
     }
     _trip = null;
     _notice = 'Đã giao hàng thành công chuyến #${trip.job.label}.';
@@ -518,22 +531,57 @@ class MockDriverTripRepository implements DriverTripRepository, TripSimulator {
         _point = _requireTrip().job.dropoffPoint;
         _ping();
       case TripSimulation.dispatcherStarts:
-        _replaceIncident(_openIncident().copyWith(status: IncidentStatus.inProgress));
+        _replaceIncident(
+          _openIncident().copyWith(status: IncidentStatus.inProgress),
+        );
       case TripSimulation.dispatcherContinues:
         final incident = _openIncident();
-        _replaceIncident(incident.copyWith(status: IncidentStatus.resolved, decision: 'ContinueTrip', note: 'Đã kiểm tra, tiếp tục chuyến.', resolvedAt: now));
-        _outcome = IncidentOutcome(IncidentOutcomeKind.continueTrip, orderCode: incident.orderCode, incidentId: incident.id, note: 'Đã kiểm tra, tiếp tục chuyến.');
+        _replaceIncident(
+          incident.copyWith(
+            status: IncidentStatus.resolved,
+            decision: 'ContinueTrip',
+            note: 'Đã kiểm tra, tiếp tục chuyến.',
+            resolvedAt: now,
+          ),
+        );
+        _outcome = IncidentOutcome(
+          IncidentOutcomeKind.continueTrip,
+          orderCode: incident.orderCode,
+          incidentId: incident.id,
+          note: 'Đã kiểm tra, tiếp tục chuyến.',
+        );
       case TripSimulation.dispatcherDismisses:
         final incident = _openIncident();
-        _replaceIncident(incident.copyWith(status: IncidentStatus.cancelled, note: 'Báo cáo không hợp lệ.', resolvedAt: now));
-        _outcome = IncidentOutcome(IncidentOutcomeKind.dismissed, orderCode: incident.orderCode, incidentId: incident.id, note: 'Báo cáo không hợp lệ.');
+        _replaceIncident(
+          incident.copyWith(
+            status: IncidentStatus.cancelled,
+            note: 'Báo cáo không hợp lệ.',
+            resolvedAt: now,
+          ),
+        );
+        _outcome = IncidentOutcome(
+          IncidentOutcomeKind.dismissed,
+          orderCode: incident.orderCode,
+          incidentId: incident.id,
+          note: 'Báo cáo không hợp lệ.',
+        );
       case TripSimulation.dispatcherReassigns:
         final incident = _openIncident();
-        _outcome = IncidentOutcome(IncidentOutcomeKind.reassignedAway, orderCode: incident.orderCode, incidentId: incident.id, note: 'Xe hỏng, đơn chuyển sang tài xế gần nhất.');
+        _outcome = IncidentOutcome(
+          IncidentOutcomeKind.reassignedAway,
+          orderCode: incident.orderCode,
+          incidentId: incident.id,
+          note: 'Xe hỏng, đơn chuyển sang tài xế gần nhất.',
+        );
         _trip = null;
       case TripSimulation.dispatcherCancelsOrder:
         final incident = _openIncident();
-        _outcome = IncidentOutcome(IncidentOutcomeKind.orderCancelled, orderCode: incident.orderCode, incidentId: incident.id, note: 'Hủy do sự cố nghiêm trọng. [Cargo: ReturnToPickup]');
+        _outcome = IncidentOutcome(
+          IncidentOutcomeKind.orderCancelled,
+          orderCode: incident.orderCode,
+          incidentId: incident.id,
+          note: 'Hủy do sự cố nghiêm trọng. [Cargo: ReturnToPickup]',
+        );
         _trip = null;
       case TripSimulation.customerReportsIncident:
         final trip = _requireTrip();
@@ -545,7 +593,8 @@ class MockDriverTripRepository implements DriverTripRepository, TripSimulator {
               orderId: int.tryParse(trip.job.id) ?? 0,
               orderCode: trip.job.label,
               type: IncidentType.other,
-              description: 'Khách hàng báo cáo sự cố, Điều phối viên đang xử lý.',
+              description:
+                  'Khách hàng báo cáo sự cố, Điều phối viên đang xử lý.',
               reportedByYou: false,
               status: IncidentStatus.open,
               createdAt: now,

@@ -201,7 +201,7 @@ class CargoInspectionScreen extends StatelessWidget {
                 contentPadding: EdgeInsets.zero,
                 controlAffinity: ListTileControlAffinity.leading,
                 title: Text(
-                  'Đã thu ${vnd(job.fare)} từ người gửi',
+                  'Xác nhận đã thu ${vnd(job.fare)} từ người gửi',
                   style: appText(size: 13, weight: FontWeight.w600),
                 ),
                 subtitle: const Text('Thu tiền trước khi xếp hàng lên xe.'),

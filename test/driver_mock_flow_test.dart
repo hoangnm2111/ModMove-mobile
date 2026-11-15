@@ -220,7 +220,7 @@ void main() {
         find.byKey(const ValueKey('field-license')),
         '790123456789',
       );
-      for (final kind in DocumentKind.values.take(2)) {
+      for (final kind in DocumentKind.values.where((k) => k.isPersonal)) {
         await chooseSample(tester, kind, 'Tải ảnh lên');
         expect(driver.documents[kind]!.remoteReference, isNotNull);
       }
@@ -236,7 +236,7 @@ void main() {
         await tester.ensureVisible(field);
         await tester.enterText(field, entry.value);
       }
-      for (final kind in DocumentKind.values.skip(2)) {
+      for (final kind in DocumentKind.values.where((k) => !k.isPersonal)) {
         await chooseSample(tester, kind, 'Tải ảnh');
       }
       await click(tester, find.text('Gửi hồ sơ xét duyệt'));

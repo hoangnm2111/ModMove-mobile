@@ -283,6 +283,7 @@ class ActiveTrip {
     this.arrivedAt,
     this.submittedAt,
     this.cashCollected = false,
+    this.dropoffNotified = false,
     this.note = '',
     List<UploadedEvidence> evidence = const [],
     List<TripIncident> incidents = const [],
@@ -296,6 +297,9 @@ class ActiveTrip {
   final String note;
   final DateTime? arrivedAt, submittedAt;
   final bool cashCollected;
+
+  /// Tài xế đã bấm "Báo đã đến điểm giao" (BE không đổi trạng thái đơn ở bước này, nên chỉ giữ trong máy).
+  final bool dropoffNotified;
   final List<UploadedEvidence> evidence;
   final List<TripIncident> incidents;
 
@@ -317,6 +321,7 @@ class ActiveTrip {
     DateTime? arrivedAt,
     DateTime? submittedAt,
     bool? cashCollected,
+    bool? dropoffNotified,
     String? note,
     List<UploadedEvidence>? evidence,
     List<TripIncident>? incidents,
@@ -329,6 +334,7 @@ class ActiveTrip {
     arrivedAt: arrivedAt ?? this.arrivedAt,
     submittedAt: submittedAt ?? this.submittedAt,
     cashCollected: cashCollected ?? this.cashCollected,
+    dropoffNotified: dropoffNotified ?? this.dropoffNotified,
     note: note ?? this.note,
     evidence: evidence ?? this.evidence,
     incidents: incidents ?? this.incidents,
@@ -366,7 +372,7 @@ class DriverSession {
   /// Kết quả xử lý sự cố chưa báo cho tài xế (null khi không có).
   final IncidentOutcome? incidentOutcome;
 
-  /// Ký quỹ tối thiểu để nhận mọi đơn (BE: REQUIRED_DEPOSIT) và phần còn thiếu.
+  /// Tiền cọc tối thiểu để nhận mọi đơn (BE: REQUIRED_DEPOSIT) và phần còn thiếu.
   final int requiredDeposit, missingDeposit;
   final bool online, gpsEnabled, mapAvailable;
   final GpsFix? fix;

@@ -232,7 +232,7 @@ class DriverHomeScreen extends StatelessWidget {
                       Padding(
                         padding: const EdgeInsets.only(bottom: 8),
                         child: Notice(
-                          'Ký quỹ dưới ${vnd(session.requiredDeposit)}: tạm ẩn mọi đơn. '
+                          'Tiền cọc dưới ${vnd(session.requiredDeposit)}: tạm ẩn mọi đơn. '
                           'Nạp thêm ít nhất ${vnd(session.missingDeposit > 0 ? session.missingDeposit : session.requiredDeposit - session.deposit)} để nhận đơn.',
                           peach: true,
                         ),
@@ -277,7 +277,7 @@ class DriverHomeScreen extends StatelessWidget {
                     const SizedBox(height: 9),
                     Row(
                       children: [
-                        _balance('shield', 'Ký quỹ', session.deposit),
+                        _balance('shield', 'Tiền cọc', session.deposit),
                         const SizedBox(width: 8),
                         _balance('wallet', 'Thu nhập', session.earnings),
                       ],

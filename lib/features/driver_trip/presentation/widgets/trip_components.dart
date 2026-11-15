@@ -186,33 +186,32 @@ class TripError extends StatelessWidget {
   );
 }
 
+/// Tiến trình cả chuyến: lấy hàng (0–2), đang giao (3), đã đến điểm giao (4), hoàn tất (5).
+/// [step] là bước hiện tại (0-based): các bước trước đó hiện dấu tích.
 class PickupStepper extends StatelessWidget {
   const PickupStepper(this.step, {super.key});
   final int step;
+
+  static const labels = ['Đến điểm lấy', 'Kiểm tra hàng', 'Khách xác nhận', 'Đang giao', 'Đến điểm giao', 'Hoàn tất'];
+
   @override
   Widget build(BuildContext context) => Padding(
     padding: const EdgeInsets.symmetric(vertical: 12),
     child: Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: List.generate(
-        4,
+        labels.length,
         (i) => Expanded(
           child: Column(
             children: [
               Row(
                 children: [
                   Expanded(
-                    child: Divider(
-                      color: i == 0
-                          ? Colors.transparent
-                          : i <= step
-                          ? AppColors.green
-                          : AppColors.line,
-                    ),
+                    child: Divider(color: i == 0 ? Colors.transparent : (i <= step ? AppColors.green : AppColors.line)),
                   ),
                   Container(
-                    width: 28,
-                    height: 28,
+                    width: 26,
+                    height: 26,
                     alignment: Alignment.center,
                     decoration: BoxDecoration(
                       shape: BoxShape.circle,
@@ -221,44 +220,28 @@ class PickupStepper extends StatelessWidget {
                           : i == step
                           ? AppColors.orange
                           : AppColors.pale,
-                      border: Border.all(
-                        color: i <= step ? Colors.transparent : AppColors.line,
-                      ),
+                      border: Border.all(color: i <= step ? Colors.transparent : AppColors.line),
                     ),
                     child: i < step
-                        ? const AppIcon('check', color: Colors.white, size: 17)
+                        ? const AppIcon('check', color: Colors.white, size: 16)
                         : Text(
                             '${i + 1}',
-                            style: appText(
-                              weight: FontWeight.w600,
-                              color: i == step
-                                  ? Colors.white
-                                  : AppColors.secondary,
-                            ),
+                            style: appText(weight: FontWeight.w600, color: i == step ? Colors.white : AppColors.secondary),
                           ),
                   ),
                   Expanded(
-                    child: Divider(
-                      color: i == 3
-                          ? Colors.transparent
-                          : i < step
-                          ? AppColors.green
-                          : AppColors.line,
-                    ),
+                    child: Divider(color: i == labels.length - 1 ? Colors.transparent : (i < step ? AppColors.green : AppColors.line)),
                   ),
                 ],
               ),
               const SizedBox(height: 6),
               Text(
-                [
-                  'Đến điểm',
-                  'Kiểm tra hàng',
-                  'Khách xác nhận',
-                  'Bắt đầu chuyến',
-                ][i],
+                labels[i],
                 textAlign: TextAlign.center,
+                maxLines: 2,
                 style: appText(
-                  size: 10,
+                  size: 9.5,
+                  weight: i == step ? FontWeight.w700 : FontWeight.w400,
                   color: i == step ? AppColors.orange : AppColors.secondary,
                 ),
               ),

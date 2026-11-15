@@ -75,6 +75,9 @@ class _DeliveryScreenState extends State<DeliveryScreen> {
     final needCash = job.cash && !trip.cashCollected;
     final paused = state.paused;
     final canFinish = _proof != null && !needCash && !state.busy && !paused;
+    final payer = job.payment == PaymentMethod.cashReceiver ? 'người nhận' : 'người gửi';
+    // Việc còn thiếu trước khi bấm "Hoàn tất giao hàng" (giữ nguyên điều kiện nghiệp vụ, chỉ nói rõ ra).
+    final missing = [if (needCash) 'xác nhận thu tiền', if (_proof == null) 'chụp ảnh giao hàng'];
     return BlocListener<ActiveTripBloc, ActiveTripState>(
       listenWhen: (previous, next) => next.delivered && !previous.delivered,
       listener: (context, _) {
@@ -91,30 +94,70 @@ class _DeliveryScreenState extends State<DeliveryScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const PickupStepper(3),
+              // 3 = đang giao; 5 = đã báo đến điểm giao, chỉ còn hoàn tất.
+              PickupStepper(trip.dropoffNotified ? 5 : 3),
               IncidentBanner(trip),
               RouteCard(job),
               const SizedBox(height: 12),
-              OutlinedButton.icon(
-                onPressed: state.busy
-                    ? null
-                    : () => context.read<ActiveTripBloc>().add(
-                        ExternalNavigationOpened(),
-                      ),
-                style: _outlined,
-                icon: const AppIcon('navigation', color: AppColors.orange),
-                label: const Text('Mở chỉ đường giao hàng'),
-              ),
+              const SectionTitle('Đến điểm giao', size: 16),
               const SizedBox(height: 8),
-              OutlinedButton.icon(
-                key: const Key('arrive-dropoff'),
-                onPressed: state.busy || paused
-                    ? null
-                    : () => context.read<ActiveTripBloc>().add(DropoffArrived()),
-                style: _outlined,
-                icon: const AppIcon('map-pin', color: AppColors.orange),
-                label: const Text('Báo đã đến điểm giao'),
-              ),
+              if (!trip.dropoffNotified)
+                AppCard(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      Text(
+                        'Khi tới điểm giao, bấm nút bên dưới để báo cho khách biết.',
+                        style: appText(size: 13, color: AppColors.secondary),
+                      ),
+                      const SizedBox(height: 10),
+                      OutlinedButton.icon(
+                        onPressed: state.busy
+                            ? null
+                            : () => context.read<ActiveTripBloc>().add(ExternalNavigationOpened()),
+                        style: _outlined,
+                        icon: const AppIcon('navigation', color: AppColors.orange),
+                        label: const Text('Mở chỉ đường giao hàng'),
+                      ),
+                      const SizedBox(height: 8),
+                      PrimaryButton(
+                        'Báo đã đến điểm giao',
+                        key: const Key('arrive-dropoff'),
+                        icon: 'map-pin',
+                        busy: state.busy,
+                        onPressed: paused ? null : () => context.read<ActiveTripBloc>().add(DropoffArrived()),
+                      ),
+                    ],
+                  ),
+                )
+              else
+                AppCard(
+                  key: const Key('dropoff-notified'),
+                  color: AppColors.greenBg,
+                  borderColor: AppColors.green,
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const AppIcon('check', color: AppColors.green),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text('Đã báo cho khách: bạn đã đến điểm giao', style: appText(size: 14, weight: FontWeight.w800)),
+                            const SizedBox(height: 3),
+                            Text(
+                              job.cash
+                                  ? 'Tiếp theo: thu tiền mặt, chụp ảnh giao hàng rồi bấm "Hoàn tất giao hàng".'
+                                  : 'Tiếp theo: chụp ảnh giao hàng rồi bấm "Hoàn tất giao hàng".',
+                              style: appText(size: 12.5, color: AppColors.secondary),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
               if (state.session.notice != null) ...[
                 const SizedBox(height: 10),
                 Notice(state.session.notice!, icon: 'info'),
@@ -129,22 +172,28 @@ class _DeliveryScreenState extends State<DeliveryScreen> {
                       const AppIcon('cash', color: AppColors.orange),
                       const SizedBox(width: 12),
                       Expanded(
-                        child: Text(
-                          needCash
-                              ? 'Thu ${vnd(job.fare)} từ ${job.payment == PaymentMethod.cashReceiver ? 'người nhận' : 'người gửi'}'
-                              : 'Đã thu ${vnd(job.fare)}',
-                          style: appText(size: 14, weight: FontWeight.w700),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              needCash ? 'Cần thu ${vnd(job.fare)} từ $payer' : 'Đã thu ${vnd(job.fare)} từ $payer',
+                              style: appText(size: 14, weight: FontWeight.w700),
+                            ),
+                            if (needCash)
+                              Text(
+                                'Nhận đủ tiền mặt rồi bấm xác nhận.',
+                                style: appText(size: 12, color: AppColors.secondary),
+                              ),
+                          ],
                         ),
                       ),
                       if (needCash)
-                        TextButton(
+                        FilledButton(
                           key: const Key('collect-cash'),
                           onPressed: state.busy || paused
                               ? null
-                              : () => context.read<ActiveTripBloc>().add(
-                                  CashCollected(),
-                                ),
-                          child: const Text('Đã thu tiền'),
+                              : () => context.read<ActiveTripBloc>().add(CashCollected()),
+                          child: const Text('Xác nhận thu tiền'),
                         )
                       else
                         const AppIcon('check', color: AppColors.green),
@@ -207,12 +256,13 @@ class _DeliveryScreenState extends State<DeliveryScreen> {
                       )
                     : null,
               ),
-              if (needCash)
+              if (missing.isNotEmpty)
                 Padding(
                   padding: const EdgeInsets.only(top: 6),
                   child: Text(
-                    'Cần xác nhận đã thu tiền trước khi hoàn tất.',
-                    style: appText(size: 11, color: AppColors.muted),
+                    'Còn thiếu: ${missing.join(' và ')}.',
+                    key: const Key('delivery-missing'),
+                    style: appText(size: 11.5, color: AppColors.muted),
                   ),
                 ),
               Row(
