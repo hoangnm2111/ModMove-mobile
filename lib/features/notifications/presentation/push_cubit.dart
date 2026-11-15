@@ -76,7 +76,7 @@ class PushCubit extends Cubit<PushState> {
       );
       _subscriptions.add(device.opened.listen(_open));
       final initial = await device.initialMessage();
-      if (initial != null && initial.route != null) {
+      if (initial != null && initial.canOpen) {
         if (initial.id != null) _seen.add('open:${initial.id}');
         _state(pending: initial);
       }
@@ -86,7 +86,7 @@ class PushCubit extends Cubit<PushState> {
   }
 
   void _open(DriverNotification message) {
-    if (_user == null || message.route == null) return;
+    if (_user == null || !message.canOpen) return;
     if (message.id != null && !_seen.add('open:${message.id}')) return;
     _state(pending: message);
   }

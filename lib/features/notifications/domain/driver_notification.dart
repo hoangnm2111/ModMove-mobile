@@ -20,6 +20,22 @@ class DriverNotification {
 
   String? get orderId => _positiveId('orderId');
   String? get incidentId => _positiveId('incidentId');
+  String? get refundId => _positiveId('refundId');
+  String? get customerRoute => switch (type) {
+    'REFUND_INFO_REQUESTED' ||
+    'REFUND_DECIDED' ||
+    'REFUND_BANK_INFO_REQUIRED' ||
+    'REFUND_PAYOUT_FAILED' => refundId == null ? '/refunds' : '/refund',
+    'INCIDENT_RESOLVED' || 'INCIDENT_IN_PROGRESS' => '/incidents',
+    'ORDER_ACCEPTED' ||
+    'DRIVER_ARRIVED' ||
+    'PICKUP_PHOTOS_TO_REVIEW' ||
+    'ORDER_DELIVERED' ||
+    'ORDER_COMPLETED' ||
+    'ORDER_CANCELLED' => orderId == null ? null : '/order',
+    _ => null,
+  };
+  bool get canOpen => route != null || customerRoute != null;
   String? get route => switch (type) {
     'NEW_MATCHING_ORDER' => orderId == null ? null : '/job-details',
     'PICKUP_APPROVED' || 'PICKUP_REJECTED' => '/active-trip',

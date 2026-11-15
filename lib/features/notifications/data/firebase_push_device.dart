@@ -24,8 +24,8 @@ class FirebasePushDevice implements PushDevice {
   bool _ready = false;
   static const _channel = AndroidNotificationChannel(
     'modmove_driver',
-    'Hoạt động tài xế',
-    description: 'Đơn hàng, hồ sơ, sự cố và ví ModMove',
+    'Hoạt động ModMove',
+    description: 'Đơn hàng, tài khoản, sự cố và thanh toán ModMove',
     importance: Importance.high,
   );
   DriverNotification _message(RemoteMessage message) => DriverNotification(

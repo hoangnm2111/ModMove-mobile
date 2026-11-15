@@ -325,6 +325,7 @@ class CustomerOrderCubit extends Cubit<OrderState> {
   Timer? _timer;
   StreamSubscription<CustomerRealtimeEvent>? _subscription;
   bool _refreshing = false, _trackingBusy = false;
+  bool _closing = false;
   Completer<void>? _refreshDone;
   OrderState update({
     OrderDetail? order,
@@ -345,9 +346,9 @@ class CustomerOrderCubit extends Cubit<OrderState> {
   );
   Future<void> initialize() async {
     await refresh();
-    if (isClosed) return;
+    if (isClosed || _closing) return;
     _subscription = realtime.events.listen((event) {
-      if (isClosed) return;
+      if (isClosed || _closing) return;
       if (event.position != null &&
           event.at != null &&
           state.tracking != null) {
@@ -375,7 +376,7 @@ class CustomerOrderCubit extends Cubit<OrderState> {
     } catch (_) {
       /* REST status refresh remains available. */
     }
-    if (isClosed) {
+    if (isClosed || _closing) {
       await realtime.stop();
       return;
     }
@@ -385,7 +386,7 @@ class CustomerOrderCubit extends Cubit<OrderState> {
   }
 
   Future<void> refresh() async {
-    if (_refreshing || state.acting || isClosed) return;
+    if (_refreshing || state.acting || isClosed || _closing) return;
     _refreshing = true;
     _refreshDone = Completer<void>();
     emit(update(busy: state.order == null));
@@ -419,7 +420,7 @@ class CustomerOrderCubit extends Cubit<OrderState> {
   }
 
   Future<void> loadTracking() async {
-    if (isClosed || _trackingBusy) return;
+    if (isClosed || _closing || _trackingBusy) return;
     _trackingBusy = true;
     try {
       var tracking = await repository.tracking(id);
@@ -449,7 +450,7 @@ class CustomerOrderCubit extends Cubit<OrderState> {
   }
 
   Future<bool> act(Future<void> Function() action) async {
-    if (state.acting || isClosed) return false;
+    if (state.acting || isClosed || _closing) return false;
     emit(update(acting: true));
     if (_refreshing) await _refreshDone?.future;
     if (isClosed) return false;
@@ -474,6 +475,7 @@ class CustomerOrderCubit extends Cubit<OrderState> {
 
   @override
   Future<void> close() async {
+    _closing = true;
     _timer?.cancel();
     await _subscription?.cancel();
     await realtime.stop();

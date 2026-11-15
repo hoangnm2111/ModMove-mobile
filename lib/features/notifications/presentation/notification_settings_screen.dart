@@ -5,7 +5,8 @@ import '../domain/driver_notification.dart';
 import 'push_cubit.dart';
 
 class NotificationSettingsScreen extends StatelessWidget {
-  const NotificationSettingsScreen({super.key});
+  const NotificationSettingsScreen({super.key, this.customer = false});
+  final bool customer;
   @override
   Widget build(BuildContext context) => Scaffold(
     appBar: const AppHeader('Thông báo'),
@@ -24,14 +25,20 @@ class NotificationSettingsScreen extends StatelessWidget {
             ),
             const SizedBox(height: 20),
             Text(
-              state.registered ? 'Đã bật thông báo' : 'Thông báo tài xế',
+              state.registered
+                  ? 'Đã bật thông báo'
+                  : customer
+                  ? 'Thông báo đơn hàng'
+                  : 'Thông báo tài xế',
               textAlign: TextAlign.center,
               style: Theme.of(context).textTheme.titleLarge,
             ),
             const SizedBox(height: 12),
-            const Text(
-              'Nhận thông báo đơn mới, kết quả duyệt hồ sơ, phản hồi sự cố '
-              'và yêu cầu rút tiền. Chạm vào thông báo để xem thông tin mới nhất.',
+            Text(
+              customer
+                  ? 'Nhận cập nhật tài xế, ảnh lấy hàng, giao hàng và kết quả hỗ trợ / hoàn tiền. Chạm vào thông báo để xem thông tin mới nhất.'
+                  : 'Nhận thông báo đơn mới, kết quả duyệt hồ sơ, phản hồi sự cố '
+                        'và yêu cầu rút tiền. Chạm vào thông báo để xem thông tin mới nhất.',
               textAlign: TextAlign.center,
             ),
             const SizedBox(height: 24),
