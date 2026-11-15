@@ -12,7 +12,9 @@ String money(num value) {
 
 String _two(int v) => v.toString().padLeft(2, '0');
 
-String dateTime(DateTime d) => '${_two(d.hour)}:${_two(d.minute)} ${_two(d.day)}/${_two(d.month)}/${d.year}';
+String dateTime(DateTime d) =>
+    '${_two(d.hour)}:${_two(d.minute)} ${_two(d.day)}/${_two(d.month)}/${d.year}';
+String timeOfDay(DateTime d) => '${_two(d.hour)}:${_two(d.minute)}';
 String date(DateTime d) => '${_two(d.day)}/${_two(d.month)}/${d.year}';
 
 String timeAgo(DateTime d, [DateTime? now]) {
