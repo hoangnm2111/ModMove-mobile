@@ -245,7 +245,7 @@ void main() {
       await chooseSample(tester, DocumentKind.licenseBack, 'Xem / Thay ảnh');
       await click(tester, find.text('Tiếp tục'));
       await chooseSample(tester, DocumentKind.inspection, 'Thay ảnh');
-      await click(tester, find.text('Gửi hồ sơ xét duyệt'));
+      await click(tester, find.text('Gửi lại hồ sơ'));
       expect(driver.version, 2);
       await click(tester, find.text('Mô phỏng'));
       await click(tester, find.byKey(const ValueKey('demo-approve')));

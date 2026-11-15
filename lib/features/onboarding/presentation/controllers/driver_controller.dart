@@ -288,6 +288,11 @@ class DriverController extends Cubit<DriverPresentationState> {
     lastError = null;
     _notify();
     try {
+      if (remote && canEdit) {
+        // Text edits live in the controller until saved. Preserve them before
+        // polling/reloading a rejected application or returning to its profile.
+        await _profile!.saveDraft(application);
+      }
       await action();
       final latest = await _profile!.refresh();
       if (_disposed) return null;
@@ -346,6 +351,7 @@ class DriverController extends Cubit<DriverPresentationState> {
     lastError = null;
     _notify();
     try {
+      if (remote && canEdit) await _profile!.saveDraft(application);
       final receipt = await _submitApplication(application);
       version = receipt.version;
       submittedAt = receipt.submittedAt;

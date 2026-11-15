@@ -11,6 +11,14 @@ class RemoteDriverRepository implements DriverProfileRepository {
   final ApiClient api;
   final List<Map<String, dynamic>> vehicleTypes = [];
   static const validation = ValidateDriverApplication(backendContract: true);
+  static const _editableFields = [
+    'citizenId',
+    'license',
+    'vehicleType',
+    'plate',
+    'payload',
+  ];
+  DriverApplication? _draft;
   DriverApplication _cached = DriverApplication(
     status: ApprovalStatus.draft,
     fields: {
@@ -53,7 +61,7 @@ class RemoteDriverRepository implements DriverProfileRepository {
     vehicleTypes.addAll(types.map((e) => Map<String, dynamic>.from(e as Map)));
     final draft = await api.store.read(_draftKey);
     if (draft != null) {
-      _cached = DriverApplicationDto.fromJson(
+      _draft = DriverApplicationDto.fromJson(
         jsonDecode(draft) as Map<String, dynamic>,
       );
     }
@@ -68,7 +76,8 @@ class RemoteDriverRepository implements DriverProfileRepository {
         await api.request('GET', '/api/driver/onboarding/status') as Map;
     final driver = await api.request('GET', '/api/driver/status') as Map;
     final fields = {
-      ..._cached.fields,
+      for (final key in [..._editableFields, 'length', 'width', 'height'])
+        key: '',
       'fullName': '${account['fullName']}',
       'phone': '${account['phoneNumber']}',
       'email': '${account['email'] ?? ''}',
@@ -77,7 +86,10 @@ class RemoteDriverRepository implements DriverProfileRepository {
       'totalRatings': '${account['totalRatings'] ?? 0}',
     };
     var approval = ApprovalStatus.draft;
-    var documents = {..._cached.documents};
+    final documents = {
+      for (final kind in DocumentKind.values)
+        kind: const VerificationDocument(),
+    };
     if (status['hasApplication'] == true) {
       approval = ApprovalStatus.values.byName(
         (status['profileApprovalStatus'] as String).toLowerCase(),
@@ -93,17 +105,11 @@ class RemoteDriverRepository implements DriverProfileRepository {
       // Rejection reasons apply to the application; the API has no per-photo decisions.
       final reason = (status['rejectionReasons'] as List?)?.join('\n');
       fields['rejectionReasons'] = reason ?? '';
-      documents = {
-        for (final kind in DocumentKind.values)
-          kind: const VerificationDocument(),
-      };
       for (final (index, kind) in validation.requiredDocuments.indexed) {
         documents[kind] = VerificationDocument(
           remoteReference: index < urls.length ? urls[index] as String : null,
           accepted: approval == ApprovalStatus.approved,
           rejectionReason: null,
-          // Backend permits resubmission with unchanged photos after correcting fields.
-          replaced: approval == ApprovalStatus.rejected,
         );
       }
     }
@@ -136,6 +142,8 @@ class RemoteDriverRepository implements DriverProfileRepository {
           entry.key: ((vehicle[entry.value] as num) / 100).toString(),
       });
       for (final entry in {
+        DocumentKind.citizenFront: account['citizenIdFrontUrl'],
+        DocumentKind.citizenBack: account['citizenIdBackUrl'],
         DocumentKind.licenseFront: account['licenseFrontUrl'],
         DocumentKind.licenseBack: account['licenseBackUrl'],
         DocumentKind.registration: vehicle['registrationCertUrl'],
@@ -150,7 +158,7 @@ class RemoteDriverRepository implements DriverProfileRepository {
         }
       }
     }
-    _cached = DriverApplication(
+    final latest = DriverApplication(
       status: approval,
       fields: fields,
       documents: documents,
@@ -159,13 +167,55 @@ class RemoteDriverRepository implements DriverProfileRepository {
       submittedAt: DateTime.tryParse('${status['submittedAt']}'),
       reviewedAt: DateTime.tryParse('${status['reviewedAt']}'),
     );
+    final draft = _draft;
+    if (draft != null &&
+        latest.canEdit &&
+        draft.status == latest.status &&
+        draft.version == latest.version) {
+      // A refresh must not replace a corrected photo/field with the rejected
+      // version. Only form data is local; approval and review metadata stay
+      // authoritative on the server. A newer version invalidates this draft.
+      _cached = DriverApplication(
+        status: latest.status,
+        fields: {
+          ...latest.fields,
+          for (final key in _editableFields)
+            if (draft.fields.containsKey(key)) key: draft.fields[key]!,
+        },
+        documents: {
+          ...latest.documents,
+          for (final entry in draft.documents.entries)
+            if (entry.value.hasImage) entry.key: entry.value,
+        },
+        version: latest.version,
+        accountActive: latest.accountActive,
+        online: latest.online,
+        submittedAt: latest.submittedAt,
+        reviewedAt: latest.reviewedAt,
+      );
+    } else {
+      _cached = latest;
+      if (draft != null) await _clearDraft();
+    }
     return _cached;
   });
+
+  Future<void> _clearDraft() async {
+    _draft = null;
+    try {
+      await api.store.delete(_draftKey);
+    } catch (_) {
+      // A local cleanup failure must not turn a successful POST into a failed
+      // submission. Version/status checks also reject this stale draft on restart.
+    }
+  }
+
   @override
   Future<DriverApplication> saveDraft(
     DriverApplication application,
   ) => _guard(() async {
     _cached = application;
+    _draft = application;
     // Drafts are local and account-scoped; never claim the backend saved a draft.
     final json = DriverApplicationDto.toJson(application);
     for (final doc in (json['documents'] as Map).values) {
@@ -230,7 +280,7 @@ class RemoteDriverRepository implements DriverProfileRepository {
       version: receipt.version,
       submittedAt: receipt.submittedAt,
     );
-    await api.store.delete(_draftKey);
+    await _clearDraft();
     try {
       await refresh();
     } on ApplicationFailure {

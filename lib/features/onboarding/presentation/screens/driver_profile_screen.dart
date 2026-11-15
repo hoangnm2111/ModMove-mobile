@@ -423,6 +423,13 @@ class _DriverProfileScreenState extends State<DriverProfileScreen>
             : 'Vui lòng cập nhật hồ sơ theo yêu cầu xét duyệt.',
         peach: true,
       ),
+      const SizedBox(height: 8),
+      const Notice(
+        'Thông tin và ảnh đã nộp được giữ nguyên.',
+        detail:
+            'Chỉ sửa hoặc bổ sung mục admin yêu cầu rồi gửi lại hồ sơ. '
+            'Không cần nhập lại từ đầu.',
+      ),
       const SizedBox(height: 12),
       PrimaryButton(
         'Cập nhật và gửi lại hồ sơ',

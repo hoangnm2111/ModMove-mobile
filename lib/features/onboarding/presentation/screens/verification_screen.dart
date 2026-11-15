@@ -199,7 +199,11 @@ class _VerificationScreenState extends State<VerificationScreen> {
               mainAxisSize: MainAxisSize.min,
               children: [
                 PrimaryButton(
-                  step == 0 ? 'Tiếp tục' : 'Gửi hồ sơ xét duyệt',
+                  step == 0
+                      ? 'Tiếp tục'
+                      : driver.status == ApprovalStatus.rejected
+                      ? 'Gửi lại hồ sơ'
+                      : 'Gửi hồ sơ xét duyệt',
                   busy: driver.submitting || driver.syncing,
                   onPressed: driver.canEdit && !driver.busy ? _continue : null,
                 ),
@@ -245,7 +249,7 @@ class _VerificationScreenState extends State<VerificationScreen> {
                 if (driver.hasApi) ...[
                   Text(
                     driver.savedAt == null
-                        ? 'Bản demo • Có thể lưu nháp và tiếp tục sau'
+                        ? 'Có thể lưu nháp và tiếp tục sau'
                         : 'Bản nháp đã lưu lúc ${formatStamp(driver.savedAt)}',
                     style: appText(size: 11, color: AppColors.secondary),
                   ),
@@ -257,9 +261,22 @@ class _VerificationScreenState extends State<VerificationScreen> {
                 ],
                 VerificationProgress(step),
                 const SizedBox(height: 6),
+                if (driver.status == ApprovalStatus.rejected) ...[
+                  Notice(
+                    'Chỉ cập nhật mục được yêu cầu',
+                    detail:
+                        'Thông tin và ảnh đã nộp được giữ nguyên. '
+                        'Bạn chỉ cần sửa thông tin hoặc thay ảnh theo yêu cầu của admin.'
+                        '${driver.fields['rejectionReasons']?.isNotEmpty == true ? '\n\nYêu cầu bổ sung:\n${driver.fields['rejectionReasons']}' : ''}',
+                    peach: true,
+                  ),
+                  const SizedBox(height: 10),
+                ],
                 if (!driver.canEdit) ...[
-                  const Notice(
-                    'Hồ sơ đang được khóa để xét duyệt.',
+                  Notice(
+                    driver.status == ApprovalStatus.approved
+                        ? 'Hồ sơ đã được duyệt. Thông tin và giấy tờ được giữ nguyên.'
+                        : 'Hồ sơ đang được khóa để xét duyệt.',
                     peach: true,
                   ),
                   const SizedBox(height: 10),
@@ -341,23 +358,21 @@ class _VerificationScreenState extends State<VerificationScreen> {
       keyboard: TextInputType.number,
     ),
     const SizedBox(height: 16),
-    if (!driver.remote) ...[
-      const SectionTitle('Căn cước công dân', size: 16),
-      const SizedBox(height: 6),
-      Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Expanded(
-            child: _tile(driver, DocumentKind.citizenFront, 'Mặt trước', 136),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: _tile(driver, DocumentKind.citizenBack, 'Mặt sau', 136),
-          ),
-        ],
-      ),
-      const SizedBox(height: 12),
-    ],
+    const SectionTitle('Căn cước công dân', size: 16),
+    const SizedBox(height: 6),
+    Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Expanded(
+          child: _tile(driver, DocumentKind.citizenFront, 'Mặt trước', 136),
+        ),
+        const SizedBox(width: 12),
+        Expanded(
+          child: _tile(driver, DocumentKind.citizenBack, 'Mặt sau', 136),
+        ),
+      ],
+    ),
+    const SizedBox(height: 12),
     const SectionTitle('Giấy phép lái xe', size: 16),
     const SizedBox(height: 6),
     Row(

@@ -11,6 +11,10 @@ class ValidateDriverApplication {
           DocumentKind.registration,
           DocumentKind.inspection,
           DocumentKind.vehicle,
+          // CCCD photos were appended by the backend; retain the original
+          // five indexes when restoring older applications.
+          DocumentKind.citizenFront,
+          DocumentKind.citizenBack,
         ]
       : DocumentKind.values;
 

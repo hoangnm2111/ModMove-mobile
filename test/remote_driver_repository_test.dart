@@ -66,7 +66,7 @@ void main() {
     },
   );
   test(
-    'backend form submits numeric vehicle ID and exactly five ordered document URLs',
+    'backend form submits numeric vehicle ID and seven ordered document URLs',
     () async {
       Map<String, dynamic>? submitted;
       final api = ApiClient(
@@ -120,9 +120,7 @@ void main() {
         documents: {
           for (final kind in DocumentKind.values)
             kind: VerificationDocument(
-              remoteReference: kind.index >= 2
-                  ? 'https://images.test/${kind.name}.png'
-                  : null,
+              remoteReference: 'https://images.test/${kind.name}.png',
             ),
         },
       );
@@ -140,6 +138,8 @@ void main() {
           'registration',
           'inspection',
           'vehicle',
+          'citizenFront',
+          'citizenBack',
         ].map((e) => 'https://images.test/$e.png').toList(),
       );
       expect(repo.loadCachedApplication().status, ApprovalStatus.pending);

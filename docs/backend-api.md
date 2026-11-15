@@ -46,8 +46,9 @@ Các đường dẫn trong bảng có tiền tố `/api`.
 lưu mã hóa, refresh token được tuần tự hóa. Mobile chỉ chấp nhận role Driver.
 Báo sự cố chuyến đang chạy gọi `POST /driver/incidents`.
 
-Hồ sơ nộp đúng 5 URL theo thứ tự: GPLX trước, GPLX sau, đăng ký xe, đăng kiểm,
-ảnh xe. CCCD hiện chỉ có trường số, chưa có trường ảnh trong API. Ảnh JPG/PNG
+Cập nhật hợp đồng hồ sơ ngày 16/11/2026 (backend `20d13c5`): nộp đúng **7 URL**
+theo thứ tự: GPLX trước, GPLX sau, đăng ký xe, đăng kiểm, ảnh xe, CCCD trước,
+CCCD sau. Năm vị trí đầu giữ nguyên để đọc được hồ sơ cũ. Ảnh JPG/PNG
 tối đa 5 MB được upload multipart field `file` lên backend. Mobile không chứa
 Cloudinary secret. Bản nháp mã hóa trên thiết bị, tách theo tài khoản/server;
 backend chưa có API bản nháp/lịch sử hồ sơ cho Driver. Xe đã duyệt hiển thị
@@ -59,7 +60,7 @@ thông số xe đăng ký từ hồ sơ, không thay bằng kích thước danh 
 
 1. Mở app → **Đăng ký tài xế**, nhập thông tin và OTP. Nếu SMTP chưa cấu hình,
    backend Development hiện OTP trong terminal theo cấu hình môi trường.
-2. Chọn 2 ảnh GPLX, nhập số CCCD/GPLX; chọn loại xe, biển số, tải trọng và 3 ảnh
+2. Chọn 2 ảnh CCCD và 2 ảnh GPLX, nhập số CCCD/GPLX; chọn loại xe, biển số, tải trọng và 3 ảnh
    xe → gửi hồ sơ. Bước upload cần Cloudinary hoạt động.
 3. Hồ sơ chuyển **Chờ duyệt**. Admin duyệt/từ chối trên web hoặc Swagger
    `http://localhost:5133/swagger`: lấy ID từ
@@ -79,6 +80,28 @@ thông số xe đăng ký từ hồ sơ, không thay bằng kích thước danh 
 
 Đây là tài khoản seed local, dữ liệu có thể thay đổi sau khi thao tác. Dù dữ liệu
 được seed, mobile vẫn đọc và ghi qua HTTP/SignalR thật.
+
+### 1.1. Bổ sung hồ sơ bị từ chối, không nhập lại từ đầu
+
+Khi admin từ chối hồ sơ, app giữ lại các trường và URL ảnh từ
+`GET /driver/onboarding/status`. Mở **Cập nhật và gửi lại hồ sơ**, đọc lý do,
+chỉ sửa thông tin hoặc thay ảnh được yêu cầu, sau đó **Gửi lại hồ sơ**.
+Các ảnh không thay được gửi lại bằng URL cũ, không phải upload lại.
+Hồ sơ cũ chỉ có 5 ảnh cần bổ sung hai ảnh CCCD còn thiếu; không xóa 5 ảnh cũ.
+
+Bản sửa được lưu mã hóa theo tài khoản/server và phiên bản hồ sơ. Ảnh tải lên
+thành công, bản nháp đã lưu và nội dung gửi lại thất bại được giữ qua refresh/
+mở lại app. Bản nháp của phiên bản cũ không ghi đè hồ sơ Pending/Approved hoặc
+phiên bản mới từ server. Ảnh upload thất bại còn trong bộ nhớ để thử lại khi
+app vẫn mở; bytes ảnh chưa upload không được lưu lâu dài, cần chọn lại nếu
+tắt app. Các ảnh đã nộp khác vẫn được giữ.
+
+API hiện trả `rejectionReasons` dưới dạng danh sách văn bản, chưa có mã trường
+hoặc quyết định duyệt từng ảnh. App hiển thị nguyên văn yêu cầu và cho sửa các
+mục trong hồ sơ Rejected; không tự đoán ảnh nào bị từ chối hoặc đánh dấu những
+ảnh còn lại đã được admin duyệt riêng. Backend vẫn nhận đầy đủ 7 URL khi tạo
+phiên bản mới. Luồng giữ dữ liệu có test HTTP giả lập/controller/widget; không
+tự thao tác tài khoản Admin để đổi trạng thái hồ sơ trên backend đang chạy.
 
 ### 2. Online → nhận đơn → đến lấy hàng
 
