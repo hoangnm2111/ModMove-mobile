@@ -7,8 +7,11 @@ abstract interface class AuthRepository {
     String name,
     String phone,
     String email,
-    String password,
-  );
+    String password, {
+    String role = 'Driver',
+  });
+  Future<void> forgotPassword(String email);
+  Future<void> resetPassword(String email, String code, String password);
   Future<void> verify(String email, String code, String password);
   Future<void> resend(String email);
   Future<void> logout();

@@ -34,11 +34,14 @@ class RemoteAuthRepository implements AuthRepository {
     String name,
     String phone,
     String email,
-    String password,
-  ) => _guard(() async {
+    String password, {
+    String role = 'Driver',
+  }) => _guard(() async {
     await api.request(
       'POST',
-      '/api/public/auth/register-driver',
+      role == 'Customer'
+          ? '/api/public/auth/register'
+          : '/api/public/auth/register-driver',
       authenticated: false,
       body: {
         'fullName': name.trim(),
@@ -48,6 +51,29 @@ class RemoteAuthRepository implements AuthRepository {
       },
     );
   });
+  @override
+  Future<void> forgotPassword(String email) => _guard(() async {
+    await api.request(
+      'POST',
+      '/api/public/auth/forgot-password',
+      authenticated: false,
+      body: {'email': email.trim()},
+    );
+  });
+  @override
+  Future<void> resetPassword(String email, String code, String password) =>
+      _guard(() async {
+        await api.request(
+          'POST',
+          '/api/public/auth/reset-password',
+          authenticated: false,
+          body: {
+            'email': email.trim(),
+            'code': code.trim(),
+            'newPassword': password,
+          },
+        );
+      });
   @override
   Future<void> verify(String email, String code, String password) =>
       _guard(() async {

@@ -2,7 +2,16 @@ import 'dart:async';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../domain/auth_repository.dart';
 
-enum AuthStage { restoring, login, register, verify, signedIn }
+enum AuthStage {
+  restoring,
+  login,
+  register,
+  verify,
+  forgot,
+  reset,
+  guest,
+  signedIn,
+}
 
 class AuthState {
   const AuthState(this.stage, {this.busy = false, this.error, this.notice});
@@ -77,9 +86,10 @@ class AuthCubit extends Cubit<AuthState> {
     String name,
     String phone,
     String email,
-    String password,
-  ) => _run(
-    () => repository.register(name, phone, email, password),
+    String password, {
+    String role = 'Driver',
+  }) => _run(
+    () => repository.register(name, phone, email, password, role: role),
     AuthStage.verify,
     notice: 'Nhập mã OTP đã gửi tới email của bạn.',
   );
@@ -93,13 +103,23 @@ class AuthCubit extends Cubit<AuthState> {
     AuthStage.verify,
     notice: 'Đã yêu cầu gửi lại OTP. Kiểm tra email của bạn.',
   );
-  Future<void> logout() async {
+  Future<void> forgot(String email) => _run(
+    () => repository.forgotPassword(email),
+    AuthStage.reset,
+    notice: 'Nếu email đã đăng ký, mã xác minh sẽ được gửi tới hộp thư.',
+  );
+  Future<void> reset(String email, String code, String password) => _run(
+    () => repository.resetPassword(email, code, password),
+    AuthStage.login,
+    notice: 'Đã đặt lại mật khẩu. Hãy đăng nhập bằng mật khẩu mới.',
+  );
+  Future<void> logout({String? notice}) async {
     try {
       await repository.logout();
     } catch (_) {
       /* local token was cleared */
     }
-    if (!isClosed) emit(const AuthState(AuthStage.login));
+    if (!isClosed) emit(AuthState(AuthStage.login, notice: notice));
   }
 
   @override
