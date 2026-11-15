@@ -1,6 +1,7 @@
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../controllers/home_controller.dart';
 import 'package:flutter/material.dart';
+import '../../../../core/widgets/brand_logo.dart';
 import 'package:modmove_mobile/core/theme/app_theme.dart';
 import 'package:modmove_mobile/core/widgets/app_widgets.dart';
 import '../models/vehicle_option.dart';
@@ -51,15 +52,24 @@ class HomeScreen extends StatelessWidget {
               height: 64,
               child: Row(
                 children: [
-                  Text(
-                    'ModMove',
-                    style: appText(
-                      size: 28,
-                      weight: FontWeight.w800,
-                      color: AppColors.orange,
-                      spacing: -1,
+                  const BrandLogo(size: 36),
+                  const SizedBox(width: 10),
+                  Flexible(
+                    child: FittedBox(
+                      fit: BoxFit.scaleDown,
+                      alignment: Alignment.centerLeft,
+                      child: Text(
+                        'ModMove',
+                        style: appText(
+                          size: 28,
+                          weight: FontWeight.w800,
+                          color: AppColors.orange,
+                          spacing: -1,
+                        ),
+                      ),
                     ),
                   ),
+                  const SizedBox(width: 8),
                   const Spacer(),
                   OutlinedButton(
                     onPressed: onAccount,
