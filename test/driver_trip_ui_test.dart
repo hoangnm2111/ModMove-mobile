@@ -7,6 +7,7 @@ import 'package:modmove_mobile/app/app.dart';
 import 'package:modmove_mobile/features/driver_trip/data/repositories/mock_driver_trip_repository.dart';
 import 'package:modmove_mobile/features/driver_trip/domain/entities/trip_models.dart';
 import 'package:modmove_mobile/features/driver_trip/domain/repositories/driver_trip_repository.dart';
+import 'package:modmove_mobile/features/driver_trip/presentation/widgets/trip_components.dart' show PickupStepper;
 
 Future<void> capture(WidgetTester tester, GlobalKey key, String name) async {
   if (!const bool.fromEnvironment('CAPTURE_SCREENSHOTS')) return;
@@ -156,6 +157,20 @@ void main() {
       await tester.pumpAndSettle();
       expect(repo.current.trip!.stage, TripStage.inTransit);
       expect(find.text('Đang giao hàng'), findsOneWidget);
+      // Tiến trình đủ 6 bước; chưa báo đến điểm giao thì bước hiện tại là "Đang giao".
+      for (final label in PickupStepper.labels) {
+        expect(find.text(label), findsWidgets);
+      }
+      expect(find.byKey(const Key('dropoff-notified')), findsNothing);
+      expect(find.byKey(const Key('delivery-missing')), findsOneWidget);
+      expect(find.textContaining('chụp ảnh giao hàng'), findsWidgets);
+      // Báo đã đến điểm giao: nút biến thành trạng thái "đã báo", chỉ dẫn bước tiếp theo, không đổi trạng thái đơn.
+      await clickTrip(tester, find.byKey(const Key('arrive-dropoff')));
+      expect(find.byKey(const Key('dropoff-notified')), findsOneWidget);
+      expect(find.byKey(const Key('arrive-dropoff')), findsNothing);
+      expect(find.textContaining('Đã báo cho khách'), findsOneWidget);
+      expect(repo.current.trip!.stage, TripStage.inTransit);
+      expect(repo.current.trip!.dropoffNotified, isTrue);
       expect(tester.takeException(), isNull);
       await tester.pumpWidget(const SizedBox());
       await repo.close();

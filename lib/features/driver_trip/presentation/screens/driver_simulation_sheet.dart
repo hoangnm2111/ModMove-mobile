@@ -48,7 +48,7 @@ Future<void> showTripSimulation(BuildContext context) async {
               TripSimulation.customerApproves: 'Khách xác nhận hàng',
               TripSimulation.customerRejects: 'Khách yêu cầu chụp lại',
               TripSimulation.emptyJobs: 'Không có đơn phù hợp',
-              TripSimulation.lowDeposit: 'Ký quỹ còn 100.000đ',
+              TripSimulation.lowDeposit: 'Tiền cọc còn 100.000đ',
             }.entries.where((e) => (repository as TripSimulator).supported.contains(e.key)).map(
               (e) => ListTile(
                 contentPadding: EdgeInsets.zero,
