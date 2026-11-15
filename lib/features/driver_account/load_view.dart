@@ -2,14 +2,20 @@ import 'package:flutter/material.dart';
 import '../../core/network/api_exception.dart';
 import '../driver_trip/presentation/widgets/trip_components.dart';
 
-String errorText(Object error) =>
-    error is ApiException ? error.message : 'Chưa tải được dữ liệu. Vui lòng thử lại.';
+String errorText(Object error) => error is ApiException
+    ? error.message
+    : 'Chưa tải được dữ liệu. Vui lòng thử lại.';
 
 /// Tải một lần, kéo để làm mới, lỗi có nút "Thử lại". [builder] nhận dữ liệu và hàm [reload].
 class LoadView<T> extends StatefulWidget {
   const LoadView({super.key, required this.load, required this.builder});
   final Future<T> Function() load;
-  final Widget Function(BuildContext context, T data, Future<void> Function() reload) builder;
+  final Widget Function(
+    BuildContext context,
+    T data,
+    Future<void> Function() reload,
+  )
+  builder;
 
   @override
   State<LoadView<T>> createState() => _LoadViewState<T>();
@@ -44,7 +50,10 @@ class _LoadViewState<T> extends State<LoadView<T>> {
   @override
   Widget build(BuildContext context) {
     if (_data != null) {
-      return RefreshIndicator(onRefresh: _reload, child: widget.builder(context, _data as T, _reload));
+      return RefreshIndicator(
+        onRefresh: _reload,
+        child: widget.builder(context, _data as T, _reload),
+      );
     }
     if (_loading) return const Center(child: CircularProgressIndicator());
     return ListView(
@@ -122,15 +131,28 @@ class _PagedListViewState<T> extends State<PagedListView<T>> {
         padding: const EdgeInsets.all(16),
         children: [
           if (widget.header != null) widget.header!,
-          if (_error != null) TripError(errorText(_error!), retry: () => _more(reset: _items.isEmpty)),
+          if (_error != null)
+            TripError(
+              errorText(_error!),
+              retry: () => _more(reset: _items.isEmpty),
+            ),
           if (_items.isEmpty && !_loading && _error == null)
             Padding(
               padding: const EdgeInsets.symmetric(vertical: 40),
-              child: Center(child: Text(widget.emptyText, textAlign: TextAlign.center)),
+              child: Center(
+                child: Text(widget.emptyText, textAlign: TextAlign.center),
+              ),
             ),
           for (final item in _items)
-            Padding(padding: const EdgeInsets.only(bottom: 8), child: widget.itemBuilder(context, item)),
-          if (_loading) const Padding(padding: EdgeInsets.all(16), child: Center(child: CircularProgressIndicator())),
+            Padding(
+              padding: const EdgeInsets.only(bottom: 8),
+              child: widget.itemBuilder(context, item),
+            ),
+          if (_loading)
+            const Padding(
+              padding: EdgeInsets.all(16),
+              child: Center(child: CircularProgressIndicator()),
+            ),
           if (_hasNext && !_loading)
             TextButton(onPressed: _more, child: const Text('Tải thêm')),
         ],

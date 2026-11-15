@@ -355,6 +355,21 @@ class _VerificationScreenState extends State<VerificationScreen> {
         ),
       ],
     ),
+    const SizedBox(height: 16),
+    const SectionTitle('Căn cước công dân', size: 16),
+    const SizedBox(height: 6),
+    Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Expanded(
+          child: _tile(driver, DocumentKind.citizenIdFront, 'Mặt trước', 108),
+        ),
+        const SizedBox(width: 12),
+        Expanded(
+          child: _tile(driver, DocumentKind.citizenIdBack, 'Mặt sau', 108),
+        ),
+      ],
+    ),
     const SizedBox(height: 10),
     const Notice(
       'Chụp rõ thông tin và đủ 4 góc giấy tờ.',

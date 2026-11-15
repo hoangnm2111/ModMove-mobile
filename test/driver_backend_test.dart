@@ -124,6 +124,10 @@ class FakeBackend {
       case 'patch /driver/online-status':
         online = (bodies[key] as Map)['isOnline'] == true;
         return http.Response('', 204);
+      case 'post /driver/onboarding':
+        return json({'id': 99}, 201);
+      case 'delete /driver/account':
+        return http.Response('', 204);
       case 'post /driver/location':
         return http.Response('', 204);
       case 'get /driver/wallet/earnings':
@@ -284,8 +288,10 @@ class FakeBackend {
 final _png = Uint8List.fromList([137, 80, 78, 71, 13, 10, 26, 10, 0, 0]);
 
 class _FixedLocation implements DriverLocationSource {
+  const _FixedLocation([this.point = const GeoPoint(10.7769, 106.7009)]);
+  final GeoPoint point;
   @override
-  Future<GeoPoint?> current() async => const GeoPoint(10.7769, 106.7009);
+  Future<GeoPoint?> current() async => point;
 }
 
 ({DriverApi api, FakeBackend backend}) _setup({String profileApproval = 'Approved'}) {
@@ -298,7 +304,7 @@ class _FixedLocation implements DriverLocationSource {
 }
 
 void main() {
-  test('hồ sơ tài xế được đọc từ BE: duyệt, xe, 5 giấy tờ, kích thước thùng', () async {
+  test('hồ sơ tài xế được đọc từ BE: duyệt, xe, 7 loại ảnh (hồ sơ cũ 5 ảnh thì thiếu CCCD), kích thước thùng', () async {
     final env = _setup();
     final repository = BackendDriverRepository(api: env.api);
     final app = await repository.refresh();
@@ -309,7 +315,9 @@ void main() {
     expect(app.fields['payload'], '500');
     expect(app.fields['length'], '1,7');
     expect(app.fields['vehicleTypeId'], '1');
-    expect(app.documents.length, 5);
+    expect(app.documents.length, 7);
+    expect(app.documents[DocumentKind.vehicle]!.remoteReference, startsWith('https://'));
+    expect(app.documents[DocumentKind.citizenIdFront]!.hasImage, isFalse);
     expect(app.documents[DocumentKind.licenseFront]!.remoteReference, startsWith('https://'));
     expect(app.version, 1);
   });
@@ -398,6 +406,38 @@ void main() {
     expect(repository.current.notice, contains('MM20261110007'));
   });
 
+  // Lỗi cũ: kịch bản giả lập "gần điểm lấy" giữ vị trí giả mãi sau khi chuyến kết thúc, nên đơn kế tiếp ở cùng
+  // khu vực hiện "Cách bạn 0,0 km" dù tài xế ở xa.
+  test('kết thúc chuyến thì bỏ vị trí giả lập, quay về vị trí thật', () async {
+    final env = _setup();
+    // Tài xế ở xa điểm lấy hàng (khác 10.7769, 106.7009 của dữ liệu giả).
+    const home = GeoPoint(10.9000, 106.8000);
+    final repository = ApiDriverTripRepository(
+      api: env.api,
+      location: const _FixedLocation(home),
+      access: const DriverAccess(approved: true, active: true),
+      pollInterval: const Duration(hours: 1),
+    );
+    addTearDown(repository.close);
+    repository.onSessionChanged(isDriver: true);
+    await repository.refresh();
+    await repository.setOnline(true);
+    await repository.openOffer('7');
+    await repository.acceptOffer('7');
+    await repository.simulate(TripSimulation.nearPickup);
+    final pickup = repository.current.trip!.job.pickupPoint;
+    expect(repository.current.fix!.point.latitude, pickup.latitude);
+
+    env.backend.orderStatus = 'InTransit';
+    await repository.refresh();
+    await repository.collectCash();
+    await repository.deliver(CargoPhoto(kind: CargoPhotoKind.overall, name: 'pod.png', bytes: _png));
+    await repository.refresh();
+    // Về vị trí của nguồn GPS (_FixedLocation), không còn dính điểm lấy hàng của chuyến cũ.
+    expect(repository.current.fix!.point.latitude, home.latitude);
+    expect(repository.current.fix!.point.longitude, home.longitude);
+  });
+
   test('đơn bị tài xế khác nhận trước (409) được bỏ khỏi danh sách và báo lỗi tiếng Việt', () async {
     final backend = FakeBackend();
     final client = MockClient((request) async {
@@ -425,7 +465,7 @@ void main() {
     await repository.openOffer('7');
     await expectLater(
       repository.acceptOffer('7'),
-      throwsA(isA<TripFailure>().having((e) => e.message, 'message', contains('thay đổi'))),
+      throwsA(isA<TripFailure>().having((e) => e.message, 'message', 'Đơn đã có tài xế khác nhận trước.')),
     );
     expect(repository.current.jobs, isEmpty);
   });
@@ -462,5 +502,35 @@ void main() {
     await repository.simulate(TripSimulation.gpsRestored);
     expect(repository.current.gpsEnabled, isTrue);
     await expectLater(repository.simulate(TripSimulation.cancelOrder), throwsA(isA<TripFailure>()));
+  });
+
+  test('nộp hồ sơ gửi đúng 7 ảnh theo thứ tự BE (D2): GPLX, đăng ký, đăng kiểm, ảnh xe, CCCD trước, CCCD sau', () async {
+    final env = _setup();
+    final docs = {for (final kind in DocumentKind.values) kind: VerificationDocument(remoteReference: 'https://res.cloudinary.com/demo/${kind.name}.jpg')};
+    final draft = DriverApplication(
+      status: ApprovalStatus.draft,
+      fields: const {'vehicleTypeId': '1', 'citizenId': '079090000002', 'license': '790000000002', 'plate': '51c-222.22', 'payload': '500'},
+      documents: docs,
+    );
+    await BackendDriverRepository(api: env.api, cached: draft).submit(draft);
+    final body = env.backend.bodies['post /driver/onboarding'] as Map;
+    expect(body['documentUrls'], [
+      for (final name in ['licenseFront', 'licenseBack', 'registration', 'inspection', 'vehicle', 'citizenIdFront', 'citizenIdBack']) 'https://res.cloudinary.com/demo/$name.jpg',
+    ]);
+    expect(body['licensePlate'], '51C-222.22');
+  });
+
+  test('thiếu ảnh CCCD thì không gửi hồ sơ lên BE', () async {
+    final env = _setup();
+    final docs = {for (final kind in DocumentKind.values) kind: VerificationDocument(remoteReference: kind.isPersonal && kind.name.startsWith('citizen') ? null : 'https://res.cloudinary.com/demo/${kind.name}.jpg')};
+    final draft = DriverApplication(status: ApprovalStatus.draft, fields: const {'vehicleTypeId': '1', 'payload': '500'}, documents: docs);
+    await expectLater(BackendDriverRepository(api: env.api, cached: draft).submit(draft), throwsA(isA<ApplicationFailure>()));
+    expect(env.backend.requests, isNot(contains('post /driver/onboarding')));
+  });
+
+  test('xoá tài khoản tài xế gọi DELETE /driver/account (Q12)', () async {
+    final env = _setup();
+    await env.api.deleteAccount();
+    expect(env.backend.requests, contains('delete /driver/account'));
   });
 }

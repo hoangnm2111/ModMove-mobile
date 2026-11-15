@@ -43,7 +43,11 @@ class _DriverIncidentsScreenState extends State<DriverIncidentsScreen> {
           child: Wrap(
             spacing: 8,
             children: [
-              ChoiceChip(label: const Text('Tất cả'), selected: _filter == null, onSelected: (_) => setState(() => _filter = null)),
+              ChoiceChip(
+                label: const Text('Tất cả'),
+                selected: _filter == null,
+                onSelected: (_) => setState(() => _filter = null),
+              ),
               for (final status in IncidentStatus.values)
                 ChoiceChip(
                   label: Text(status.label),
@@ -54,19 +58,41 @@ class _DriverIncidentsScreenState extends State<DriverIncidentsScreen> {
           ),
         ),
         fetch: (page) async {
-          final j = await api.incidents(status: _filter == null ? null : _apiStatus[_filter], page: page);
-          final items = [for (final e in (j['items'] as List? ?? const [])) TripIncident.fromJson((e as Map).cast<String, dynamic>())];
+          final j = await api.incidents(
+            status: _filter == null ? null : _apiStatus[_filter],
+            page: page,
+          );
+          final items = [
+            for (final e in (j['items'] as List? ?? const []))
+              TripIncident.fromJson((e as Map).cast<String, dynamic>()),
+          ];
           return PageResult(items, j['hasNextPage'] == true);
         },
         itemBuilder: (context, incident) => AppCard(
-          onTap: () => Navigator.pushNamed(context, '/driver-incident', arguments: incident.id),
+          onTap: () => Navigator.pushNamed(
+            context,
+            '/driver-incident',
+            arguments: incident.id,
+          ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Row(
                 children: [
-                  Expanded(child: Text('#${incident.id} · ${incident.orderCode}', style: appText(size: 14, weight: FontWeight.w800))),
-                  Text(incident.status.label, style: appText(size: 12, weight: FontWeight.w700, color: _statusColor(incident.status))),
+                  Expanded(
+                    child: Text(
+                      '#${incident.id} · ${incident.orderCode}',
+                      style: appText(size: 14, weight: FontWeight.w800),
+                    ),
+                  ),
+                  Text(
+                    incident.status.label,
+                    style: appText(
+                      size: 12,
+                      weight: FontWeight.w700,
+                      color: _statusColor(incident.status),
+                    ),
+                  ),
                 ],
               ),
               const SizedBox(height: 4),
@@ -75,7 +101,10 @@ class _DriverIncidentsScreenState extends State<DriverIncidentsScreen> {
                 style: appText(size: 12.5, color: AppColors.secondary),
               ),
               const SizedBox(height: 2),
-              Text(dateTime(incident.createdAt), style: appText(size: 11, color: AppColors.muted)),
+              Text(
+                dateTime(incident.createdAt),
+                style: appText(size: 11, color: AppColors.muted),
+              ),
             ],
           ),
         ),
@@ -101,19 +130,44 @@ class DriverIncidentDetailScreen extends StatelessWidget {
           children: [
             Row(
               children: [
-                Expanded(child: Text('Sự cố #${i.id}', style: appText(size: 20, weight: FontWeight.w800))),
-                Text(i.status.label, style: appText(size: 13, weight: FontWeight.w700, color: _statusColor(i.status))),
+                Expanded(
+                  child: Text(
+                    'Sự cố #${i.id}',
+                    style: appText(size: 20, weight: FontWeight.w800),
+                  ),
+                ),
+                Text(
+                  i.status.label,
+                  style: appText(
+                    size: 13,
+                    weight: FontWeight.w700,
+                    color: _statusColor(i.status),
+                  ),
+                ),
               ],
             ),
             const SizedBox(height: 12),
             AppCard(
               child: Column(
                 children: [
-                  _row('Đơn hàng', '${i.orderCode}${i.orderStatus == null ? '' : ' · ${i.orderStatus}'}'),
+                  _row(
+                    'Đơn hàng',
+                    '${i.orderCode}${i.orderStatus == null ? '' : ' · ${i.orderStatus}'}',
+                  ),
                   _row('Loại sự cố', i.type.label),
-                  _row('Ai báo', i.reportedByYou ? 'Bạn báo' : 'Khách báo (bạn chỉ thấy câu chung)'),
+                  _row(
+                    'Ai báo',
+                    i.reportedByYou
+                        ? 'Bạn báo'
+                        : 'Khách báo (bạn chỉ thấy câu chung)',
+                  ),
                   _row('Báo lúc', dateTime(i.createdAt)),
-                  _row('Vị trí', i.latitude == null || i.longitude == null ? '—' : '${i.latitude!.toStringAsFixed(5)}, ${i.longitude!.toStringAsFixed(5)}'),
+                  _row(
+                    'Vị trí',
+                    i.latitude == null || i.longitude == null
+                        ? '—'
+                        : '${i.latitude!.toStringAsFixed(5)}, ${i.longitude!.toStringAsFixed(5)}',
+                  ),
                 ],
               ),
             ),
@@ -133,7 +187,17 @@ class DriverIncidentDetailScreen extends StatelessWidget {
                         padding: const EdgeInsets.only(right: 8),
                         child: ClipRRect(
                           borderRadius: BorderRadius.circular(8),
-                          child: Image.network(url, width: 84, height: 84, fit: BoxFit.cover, errorBuilder: (_, _, _) => const SizedBox(width: 84, height: 84, child: Icon(Icons.broken_image_outlined))),
+                          child: Image.network(
+                            url,
+                            width: 84,
+                            height: 84,
+                            fit: BoxFit.cover,
+                            errorBuilder: (_, _, _) => const SizedBox(
+                              width: 84,
+                              height: 84,
+                              child: Icon(Icons.broken_image_outlined),
+                            ),
+                          ),
                         ),
                       ),
                   ],
@@ -144,18 +208,27 @@ class DriverIncidentDetailScreen extends StatelessWidget {
             const SectionTitle('Xử lý của điều phối viên', size: 15),
             const SizedBox(height: 6),
             switch (i.status) {
-              IncidentStatus.open => const Text('Đang chờ điều phối viên nhận xử lý.'),
-              IncidentStatus.inProgress => const Text('Điều phối viên đang xử lý sự cố này.'),
+              IncidentStatus.open => const Text(
+                'Đang chờ điều phối viên nhận xử lý.',
+              ),
+              IncidentStatus.inProgress => const Text(
+                'Điều phối viên đang xử lý sự cố này.',
+              ),
               IncidentStatus.resolved => AppCard(
                 child: Column(
                   children: [
                     _row('Quyết định', i.decisionLabel ?? '—'),
                     _row('Ghi chú', i.note ?? '—'),
-                    _row('Xử lý lúc', i.resolvedAt == null ? '—' : dateTime(i.resolvedAt!)),
+                    _row(
+                      'Xử lý lúc',
+                      i.resolvedAt == null ? '—' : dateTime(i.resolvedAt!),
+                    ),
                   ],
                 ),
               ),
-              IncidentStatus.cancelled => Text('Báo cáo đã bị hủy${i.note == null ? '.' : ': ${i.note}'}'),
+              IncidentStatus.cancelled => Text(
+                'Báo cáo đã bị hủy${i.note == null ? '.' : ': ${i.note}'}',
+              ),
             },
           ],
         ),
@@ -168,8 +241,16 @@ class DriverIncidentDetailScreen extends StatelessWidget {
     child: Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        SizedBox(width: 96, child: Text(label, style: appText(size: 12, color: AppColors.secondary))),
-        Expanded(child: Text(value, style: appText(size: 13, weight: FontWeight.w600))),
+        SizedBox(
+          width: 96,
+          child: Text(
+            label,
+            style: appText(size: 12, color: AppColors.secondary),
+          ),
+        ),
+        Expanded(
+          child: Text(value, style: appText(size: 13, weight: FontWeight.w600)),
+        ),
       ],
     ),
   );
