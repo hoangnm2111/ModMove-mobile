@@ -83,6 +83,33 @@ void main() {
     expect(c.state.showing, a);
   });
 
+  test('câu thao tác khác nhau trong 10 giây đều hiện, câu mới thay câu cũ', () {
+    c.push(noticeFor('ACTION_ERROR', body: 'Chọn lý do khiếu nại.'));
+    clock = clock.add(const Duration(seconds: 2));
+    c.push(noticeFor('ACTION_ERROR', body: 'Số tiền yêu cầu chưa hợp lệ.'));
+    expect(c.state.showing?.body, 'Số tiền yêu cầu chưa hợp lệ.');
+    expect(c.state.queue, isEmpty);
+  });
+
+  test('đúng câu thao tác đang hiện thì không đẩy lại; đã đóng thì bấm lại vẫn hiện', () {
+    c.push(noticeFor('ACTION_ERROR', body: 'Nhập mô tả sự cố.'));
+    final first = c.state.showing;
+    c.push(noticeFor('ACTION_ERROR', body: 'Nhập mô tả sự cố.'));
+    expect(c.state.showing, same(first));
+    c.dismissCurrent();
+    clock = clock.add(const Duration(seconds: 3));
+    c.push(noticeFor('ACTION_ERROR', body: 'Nhập mô tả sự cố.'));
+    expect(c.state.showing?.body, 'Nhập mô tả sự cố.');
+  });
+
+  test('câu thao tác không chen ngang thông báo server đang hiện', () {
+    c.push(a);
+    c.push(b);
+    c.push(noticeFor('ACTION_DONE', body: 'Đã lưu.'));
+    expect(c.state.showing, a);
+    expect(c.state.queue.map((n) => n.type), ['ACTION_DONE', 'ORDER_DELIVERED']);
+  });
+
   test('pushed phát thông báo đã qua chống trùng', () async {
     final seen = <String>[];
     final sub = c.pushed.listen((n) => seen.add(n.type));

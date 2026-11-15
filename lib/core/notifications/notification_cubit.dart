@@ -33,8 +33,16 @@ class NotificationCubit extends Cubit<NotificationState> {
   Stream<AppNotice> get pushed => _pushed.stream;
 
   /// Cùng `type` và `orderId` trong 10 giây chỉ đẩy một lần (server dội lại, khách vừa tự thao tác xong...).
+  ///
+  /// Câu ngắn của thao tác (không lưu hộp thư: lỗi nhập liệu, "đã lưu"...) thì khác: mỗi lần bấm phải có phản hồi,
+  /// nên không chống trùng theo thời gian. Câu mới thay ngay câu thao tác đang hiện (như SnackBar), chỉ bỏ qua
+  /// khi đúng câu đó đang hiện.
   void push(AppNotice notice) {
     if (isClosed) return;
+    if (!notice.persist) {
+      _pushTransient(notice);
+      return;
+    }
     final key = '${notice.type}|${notice.orderId ?? ''}';
     final now = _clock();
     _recent.removeWhere((_, at) => now.difference(at) > dedupeWindow);
@@ -47,6 +55,20 @@ class NotificationCubit extends Cubit<NotificationState> {
       emit(NotificationState(showing: notice, queue: state.queue, inbox: inbox));
     } else {
       emit(NotificationState(showing: state.showing, queue: [...state.queue, notice], inbox: inbox));
+    }
+    if (!_pushed.isClosed) _pushed.add(notice);
+  }
+
+  void _pushTransient(AppNotice notice) {
+    bool same(AppNotice n) => !n.persist && n.type == notice.type && n.title == notice.title && n.body == notice.body;
+    final showing = state.showing;
+    if (showing != null && same(showing)) return;
+    final queue = state.queue.where((n) => n.persist).toList();
+    if (showing == null || !showing.persist) {
+      emit(NotificationState(showing: notice, queue: queue, inbox: state.inbox));
+    } else {
+      // Đang hiện thông báo từ server: câu thao tác chờ ngay sau nó, trước các thông báo server khác.
+      emit(NotificationState(showing: showing, queue: [notice, ...queue], inbox: state.inbox));
     }
     if (!_pushed.isClosed) _pushed.add(notice);
   }

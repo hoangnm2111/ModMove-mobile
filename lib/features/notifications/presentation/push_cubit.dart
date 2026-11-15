@@ -18,9 +18,13 @@ class PushState {
 }
 
 class PushCubit extends Cubit<PushState> {
-  PushCubit(this.device, this.repository) : super(const PushState());
+  PushCubit(this.device, this.repository, {this.onForeground}) : super(const PushState());
   final PushDevice device;
   final PushTokenRepository repository;
+
+  /// Thông báo FCM tới khi app đang mở. Trả `true` nếu app đã tự hiện (banner trong app): khi đó không tạo thêm
+  /// thông báo hệ thống, vì SignalR cũng gửi đúng nội dung này và người dùng sẽ thấy hai lần.
+  final bool Function(PushMessage message)? onForeground;
   final _subscriptions = <StreamSubscription<dynamic>>[];
   final _seen = <String>{};
   String? _user, _token;
@@ -67,6 +71,7 @@ class PushCubit extends Cubit<PushState> {
           }
           if (message.id != null && !_seen.add('show:${message.id}')) return;
           if (_seen.length > 200) _seen.clear();
+          if (onForeground?.call(message) ?? false) return;
           try {
             await device.show(message);
           } catch (_) {
