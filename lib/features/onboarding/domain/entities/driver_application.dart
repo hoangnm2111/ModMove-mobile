@@ -2,14 +2,20 @@ import 'dart:typed_data';
 
 enum ApprovalStatus { draft, pending, approved, rejected }
 
-/// Đúng 5 giấy tờ BE yêu cầu, theo thứ tự `documentUrls` của POST api/driver/onboarding:
-/// GPLX trước, GPLX sau, đăng ký xe, đăng kiểm, ảnh xe. (BE không nhận ảnh CCCD, chỉ số CCCD.)
+/// Đúng 7 ảnh BE yêu cầu (DECISIONS D2, 2026-11-12), theo thứ tự `documentUrls` của POST api/driver/onboarding:
+/// GPLX trước, GPLX sau, đăng ký xe, đăng kiểm, ảnh xe, CCCD trước, CCCD sau. CCCD nằm cuối để hồ sơ 5 ảnh cũ
+/// giữ nguyên vị trí. Mọi ảnh phải tải qua api/driver/uploads (Cloudinary), BE chặn URL lạ.
 enum DocumentKind {
   licenseFront,
   licenseBack,
   registration,
   inspection,
   vehicle,
+  citizenIdFront,
+  citizenIdBack;
+
+  /// Giấy tờ cá nhân (bước 1 của form): GPLX và CCCD. Còn lại là giấy tờ xe (bước 2).
+  bool get isPersonal => this == licenseFront || this == licenseBack || this == citizenIdFront || this == citizenIdBack;
 }
 
 enum PhotoSource { camera, gallery, sample }

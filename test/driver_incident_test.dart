@@ -297,10 +297,13 @@ void main() {
       expect(find.text('Nhập mô tả sự cố.'), findsOneWidget);
       expect(result, isNull);
 
-      await tester.tap(find.byKey(const ValueKey('incident-quick-Khách vắng mặt')));
-      await tester.pumpAndSettle();
+      // Không còn nút "Lý do nhanh" và không tự điền câu: mô tả để trống cho tài xế tự viết, dữ liệu gửi đi là đúng chữ họ nhập.
+      expect(find.text('Lý do nhanh'), findsNothing);
       final field = tester.widget<TextField>(find.byKey(const Key('incident-description')));
-      expect(field.controller!.text, startsWith('Khách vắng mặt'));
+      expect(field.controller!.text, isEmpty);
+      // Vẫn chọn được đúng 4 loại của BE.
+      expect(find.byKey(const ValueKey('incident-type-Other')), findsOneWidget);
+      expect(find.byKey(const ValueKey('incident-type-Accident')), findsOneWidget);
 
       await tester.enterText(find.byKey(const Key('incident-description')), 'Khách vắng mặt tại điểm lấy 15 phút');
       await tester.ensureVisible(find.text('Gửi sự cố'));

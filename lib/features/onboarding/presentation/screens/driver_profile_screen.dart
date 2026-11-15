@@ -3,6 +3,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:modmove_mobile/core/theme/app_theme.dart';
 import 'package:modmove_mobile/core/widgets/app_widgets.dart';
 import '../../../auth/presentation/logout_button.dart';
+import '../../../driver_account/delete_driver_account_button.dart';
 import '../../domain/entities/driver_application.dart';
 import '../controllers/driver_controller.dart';
 import '../models/document_display.dart';
@@ -17,11 +18,15 @@ class DriverProfileScreen extends StatefulWidget {
     required this.onUpdate,
     this.onDemo,
     this.onHistory,
+    this.onWallet,
   });
   final VoidCallback onHome;
   final VoidCallback onOrders;
   final ValueChanged<int> onUpdate;
   final VoidCallback? onDemo, onHistory;
+
+  /// Mở ví tài xế (chỉ có khi chạy trên BE thật).
+  final VoidCallback? onWallet;
   @override
   State<DriverProfileScreen> createState() => _DriverProfileScreenState();
 }
@@ -53,11 +58,19 @@ class _DriverProfileScreenState extends State<DriverProfileScreen> {
           if (index == 0) widget.onHome();
           if (index == 1) widget.onOrders();
           if (index == 2) {
-            showInfoSheet(
-              context,
-              'Ví tài xế',
-              'Theo dõi thu nhập và số dư từ những chuyến giao hàng của bạn.',
-            );
+            // Chạy BE thật và hồ sơ đã duyệt: mở ví thật. Còn lại (mô phỏng, chưa duyệt) chỉ giải thích.
+            final openWallet = widget.onWallet;
+            if (openWallet != null && driver.canGoOnline) {
+              openWallet();
+            } else {
+              showInfoSheet(
+                context,
+                'Ví tài xế',
+                openWallet == null
+                    ? 'Theo dõi thu nhập và số dư từ những chuyến giao hàng của bạn.'
+                    : 'Ví được mở sau khi hồ sơ tài xế của bạn được duyệt.',
+              );
+            }
           }
         },
       ),
@@ -123,26 +136,23 @@ class _DriverProfileScreenState extends State<DriverProfileScreen> {
             else
               ..._personalDetails(driver),
           ],
+          // Tải lại trạng thái: dùng nút ⟳ trên thanh tiêu đề (trước đây có thêm nút trùng ở đây).
+          const SizedBox(height: 16),
           if (driver.hasApi) ...[
-            const SizedBox(height: 16),
-            OutlinedButton.icon(
-              onPressed: driver.busy ? null : driver.refresh,
-              icon: const Icon(Icons.refresh),
-              label: const Text('Kiểm tra trạng thái mới nhất'),
-            ),
             if (widget.onHistory != null)
-              TextButton.icon(
-                onPressed: driver.busy ? null : widget.onHistory,
-                icon: const Icon(Icons.history),
-                label: const Text('Lịch sử các lần gửi'),
+              MenuTile(
+                Icons.history,
+                'Lịch sử các lần gửi',
+                onTap: driver.busy ? null : widget.onHistory,
               ),
-            TextButton.icon(
-              onPressed: () => Navigator.pushNamed(context, '/notifications'),
-              icon: const Icon(Icons.notifications_none),
-              label: const Text('Cài đặt thông báo'),
+            MenuTile(
+              Icons.notifications_none,
+              'Cài đặt thông báo',
+              onTap: () => Navigator.pushNamed(context, '/notifications'),
             ),
           ],
-          const SizedBox(height: 12),
+          const DeleteDriverAccountButton(),
+          const SizedBox(height: 8),
           const LogoutButton(),
           const SizedBox(height: 8),
         ],
@@ -429,7 +439,7 @@ class _DriverProfileScreenState extends State<DriverProfileScreen> {
             children: [
               const SectionTitle('Giấy tờ cá nhân'),
               const SizedBox(height: 12),
-              for (final kind in DocumentKind.values.take(4))
+              for (final kind in DocumentKind.values.where((k) => k.isPersonal))
                 ListTile(
                   leading: const AppIcon('document'),
                   title: Text(kind.label),

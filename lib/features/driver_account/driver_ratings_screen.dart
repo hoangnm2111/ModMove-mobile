@@ -27,10 +27,21 @@ class DriverRatingsScreen extends StatelessWidget {
                   Column(
                     children: [
                       Text(
-                        ratings.average == null ? '—' : ratings.average!.toStringAsFixed(1).replaceAll('.', ','),
-                        style: appText(size: 34, weight: FontWeight.w800, color: AppColors.orange),
+                        ratings.average == null
+                            ? '—'
+                            : ratings.average!
+                                  .toStringAsFixed(1)
+                                  .replaceAll('.', ','),
+                        style: appText(
+                          size: 34,
+                          weight: FontWeight.w800,
+                          color: AppColors.orange,
+                        ),
                       ),
-                      Text('${ratings.total} đánh giá', style: appText(size: 11, color: AppColors.secondary)),
+                      Text(
+                        '${ratings.total} đánh giá',
+                        style: appText(size: 11, color: AppColors.secondary),
+                      ),
                     ],
                   ),
                   const SizedBox(width: 18),
@@ -42,16 +53,32 @@ class DriverRatingsScreen extends StatelessWidget {
                             padding: const EdgeInsets.symmetric(vertical: 2),
                             child: Row(
                               children: [
-                                SizedBox(width: 26, child: Text('${5 - i}★', style: appText(size: 11))),
+                                SizedBox(
+                                  width: 26,
+                                  child: Text(
+                                    '${5 - i}★',
+                                    style: appText(size: 11),
+                                  ),
+                                ),
                                 Expanded(
                                   child: LinearProgressIndicator(
-                                    value: ratings.total == 0 ? 0 : ratings.distribution[i] / ratings.total,
+                                    value: ratings.total == 0
+                                        ? 0
+                                        : ratings.distribution[i] /
+                                              ratings.total,
                                     minHeight: 6,
                                     color: AppColors.orange,
                                     backgroundColor: AppColors.pale,
                                   ),
                                 ),
-                                SizedBox(width: 26, child: Text('${ratings.distribution[i]}', textAlign: TextAlign.right, style: appText(size: 11))),
+                                SizedBox(
+                                  width: 26,
+                                  child: Text(
+                                    '${ratings.distribution[i]}',
+                                    textAlign: TextAlign.right,
+                                    style: appText(size: 11),
+                                  ),
+                                ),
                               ],
                             ),
                           ),
@@ -65,7 +92,10 @@ class DriverRatingsScreen extends StatelessWidget {
             const SectionTitle('Nhận xét', size: 16),
             const SizedBox(height: 8),
             if (ratings.reviews.items.isEmpty)
-              const Padding(padding: EdgeInsets.symmetric(vertical: 30), child: Center(child: Text('Chưa có đánh giá nào.'))),
+              const Padding(
+                padding: EdgeInsets.symmetric(vertical: 30),
+                child: Center(child: Text('Chưa có đánh giá nào.')),
+              ),
             for (final r in ratings.reviews.items)
               Padding(
                 padding: const EdgeInsets.only(bottom: 8),
@@ -75,9 +105,15 @@ class DriverRatingsScreen extends StatelessWidget {
                     children: [
                       Row(
                         children: [
-                          Text('★' * r.stars + '☆' * (5 - r.stars), style: appText(size: 14, color: AppColors.orange)),
+                          Text(
+                            '★' * r.stars + '☆' * (5 - r.stars),
+                            style: appText(size: 14, color: AppColors.orange),
+                          ),
                           const Spacer(),
-                          Text('#${r.orderCode}', style: appText(size: 11, color: AppColors.muted)),
+                          Text(
+                            '#${r.orderCode}',
+                            style: appText(size: 11, color: AppColors.muted),
+                          ),
                         ],
                       ),
                       if ((r.comment ?? '').isNotEmpty) ...[

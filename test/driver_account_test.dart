@@ -39,7 +39,7 @@ void main() {
     expect(find.text('Thu nhập chuyến'), findsOneWidget);
     expect(find.text('+252.000đ'), findsOneWidget);
     expect(find.text('-20.000đ'), findsOneWidget);
-    expect(find.text('Tự bù ký quỹ từ thu nhập'), findsOneWidget);
+    expect(find.text('Tự bù tiền cọc từ thu nhập'), findsOneWidget);
     expect(find.text('30.000đ'), findsOneWidget);
     await tester.tap(find.text('Rút tiền').first);
     await tester.pumpAndSettle();

@@ -18,7 +18,12 @@ class DriverTripsScreen extends StatefulWidget {
 
 class _DriverTripsScreenState extends State<DriverTripsScreen> {
   String _view = 'All';
-  static const _views = {'All': 'Tất cả', 'Active': 'Đang chạy', 'Completed': 'Hoàn thành', 'Cancelled': 'Đã hủy'};
+  static const _views = {
+    'All': 'Tất cả',
+    'Active': 'Đang chạy',
+    'Completed': 'Hoàn thành',
+    'Cancelled': 'Đã hủy',
+  };
 
   @override
   Widget build(BuildContext context) {
@@ -43,7 +48,10 @@ class _DriverTripsScreenState extends State<DriverTripsScreen> {
           ),
         ),
         fetch: (page) async {
-          final p = PageOf.fromJson(await api.trips(view: _view, page: page), DriverTripSummary.fromJson);
+          final p = PageOf.fromJson(
+            await api.trips(view: _view, page: page),
+            DriverTripSummary.fromJson,
+          );
           return PageResult(p.items, p.hasNext);
         },
         itemBuilder: (context, trip) => AppCard(
@@ -53,24 +61,44 @@ class _DriverTripsScreenState extends State<DriverTripsScreen> {
             children: [
               Row(
                 children: [
-                  Expanded(child: Text('#${trip.code}', style: appText(size: 14, weight: FontWeight.w800))),
+                  Expanded(
+                    child: Text(
+                      '#${trip.code}',
+                      style: appText(size: 14, weight: FontWeight.w800),
+                    ),
+                  ),
                   Text(
                     trip.statusLabel,
                     style: appText(
                       size: 12,
                       weight: FontWeight.w700,
-                      color: trip.status == 'Cancelled' ? AppColors.red : (trip.status == 'Completed' ? AppColors.green : AppColors.orange),
+                      color: trip.status == 'Cancelled'
+                          ? AppColors.red
+                          : (trip.status == 'Completed'
+                                ? AppColors.green
+                                : AppColors.orange),
                     ),
                   ),
                 ],
               ),
               const SizedBox(height: 6),
-              Text('${trip.pickup}\n→ ${trip.dropoff}', style: appText(size: 12, color: AppColors.secondary)),
+              Text(
+                '${trip.pickup}\n→ ${trip.dropoff}',
+                style: appText(size: 12, color: AppColors.secondary),
+              ),
               const SizedBox(height: 6),
               Row(
                 children: [
-                  Expanded(child: Text(trip.at == null ? '' : dateTime(trip.at!), style: appText(size: 11, color: AppColors.muted))),
-                  Text('Thực nhận ${vnd(trip.earning)}', style: appText(size: 13, weight: FontWeight.w800)),
+                  Expanded(
+                    child: Text(
+                      trip.at == null ? '' : dateTime(trip.at!),
+                      style: appText(size: 11, color: AppColors.muted),
+                    ),
+                  ),
+                  Text(
+                    'Thực nhận ${vnd(trip.earning)}',
+                    style: appText(size: 13, weight: FontWeight.w800),
+                  ),
                 ],
               ),
             ],
@@ -80,7 +108,11 @@ class _DriverTripsScreenState extends State<DriverTripsScreen> {
     );
   }
 
-  Future<void> _detail(BuildContext context, DriverApi api, DriverTripSummary trip) => showModalBottomSheet<void>(
+  Future<void> _detail(
+    BuildContext context,
+    DriverApi api,
+    DriverTripSummary trip,
+  ) => showModalBottomSheet<void>(
     context: context,
     isScrollControlled: true,
     showDragHandle: true,
@@ -90,15 +122,26 @@ class _DriverTripsScreenState extends State<DriverTripsScreen> {
       child: FutureBuilder<Map<String, dynamic>>(
         future: api.trip('${trip.id}'),
         builder: (context, snapshot) {
-          if (snapshot.hasError) return Padding(padding: const EdgeInsets.all(16), child: TripError(errorText(snapshot.error!)));
+          if (snapshot.hasError) {
+            return Padding(
+              padding: const EdgeInsets.all(16),
+              child: TripError(errorText(snapshot.error!)),
+            );
+          }
           final j = snapshot.data;
-          if (j == null) return const Center(child: CircularProgressIndicator());
+          if (j == null) {
+            return const Center(child: CircularProgressIndicator());
+          }
           int money(String key) => ((j[key] as num?) ?? 0).round();
-          final histories = ((j['statusHistories'] as List?) ?? const []).cast<Map>();
+          final histories = ((j['statusHistories'] as List?) ?? const [])
+              .cast<Map>();
           return ListView(
             padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
             children: [
-              Text('#${j['orderCode']} · ${DriverTripSummary.statusLabels[j['orderStatus']] ?? j['orderStatus']}', style: appText(size: 18, weight: FontWeight.w800)),
+              Text(
+                '#${j['orderCode']} · ${DriverTripSummary.statusLabels[j['orderStatus']] ?? j['orderStatus']}',
+                style: appText(size: 18, weight: FontWeight.w800),
+              ),
               const SizedBox(height: 12),
               _line('Điểm lấy', '${j['pickupAddress']}'),
               _line('Điểm giao', '${j['dropoffAddress']}'),
@@ -106,20 +149,31 @@ class _DriverTripsScreenState extends State<DriverTripsScreen> {
               _phone('Số điện thoại khách', j['customerPhone'] as String?),
               _line('Người nhận', '${j['receiverName'] ?? ''}'),
               _phone('Số điện thoại người nhận', j['receiverPhone'] as String?),
-              _line('Quãng đường', '${j['estimatedDistanceKm']} km · ${j['estimatedDurationMin']} phút'),
+              _line(
+                'Quãng đường',
+                '${j['estimatedDistanceKm']} km · ${j['estimatedDurationMin']} phút',
+              ),
               const Divider(),
               _line('Tổng cước', vnd(money('totalFee'))),
               _line('Hoa hồng', '-${vnd(money('commissionAmount'))}'),
               _line('Thực nhận', vnd(money('driverEarning')), bold: true),
-              _line('Thanh toán', '${j['paymentMethod'] == 'Cash' ? 'Tiền mặt' : 'PayOS'} · ${j['paymentStatus']}'),
+              _line(
+                'Thanh toán',
+                '${j['paymentMethod'] == 'Cash' ? 'Tiền mặt' : 'PayOS'} · ${j['paymentStatus']}',
+              ),
               if (histories.isNotEmpty) ...[
                 const Divider(),
                 const SectionTitle('Lịch sử trạng thái', size: 14),
                 const SizedBox(height: 6),
                 for (final h in histories)
                   _line(
-                    DriverTripSummary.statusLabels[h['toStatus']] ?? '${h['toStatus']}',
-                    DateTime.tryParse('${h['changedAt']}') == null ? '' : dateTime(DateTime.parse('${h['changedAt']}').toLocal()),
+                    DriverTripSummary.statusLabels[h['toStatus']] ??
+                        '${h['toStatus']}',
+                    DateTime.tryParse('${h['changedAt']}') == null
+                        ? ''
+                        : dateTime(
+                            DateTime.parse('${h['changedAt']}').toLocal(),
+                          ),
                   ),
               ],
             ],
@@ -134,8 +188,22 @@ class _DriverTripsScreenState extends State<DriverTripsScreen> {
     child: Row(
       crossAxisAlignment: CrossAxisAlignment.center,
       children: [
-        SizedBox(width: 110, child: Text(label, style: appText(size: 12, color: AppColors.secondary))),
-        Expanded(child: Align(alignment: Alignment.centerLeft, child: PhoneText(phone, style: appText(size: 13, weight: FontWeight.w600)))),
+        SizedBox(
+          width: 110,
+          child: Text(
+            label,
+            style: appText(size: 12, color: AppColors.secondary),
+          ),
+        ),
+        Expanded(
+          child: Align(
+            alignment: Alignment.centerLeft,
+            child: PhoneText(
+              phone,
+              style: appText(size: 13, weight: FontWeight.w600),
+            ),
+          ),
+        ),
       ],
     ),
   );
@@ -145,8 +213,22 @@ class _DriverTripsScreenState extends State<DriverTripsScreen> {
     child: Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        SizedBox(width: 110, child: Text(label, style: appText(size: 12, color: AppColors.secondary))),
-        Expanded(child: Text(value, style: appText(size: 13, weight: bold ? FontWeight.w800 : FontWeight.w600))),
+        SizedBox(
+          width: 110,
+          child: Text(
+            label,
+            style: appText(size: 12, color: AppColors.secondary),
+          ),
+        ),
+        Expanded(
+          child: Text(
+            value,
+            style: appText(
+              size: 13,
+              weight: bold ? FontWeight.w800 : FontWeight.w600,
+            ),
+          ),
+        ),
       ],
     ),
   );

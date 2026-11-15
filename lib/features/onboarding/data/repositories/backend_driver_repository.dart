@@ -7,7 +7,7 @@ import '../../domain/repositories/driver_repository.dart';
 ///
 /// BE khác bản mô phỏng cũ ở các điểm sau (BE là chuẩn):
 /// - không có bản nháp trên server: nháp chỉ giữ trong máy, "Gửi hồ sơ" mới tạo version mới;
-/// - 5 giấy tờ (GPLX 2 mặt, đăng ký, đăng kiểm, ảnh xe), không có ảnh CCCD (chỉ số CCCD);
+/// - 7 ảnh theo thứ tự của [DocumentKind] (GPLX 2 mặt, đăng ký, đăng kiểm, ảnh xe, CCCD 2 mặt);
 /// - kích thước thùng xe do loại xe quyết định, không nhập tay;
 /// - BE chỉ trả version hồ sơ mới nhất (không có lịch sử các version).
 class BackendDriverRepository implements DriverProfileRepository, VehicleTypeCatalog, ProfileLocalCache {

@@ -4,7 +4,8 @@ library;
 num _n(Object? v) => v is num ? v : num.tryParse('$v') ?? 0;
 int _i(Object? v) => _n(v).round();
 String _s(Object? v) => v == null ? '' : '$v';
-DateTime? _d(Object? v) => v == null ? null : DateTime.tryParse('$v')?.toLocal();
+DateTime? _d(Object? v) =>
+    v == null ? null : DateTime.tryParse('$v')?.toLocal();
 
 class PageOf<T> {
   const PageOf(this.items, this.page, this.hasNext);
@@ -15,7 +16,10 @@ class PageOf<T> {
   factory PageOf.fromJson(Object? json, T Function(Map<String, dynamic>) map) {
     final j = (json as Map).cast<String, dynamic>();
     return PageOf(
-      [for (final e in (j['items'] as List? ?? const [])) map((e as Map).cast<String, dynamic>())],
+      [
+        for (final e in (j['items'] as List? ?? const []))
+          map((e as Map).cast<String, dynamic>()),
+      ],
       _i(j['pageNumber']),
       j['hasNextPage'] == true,
     );
@@ -29,7 +33,11 @@ class BankAccount {
   static BankAccount? from(Object? json) {
     if (json is! Map) return null;
     final j = json.cast<String, dynamic>();
-    final b = BankAccount(_s(j['bankName']), _s(j['bankAccountNumber']), _s(j['bankAccountHolder']));
+    final b = BankAccount(
+      _s(j['bankName']),
+      _s(j['bankAccountNumber']),
+      _s(j['bankAccountHolder']),
+    );
     return b.number.isEmpty ? null : b;
   }
 }
@@ -50,8 +58,14 @@ class DriverWallet {
   });
   final String status;
 
-  /// Ví ký quỹ, ví thu nhập và tổng (BE: GB-32: rút được cả hai ví khi không có đơn đang chạy).
-  final int deposit, earnings, total, missingDeposit, maxWithdrawable, requiredDeposit, pendingWithdrawal;
+  /// Ví tiền cọc, ví thu nhập và tổng (BE: GB-32: rút được cả hai ví khi không có đơn đang chạy).
+  final int deposit,
+      earnings,
+      total,
+      missingDeposit,
+      maxWithdrawable,
+      requiredDeposit,
+      pendingWithdrawal;
   final bool canReceiveOrders, hasActiveOrder;
   final BankAccount? bank;
 
@@ -65,13 +79,24 @@ class DriverWallet {
     requiredDeposit: _i(j['requiredDeposit']),
     canReceiveOrders: j['canReceiveOrders'] == true,
     hasActiveOrder: j['hasActiveOrder'] == true,
-    pendingWithdrawal: j['hasPendingWithdrawal'] == true ? _i(j['pendingWithdrawalAmount']) : 0,
+    pendingWithdrawal: j['hasPendingWithdrawal'] == true
+        ? _i(j['pendingWithdrawalAmount'])
+        : 0,
     bank: BankAccount.from(j['bankAccount']),
   );
 }
 
 class WalletTx {
-  const WalletTx(this.type, this.amount, this.earningsAmount, this.depositAmount, this.balanceAfter, this.status, this.orderCode, this.createdAt);
+  const WalletTx(
+    this.type,
+    this.amount,
+    this.earningsAmount,
+    this.depositAmount,
+    this.balanceAfter,
+    this.status,
+    this.orderCode,
+    this.createdAt,
+  );
   final String type, status;
   final String? orderCode;
   final int amount, earningsAmount, depositAmount, balanceAfter;
@@ -89,10 +114,10 @@ class WalletTx {
   );
 
   static const labels = {
-    'TopUpDeposit': 'Nạp ký quỹ',
+    'TopUpDeposit': 'Nạp tiền cọc',
     'TripEarning': 'Thu nhập chuyến',
     'CommissionDeduction': 'Trừ hoa hồng đơn tiền mặt',
-    'DepositRefill': 'Tự bù ký quỹ từ thu nhập',
+    'DepositRefill': 'Tự bù tiền cọc từ thu nhập',
     'Withdrawal': 'Rút tiền',
   };
   String get label => labels[type] ?? type;
@@ -100,12 +125,20 @@ class WalletTx {
   /// Khoản trừ ví (hoa hồng, rút tiền) hiển thị dấu trừ.
   bool get debit => type == 'CommissionDeduction' || type == 'Withdrawal';
 
-  /// Chuyển nội bộ từ thu nhập sang ký quỹ: tổng ví không đổi nên không có dấu.
+  /// Chuyển nội bộ từ thu nhập sang tiền cọc: tổng ví không đổi nên không có dấu.
   bool get transfer => type == 'DepositRefill';
 }
 
 class Withdrawal {
-  const Withdrawal(this.amount, this.earningsAmount, this.depositAmount, this.status, this.bank, this.reference, this.createdAt);
+  const Withdrawal(
+    this.amount,
+    this.earningsAmount,
+    this.depositAmount,
+    this.status,
+    this.bank,
+    this.reference,
+    this.createdAt,
+  );
   final int amount, earningsAmount, depositAmount;
   final String status;
   final BankAccount? bank;
@@ -124,11 +157,20 @@ class Withdrawal {
 }
 
 class EarningsSummary {
-  const EarningsSummary(this.completedTrips, this.gross, this.commission, this.net);
+  const EarningsSummary(
+    this.completedTrips,
+    this.gross,
+    this.commission,
+    this.net,
+  );
   final int completedTrips, gross, commission, net;
 
-  factory EarningsSummary.fromJson(Map<String, dynamic> j) =>
-      EarningsSummary(_i(j['completedTrips']), _i(j['grossFares']), _i(j['totalCommission']), _i(j['netEarnings']));
+  factory EarningsSummary.fromJson(Map<String, dynamic> j) => EarningsSummary(
+    _i(j['completedTrips']),
+    _i(j['grossFares']),
+    _i(j['totalCommission']),
+    _i(j['netEarnings']),
+  );
 }
 
 class DriverTripSummary {
@@ -151,19 +193,20 @@ class DriverTripSummary {
   final bool cash;
   final DateTime? at;
 
-  factory DriverTripSummary.fromJson(Map<String, dynamic> j) => DriverTripSummary(
-    id: _i(j['id']),
-    code: _s(j['orderCode']),
-    status: _s(j['orderStatus']),
-    pickup: _s(j['pickupAddress']),
-    dropoff: _s(j['dropoffAddress']),
-    totalFee: _i(j['totalFee']),
-    commission: _i(j['commissionAmount']),
-    earning: _i(j['driverEarning']),
-    cash: j['paymentMethod'] == 'Cash',
-    customerName: _s(j['customerName']),
-    at: _d(j['completedAt']) ?? _d(j['deliveredAt']) ?? _d(j['createdAt']),
-  );
+  factory DriverTripSummary.fromJson(Map<String, dynamic> j) =>
+      DriverTripSummary(
+        id: _i(j['id']),
+        code: _s(j['orderCode']),
+        status: _s(j['orderStatus']),
+        pickup: _s(j['pickupAddress']),
+        dropoff: _s(j['dropoffAddress']),
+        totalFee: _i(j['totalFee']),
+        commission: _i(j['commissionAmount']),
+        earning: _i(j['driverEarning']),
+        cash: j['paymentMethod'] == 'Cash',
+        customerName: _s(j['customerName']),
+        at: _d(j['completedAt']) ?? _d(j['deliveredAt']) ?? _d(j['createdAt']),
+      );
 
   static const statusLabels = {
     'Pending': 'Chờ nhận',
@@ -179,7 +222,13 @@ class DriverTripSummary {
 }
 
 class Review {
-  const Review(this.stars, this.comment, this.customer, this.orderCode, this.createdAt);
+  const Review(
+    this.stars,
+    this.comment,
+    this.customer,
+    this.orderCode,
+    this.createdAt,
+  );
   final int stars;
   final String? comment;
   final String customer, orderCode;
@@ -195,7 +244,12 @@ class Review {
 }
 
 class RatingsSummary {
-  const RatingsSummary(this.average, this.total, this.distribution, this.reviews);
+  const RatingsSummary(
+    this.average,
+    this.total,
+    this.distribution,
+    this.reviews,
+  );
   final double? average;
   final int total;
 

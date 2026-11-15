@@ -53,7 +53,7 @@ class ValidateDriverApplication {
     DriverApplication application, {
     bool personalOnly = false,
   }) => DocumentKind.values
-      .where((kind) => !personalOnly || kind.index < 2)
+      .where((kind) => !personalOnly || kind.isPersonal)
       .where(
         (kind) =>
             !(application.documents[kind]?.hasImage ?? false) ||

@@ -7,6 +7,8 @@ extension DocumentDisplay on DocumentKind {
     DocumentKind.registration => 'Đăng ký xe',
     DocumentKind.inspection => 'Giấy đăng kiểm',
     DocumentKind.vehicle => 'Ảnh phương tiện',
+    DocumentKind.citizenIdFront => 'CCCD · Mặt trước',
+    DocumentKind.citizenIdBack => 'CCCD · Mặt sau',
   };
   String get preview => switch (this) {
     DocumentKind.registration => 'registration',
