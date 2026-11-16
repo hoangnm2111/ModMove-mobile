@@ -147,10 +147,10 @@ class _BottomBar extends StatelessWidget {
                           ? 'Đang tính…'
                           : e == null
                           ? '—'
-                          : money(e.totalFee),
+                          : moneyCeil1000(e.totalFee),
                       style: appText(size: 19, weight: FontWeight.w800),
                     ),
-                    if (e != null) Text('${e.distanceKm} km • ~${e.durationMinutes} phút', style: appText(size: 11, color: AppColors.muted)),
+                    if (e != null) Text('${kmCeil(e.distanceKm)} • ~${e.durationMinutes} phút', style: appText(size: 11, color: AppColors.muted)),
                   ],
                 ),
               ),
@@ -210,7 +210,6 @@ class _RouteStep extends StatelessWidget {
             ],
           ),
         ),
-        const Notice('Một điểm lấy và một điểm giao. Giá được tính theo quãng đường thực tế do hệ thống xác định.', icon: 'info'),
       ],
     );
   }
@@ -319,7 +318,7 @@ class _CargoStep extends StatelessWidget {
                   const SizedBox(width: 10),
                   Expanded(
                     child: _Text(
-                      label: 'Tổng KL (kg)',
+                      label: 'Tổng khối lượng',
                       value: d.weightKg == 0 ? '' : '${d.weightKg}',
                       number: true,
                       onChanged: (v) => cubit.update((x) => x.copyWith(weightKg: double.tryParse(v) ?? 0)),
@@ -327,7 +326,7 @@ class _CargoStep extends StatelessWidget {
                   ),
                 ],
               ),
-              Text('Kích thước món lớn nhất (cm) – để kiểm tra lọt thùng', style: appText(size: 12, color: AppColors.secondary)),
+              Text('Kích thước món lớn nhất', style: appText(size: 12, color: AppColors.secondary)),
               const SizedBox(height: 8),
               Row(
                 children: [
@@ -360,7 +359,7 @@ class _CargoStep extends StatelessWidget {
                 ],
               ),
               _Text(
-                label: 'Ghi chú bốc xếp (dễ vỡ, không lật…)',
+                label: 'Ghi chú bốc xếp',
                 value: d.specialNotes,
                 onChanged: (v) => cubit.update((x) => x.copyWith(specialNotes: v)),
               ),
@@ -370,7 +369,7 @@ class _CargoStep extends StatelessWidget {
         SectionCard(
           title: 'Ảnh hàng hoá',
           child: PhotoPicker(
-            label: 'Ảnh hàng (1–5)',
+            label: 'Ảnh hàng',
             urls: d.photos,
             upload: cubit.api.upload,
             onChanged: (p) => cubit.update((x) => x.copyWith(photos: p)),
@@ -494,7 +493,7 @@ class _PaymentStep extends StatelessWidget {
                 textCapitalization: TextCapitalization.characters,
                 onFieldSubmitted: (v) => cubit.update((x) => x.copyWith(couponCode: v.toUpperCase())),
                 decoration: InputDecoration(
-                  labelText: 'Nhập mã (mỗi đơn 1 mã)',
+                  labelText: 'Nhập mã giảm giá',
                   errorText: s.couponError,
                   helperText: s.couponError == null && d.couponCode.isNotEmpty && e != null ? 'Đã áp dụng: -${money(e.discountAmount)}' : null,
                   suffixIcon: d.couponCode.isEmpty
@@ -515,7 +514,7 @@ class _PaymentStep extends StatelessWidget {
                     for (final c in s.coupons)
                       ChoiceChip(
                         label: Text('${c.code} -${money(c.discountValue)}'),
-                        tooltip: 'Đơn từ ${money(c.minimumOrderValue)} • HSD ${date(c.expiresAt)}',
+                        tooltip: 'Đơn từ ${money(c.minimumOrderValue)} • Hạn dùng ${date(c.expiresAt)}',
                         selected: d.couponCode == c.code,
                         onSelected: (sel) => cubit.update((x) => x.copyWith(couponCode: sel ? c.code : '')),
                       ),
@@ -533,7 +532,7 @@ class _PaymentStep extends StatelessWidget {
             child: Column(
               children: [
                 const RadioListTile(contentPadding: EdgeInsets.zero, value: 'PayOS', title: Text('Chuyển khoản PayOS'), subtitle: Text('Thanh toán trước, đơn chỉ gửi tới tài xế sau khi thanh toán.')),
-                const RadioListTile(contentPadding: EdgeInsets.zero, value: 'Cash', title: Text('Tiền mặt (COD)'), subtitle: Text('Trả tiền mặt cho tài xế; hệ thống tìm tài xế ngay.')),
+                const RadioListTile(contentPadding: EdgeInsets.zero, value: 'Cash', title: Text('Tiền mặt'), subtitle: Text('Trả tiền mặt cho tài xế; hệ thống tìm tài xế ngay.')),
                 if (d.paymentMethod == 'Cash')
                   SegmentedButton<String>(
                     segments: const [
@@ -553,11 +552,11 @@ class _PaymentStep extends StatelessWidget {
               ? Text(s.estimating ? 'Đang tính giá…' : (s.estimateError ?? 'Chưa có giá.'), style: appText(size: 13, color: AppColors.secondary))
               : Column(
                   children: [
-                    KvRow('Cước quãng đường (${e.distanceKm} km)', money(e.distanceFee)),
-                    if (e.serviceFee > 0) KvRow('Phí bốc xếp', money(e.serviceFee)),
-                    if (e.discountAmount > 0) KvRow('Giảm giá', '-${money(e.discountAmount)}', valueColor: AppColors.green),
+                    KvRow('Cước quãng đường ${kmCeil(e.distanceKm)}', moneyCeil1000(e.distanceFee)),
+                    if (e.serviceFee > 0) KvRow('Phí bốc xếp', moneyCeil1000(e.serviceFee)),
+                    if (e.discountAmount > 0) KvRow('Giảm giá', '-${moneyCeil1000(e.discountAmount)}', valueColor: AppColors.green),
                     const Divider(),
-                    KvRow('Tổng thanh toán', money(e.totalFee), strong: true),
+                    KvRow('Tổng thanh toán', moneyCeil1000(e.totalFee), strong: true),
                   ],
                 ),
         ),
@@ -568,9 +567,50 @@ class _PaymentStep extends StatelessWidget {
           onChanged: (v) => cubit.update((x) => x.copyWith(agreedWarranty: v ?? false)),
           title: Text('Tôi đồng ý với chính sách bảo hành & bồi thường.', style: appText(size: 13)),
         ),
+        Align(
+          alignment: Alignment.centerLeft,
+          child: TextButton(onPressed: () => _showPolicies(context), child: const Text('Xem chính sách')),
+        ),
       ],
     );
   }
+}
+
+/// Chính sách bảo hành và hoàn tiền do hệ thống cung cấp.
+Future<void> _showPolicies(BuildContext context) {
+  final api = context.read<CustomerApi>();
+  return showModalBottomSheet<void>(
+    context: context,
+    isScrollControlled: true,
+    showDragHandle: true,
+    builder: (_) => DraggableScrollableSheet(
+      expand: false,
+      initialChildSize: 0.75,
+      maxChildSize: 0.95,
+      builder: (_, scroll) => FutureBuilder<List<LookupItem>>(
+        future: api.policies(),
+        builder: (_, snap) {
+          if (snap.connectionState != ConnectionState.done) return const Center(child: CircularProgressIndicator());
+          if (snap.hasError) return ErrorView(errorText(snap.error!), onRetry: () => Navigator.pop(context));
+          final items = (snap.data ?? const <LookupItem>[]).where((p) => p.code == 'WARRANTY' || p.code == 'REFUND').toList();
+          if (items.isEmpty) return const EmptyView('Chưa có nội dung.');
+          return ListView(
+            controller: scroll,
+            padding: const EdgeInsets.fromLTRB(14, 0, 14, 24),
+            children: [
+              for (final p in items)
+                ExpansionTile(
+                  title: Text(p.name, style: appText(weight: FontWeight.w700)),
+                  childrenPadding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+                  expandedCrossAxisAlignment: CrossAxisAlignment.start,
+                  children: [Text((p.description ?? '').trim().isEmpty ? 'Nội dung đang được cập nhật.' : p.description!, style: appText(size: 13.5, color: AppColors.secondary))],
+                ),
+            ],
+          );
+        },
+      ),
+    ),
+  );
 }
 
 /// Nhãn phụ cho thẻ xe.
