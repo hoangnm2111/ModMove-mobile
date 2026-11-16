@@ -1,6 +1,7 @@
 import '../../../../core/network/api_exception.dart';
 import '../../../driver_trip/data/driver_api.dart';
 import '../../domain/entities/driver_application.dart';
+import '../../domain/rejection_mapper.dart';
 import '../../domain/repositories/driver_repository.dart';
 
 /// Hồ sơ tài xế chạy trên BE thật (api/driver/*), dữ liệu lấy từ DB.
@@ -108,8 +109,9 @@ class BackendDriverRepository implements DriverProfileRepository, VehicleTypeCat
           };
 
     final urls = ((onboarding['documentUrls'] as List?) ?? const []).cast<String>();
-    final reasons = ((onboarding['rejectionReasons'] as List?) ?? const []).cast<String>();
-    final reason = reasons.isEmpty ? null : reasons.join('; ');
+    final reasons = approval == ApprovalStatus.rejected ? ((onboarding['rejectionReasons'] as List?) ?? const []).cast<String>() : const <String>[];
+    // Chỉ giấy tờ Admin chọn từ chối mới bị đánh dấu phải làm lại; các giấy tờ còn lại giữ nguyên ảnh đã nộp.
+    final rejection = summarizeRejection(reasons);
     final kinds = DocumentKind.values;
     final documents = {
       for (var i = 0; i < kinds.length; i++)
@@ -117,7 +119,7 @@ class BackendDriverRepository implements DriverProfileRepository, VehicleTypeCat
             ? VerificationDocument(
                 remoteReference: urls[i],
                 accepted: approval == ApprovalStatus.approved,
-                rejectionReason: approval == ApprovalStatus.rejected ? reason ?? 'Cần cập nhật giấy tờ.' : null,
+                rejectionReason: rejection.documents[kinds[i]],
               )
             : const VerificationDocument(),
     };
@@ -165,6 +167,7 @@ class BackendDriverRepository implements DriverProfileRepository, VehicleTypeCat
       online: status['isOnline'] == true && approval == ApprovalStatus.approved,
       submittedAt: _date(onboarding['submittedAt']),
       reviewedAt: _date(onboarding['reviewedAt']),
+      rejectionReasons: reasons,
     );
   }
 

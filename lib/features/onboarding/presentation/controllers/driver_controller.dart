@@ -211,7 +211,7 @@ class DriverController extends Cubit<DriverPresentationState> {
         documents.entries
             .where(
               (item) =>
-                  (!personalOnly || item.key.index < 2) &&
+                  (!personalOnly || item.key.isPersonal) &&
                   item.value.remoteReference == null,
             )
             .map((item) => item.key),
@@ -267,7 +267,6 @@ class DriverController extends Cubit<DriverPresentationState> {
     }
     try {
       await _profile.saveDraft(application);
-      savedAt = DateTime.now();
       return null;
     } catch (error) {
       return 'Ảnh đã tải lên; chưa lưu được bản nháp. ${_error(error)}';
@@ -292,6 +291,23 @@ class DriverController extends Cubit<DriverPresentationState> {
     }
   }
 
+  /// Giữ dữ liệu đang nhập trong máy (khi chuyển bước/thoát màn hình), không đánh dấu là "đã lưu nháp".
+  Future<String?> persistDraft() async {
+    if (!hasApi || !canEdit || busy) return null;
+    syncing = true;
+    _notify();
+    try {
+      await _profile!.saveDraft(application);
+      return null;
+    } catch (error) {
+      return _error(error);
+    } finally {
+      syncing = false;
+      _notify();
+    }
+  }
+
+  /// Chỉ gọi khi người dùng bấm "Lưu nháp".
   Future<String?> saveDraft() async {
     if (!hasApi || !canEdit || busy) return 'Chưa thể lưu bản nháp lúc này.';
     syncing = true;
