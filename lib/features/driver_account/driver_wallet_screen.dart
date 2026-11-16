@@ -99,10 +99,8 @@ class _OverviewState extends State<_Overview> with WidgetsBindingObserver {
     final amount = await _askAmount(
       'Nạp tiền cọc',
       wallet.missingDeposit > 0
-          ? 'Số tiền (tối thiểu ${vnd(least)})'
+          ? 'Số tiền'
           : 'Số tiền nạp',
-      note:
-          'Thanh toán qua PayOS, tiền cọc được cộng sau khi thanh toán thành công.',
     );
     if (amount == null || !mounted) return;
     if (amount < least) {
@@ -148,9 +146,6 @@ class _OverviewState extends State<_Overview> with WidgetsBindingObserver {
     final amount = await _askAmount(
       'Rút tiền từ ví',
       'Tối đa ${vnd(wallet.maxWithdrawable)}',
-      note: wallet.hasActiveOrder
-          ? 'Đang có đơn chạy: chỉ rút được phần thu nhập. Quản trị viên chuyển khoản thủ công.'
-          : 'Trừ ví thu nhập trước, thiếu thì trừ tiếp ví tiền cọc. Quản trị viên chuyển khoản thủ công.',
     );
     if (amount == null || !mounted) return;
     if (amount <= 0) {

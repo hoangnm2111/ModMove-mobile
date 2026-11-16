@@ -566,7 +566,7 @@ class _NextActionState extends State<_NextAction> {
             AppColors.amberBg,
             AppColors.amber,
             'clipboard-check',
-            'Duyệt ảnh lấy hàng (lần ${o.proof?.submissionCount ?? 1}/5)',
+            'Duyệt ảnh lấy hàng lần ${o.proof?.submissionCount ?? 1}/5',
             OrderRules.canApprovePickup(o)
                 ? 'Kiểm tra ảnh tài xế vừa chụp bên dưới. Chuyến chỉ bắt đầu sau khi bạn duyệt.'
                 : 'Chưa duyệt được khi tài xế đang có sự cố. Bạn vẫn có thể từ chối để tài xế chụp lại.',
@@ -621,7 +621,7 @@ class _NextActionState extends State<_NextAction> {
           AppColors.secondary,
           'route',
           'Hàng đang được vận chuyển',
-          'Theo dõi vị trí tài xế bên dưới. Có vấn đề (hỏng hàng, trễ, sai tuyến…) hãy báo sự cố.',
+          'Theo dõi vị trí tài xế bên dưới. Có vấn đề hãy báo sự cố.',
           [incident],
         );
       case OrderStatus.delivered:
@@ -830,7 +830,7 @@ class _ProofCard extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
-          'Ảnh lấy hàng (lần gửi ${p.submissionCount}/5)',
+          'Ảnh lấy hàng lần ${p.submissionCount}/5',
           style: appText(size: 12.5, weight: FontWeight.w600),
         ),
         const SizedBox(height: 6),
@@ -845,7 +845,7 @@ class _ProofCard extends StatelessWidget {
           ),
         const SizedBox(height: 12),
         Text(
-          'Ảnh giao hàng (POD)',
+          'Ảnh giao hàng',
           style: appText(size: 12.5, weight: FontWeight.w600),
         ),
         const SizedBox(height: 6),
@@ -931,10 +931,6 @@ class _RouteCargoCard extends StatelessWidget {
           padding: const EdgeInsets.only(left: 26, top: 4),
           child: Row(
             children: [
-              Text(
-                'Số điện thoại người nhận: ',
-                style: appText(size: 11.5, color: AppColors.secondary),
-              ),
               Flexible(
                 child: PhoneText(
                   o.receiverPhone,
@@ -993,7 +989,7 @@ class _FareCard extends StatelessWidget {
     title: 'Cước phí & thanh toán',
     child: Column(
       children: [
-        KvRow('Cước quãng đường (${o.distanceKm} km)', money(o.distanceFee)),
+        KvRow('Cước quãng đường ${o.distanceKm} km', money(o.distanceFee)),
         if (o.serviceFee > 0) KvRow('Phí bốc xếp', money(o.serviceFee)),
         if (o.discountAmount > 0)
           KvRow(
@@ -1046,7 +1042,7 @@ class _IncidentsCard extends StatelessWidget {
     final canReport = OrderRules.canReportIncident(order);
     if (incidents.isEmpty && !canReport) return const SizedBox.shrink();
     return SectionCard(
-      title: 'Sự cố (${incidents.length})',
+      title: 'Sự cố ${incidents.length}',
       trailing: canReport
           ? TextButton(onPressed: onReport, child: const Text('Báo sự cố'))
           : null,
@@ -1196,7 +1192,7 @@ class _RefundsCard extends StatelessWidget {
   Widget build(BuildContext context) {
     if (refunds.isEmpty) return const SizedBox.shrink();
     return SectionCard(
-      title: 'Hoàn tiền & khiếu nại (${refunds.length})',
+      title: 'Hoàn tiền và khiếu nại ${refunds.length}',
       child: Column(
         children: [
           for (final r in refunds)

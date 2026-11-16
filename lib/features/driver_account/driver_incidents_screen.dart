@@ -159,7 +159,7 @@ class DriverIncidentDetailScreen extends StatelessWidget {
                     'Ai báo',
                     i.reportedByYou
                         ? 'Bạn báo'
-                        : 'Khách báo (bạn chỉ thấy câu chung)',
+                        : 'Khách báo',
                   ),
                   _row('Báo lúc', dateTime(i.createdAt)),
                   _row(

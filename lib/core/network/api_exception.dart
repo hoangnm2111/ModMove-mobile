@@ -25,7 +25,7 @@ class ApiException implements Exception {
       return ApiException(withDetail ? '$known ($detail)' : known, code: code, status: status);
     }
     final fallback = (body?['detail'] ?? body?['title']) as String?;
-    return ApiException(fallback ?? (status == 401 ? errorMessages['UNAUTHORIZED']! : 'Đã có lỗi xảy ra (HTTP $status).'), code: code, status: status);
+    return ApiException(fallback ?? (status == 401 ? errorMessages['UNAUTHORIZED']! : 'Đã có lỗi xảy ra.'), code: code, status: status);
   }
 
   static const network = ApiException('Không kết nối được tới máy chủ. Kiểm tra mạng hoặc địa chỉ API rồi thử lại.', code: 'NETWORK');
@@ -77,9 +77,9 @@ const errorMessages = <String, String>{
   'REFUND_PAYOUT_LOCKED': 'Khoản hoàn này đã xử lý xong nên không sửa được tài khoản nhận.',
   'REFUND_PAYOUT_UNCHANGED': 'Tài khoản này vừa chuyển khoản lỗi. Hãy nhập một tài khoản khác.',
   // Tài xế: ghép đơn, chuyến, ví, hồ sơ
-  'ORDER_NOT_AVAILABLE': 'Đơn không còn mở để nhận (đã hết thời gian ghép hoặc đã có người nhận).',
+  'ORDER_NOT_AVAILABLE': 'Đơn không còn mở để nhận.',
   'DRIVER_NOT_APPROVED': 'Hồ sơ tài xế chưa được duyệt nên chưa dùng được chức năng này.',
-  'DRIVER_NOT_ELIGIBLE': 'Bạn chưa đủ điều kiện nhận đơn này (trạng thái hoạt động, vị trí, loại xe hoặc tiền cọc).',
+  'DRIVER_NOT_ELIGIBLE': 'Bạn chưa đủ điều kiện nhận đơn này.',
   'PICKUP_PHOTO_LIMIT': 'Đã gửi ảnh lấy hàng đủ 5 lần. Hãy báo sự cố để điều phối viên xử lý.',
   'CASH_COLLECTION_NOT_ALLOWED': 'Chưa tới bước thu tiền mặt của đơn này.',
   'ORDER_ALREADY_PAID': 'Đơn này đã được xác nhận thu tiền.',

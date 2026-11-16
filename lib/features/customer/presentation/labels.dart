@@ -35,7 +35,7 @@ const paymentStatusTone = <String, Tone>{'Unpaid': Tone('Chưa thanh toán', App
 const paymentMethodLabel = {'Cash': 'Tiền mặt', 'PayOS': 'PayOS (QR / chuyển khoản)'};
 const payerRoleLabel = {'Sender': 'Người gửi trả khi lấy hàng', 'Receiver': 'Người nhận trả khi giao hàng'};
 
-const incidentTypeLabel = {'VehicleBreakdown': 'Hỏng xe', 'DamagedCargo': 'Hư hỏng hàng hoá', 'Accident': 'Tai nạn', 'Other': 'Khác (trễ, sai tuyến, vắng mặt…)'};
+const incidentTypeLabel = {'VehicleBreakdown': 'Hỏng xe', 'DamagedCargo': 'Hư hỏng hàng hoá', 'Accident': 'Tai nạn', 'Other': 'Khác'};
 const incidentStatusTone = <String, Tone>{
   'Open': Tone('Đang chờ xử lý', AppColors.red, AppColors.redBg),
   'InProgress': Tone('Điều phối viên đang xử lý', AppColors.amber, AppColors.amberBg),

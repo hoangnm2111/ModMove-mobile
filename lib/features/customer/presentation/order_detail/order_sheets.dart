@@ -115,7 +115,7 @@ class _PayoutFieldsState extends State<_PayoutFields> {
         keyboardType: TextInputType.number,
         maxLength: 19,
         inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-        decoration: const InputDecoration(labelText: 'Số tài khoản (6 đến 19 chữ số)'),
+        decoration: const InputDecoration(labelText: 'Số tài khoản'),
       ),
       TextField(
         controller: widget.controller.holder,
@@ -130,9 +130,8 @@ class _PayoutFieldsState extends State<_PayoutFields> {
             );
           }
         },
-        decoration: const InputDecoration(labelText: 'Chủ tài khoản (chữ in hoa, không dấu)'),
+        decoration: const InputDecoration(labelText: 'Chủ tài khoản'),
       ),
-      Text('Hệ thống chỉ hiển thị lại 4 số cuối. Quản trị viên dùng thông tin này để chuyển khoản hoàn tiền.', style: appText(size: 11, color: AppColors.muted)),
     ],
   );
 }
@@ -250,12 +249,10 @@ class _CancelOrderSheetState extends State<CancelOrderSheet> {
         );
       },
       children: [
-        Notice(
-          'Huỷ miễn phí khi đơn đang tìm tài xế hoặc tài xế đã nhận.'
-          '${paid ? ' Đơn đã thanh toán sẽ được hoàn 100% (${money(o.totalFee)}) sau khi Admin duyệt.' : ''}',
-          icon: 'info',
-        ),
-        _gap(),
+        if (paid) ...[
+          const Notice('Hoàn 100% sau khi quản trị viên duyệt.', icon: 'info'),
+          _gap(),
+        ],
         FutureBuilder<List<LookupItem>>(
           future: _reasons,
           builder: (_, snap) => DropdownButtonFormField<String>(
@@ -306,7 +303,7 @@ class _RejectPickupSheetState extends State<RejectPickupSheet> {
       return runAction(context, () => widget.api.reviewPickup(widget.order.id, approve: false, reason: _reason.text.trim()), success: 'Đã từ chối ảnh. Tài xế sẽ chụp lại.');
     },
     children: [
-      Notice('Lần gửi ảnh thứ ${widget.order.proof?.submissionCount ?? 1}/5. Sau lần từ chối thứ 5, tài xế phải báo sự cố.', icon: 'warning', peach: true),
+      Notice('Lần gửi ảnh thứ ${widget.order.proof?.submissionCount ?? 1}/5.', icon: 'warning', peach: true),
       _gap(),
       TextField(
         controller: _reason,
@@ -376,11 +373,6 @@ class _ComplaintSheetState extends State<ComplaintSheet> {
         );
       },
       children: [
-        Notice(
-          'Khiếu nại trong 24 giờ sau khi giao. Khi khiếu nại đang mở, đơn chưa hoàn tất.'
-          '${o.paymentMethod == 'Cash' ? ' Đơn tiền mặt: tranh chấp tiền xử lý ngoài hệ thống.' : ''}',
-          icon: 'info',
-        ),
         _gap(),
         FutureBuilder<List<LookupItem>>(
           future: _reasons,
@@ -403,7 +395,7 @@ class _ComplaintSheetState extends State<ComplaintSheet> {
           controller: _amount,
           keyboardType: TextInputType.number,
           inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-          decoration: InputDecoration(labelText: 'Số tiền yêu cầu hoàn (tối đa ${money(o.totalFee)})'),
+          decoration: InputDecoration(labelText: 'Số tiền yêu cầu hoàn'),
         ),
         _gap(),
         PhotoPicker(label: 'Ảnh bằng chứng', urls: _photos, max: OrderRules.maxEvidencePhotos, upload: widget.api.upload, onChanged: (p) => setState(() => _photos = p)),
@@ -453,12 +445,6 @@ class _IncidentSheetState extends State<IncidentSheet> {
       );
     },
     children: [
-      const Notice(
-        'Điều phối viên sẽ kiểm tra và có thể cho tiếp tục, đổi tài xế hoặc hủy đơn. '
-        'Tài xế chỉ nhận thông báo chung, không thấy nội dung bạn viết. Chuyến vẫn tiếp tục trong lúc chờ xử lý.',
-        icon: 'info',
-      ),
-      _gap(),
       TextField(
         key: const Key('customer-incident-description'),
         controller: _desc,
@@ -522,8 +508,6 @@ class _IncidentRefundSheetState extends State<IncidentRefundSheet> {
       );
     },
     children: [
-      const Notice('Chỉ áp dụng đơn PayOS đã thanh toán. Số được duyệt không vượt số bạn yêu cầu.', icon: 'info'),
-      _gap(),
       TextField(
         controller: _reason,
         maxLines: 3,
@@ -534,7 +518,7 @@ class _IncidentRefundSheetState extends State<IncidentRefundSheet> {
         controller: _amount,
         keyboardType: TextInputType.number,
         inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-        decoration: InputDecoration(labelText: 'Số tiền yêu cầu (tối đa ${money(widget.order.totalFee)})'),
+        decoration: InputDecoration(labelText: 'Số tiền yêu cầu'),
       ),
       _gap(),
       PhotoPicker(label: 'Ảnh bằng chứng', urls: _photos, max: OrderRules.maxEvidencePhotos, upload: widget.api.upload, onChanged: (p) => setState(() => _photos = p)),
@@ -642,7 +626,6 @@ class _RatingSheetState extends State<RatingSheet> {
         maxLength: 1000,
         decoration: const InputDecoration(labelText: 'Nhận xét'),
       ),
-      Text('Mỗi đơn đánh giá 1 lần, không sửa được, trong 1 ngày sau khi hoàn thành.', style: appText(size: 11.5, color: AppColors.muted)),
     ],
   );
 }
@@ -798,8 +781,6 @@ class _PayOsSheetState extends State<PayOsSheet> with WidgetsBindingObserver {
             const Notice('Mã cũ không còn nhận chuyển khoản. Hãy tạo mã mới cho cùng đơn.', icon: 'warning', peach: true),
         ],
         const SizedBox(height: 10),
-        Text('Đơn chỉ hiện cho tài xế sau khi PayOS xác nhận. Mỗi mã sống 10 phút; đơn chưa thanh toán sau 30 phút sẽ tự huỷ.', style: appText(size: 11.5, color: AppColors.muted)),
-        const SizedBox(height: 12),
         Row(
           children: [
             Expanded(

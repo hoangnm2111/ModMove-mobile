@@ -146,9 +146,9 @@ class _DriverTripsScreenState extends State<DriverTripsScreen> {
               _line('Điểm lấy', '${j['pickupAddress']}'),
               _line('Điểm giao', '${j['dropoffAddress']}'),
               _line('Khách hàng', '${j['customerName'] ?? ''}'),
-              _phone('Số điện thoại khách', j['customerPhone'] as String?),
+              _phone(j['customerPhone'] as String?),
               _line('Người nhận', '${j['receiverName'] ?? ''}'),
-              _phone('Số điện thoại người nhận', j['receiverPhone'] as String?),
+              _phone(j['receiverPhone'] as String?),
               _line(
                 'Quãng đường',
                 '${j['estimatedDistanceKm']} km · ${j['estimatedDurationMin']} phút',
@@ -183,18 +183,11 @@ class _DriverTripsScreenState extends State<DriverTripsScreen> {
     ),
   );
 
-  Widget _phone(String label, String? phone) => Padding(
+  Widget _phone(String? phone) => Padding(
     padding: const EdgeInsets.symmetric(vertical: 4),
     child: Row(
       crossAxisAlignment: CrossAxisAlignment.center,
       children: [
-        SizedBox(
-          width: 110,
-          child: Text(
-            label,
-            style: appText(size: 12, color: AppColors.secondary),
-          ),
-        ),
         Expanded(
           child: Align(
             alignment: Alignment.centerLeft,
