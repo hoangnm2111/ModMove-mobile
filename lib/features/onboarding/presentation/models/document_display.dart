@@ -1,3 +1,4 @@
+import '../../../../core/format/formatters.dart';
 import '../../domain/entities/driver_application.dart';
 
 extension DocumentDisplay on DocumentKind {
@@ -20,6 +21,5 @@ extension DocumentDisplay on DocumentKind {
 
 String formatStamp(DateTime? value) {
   if (value == null) return '—';
-  String two(int n) => n.toString().padLeft(2, '0');
-  return '${two(value.hour)}:${two(value.minute)} · ${two(value.day)}/${two(value.month)}/${value.year}';
+  return dateTime(value);
 }

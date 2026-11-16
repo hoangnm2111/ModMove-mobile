@@ -111,13 +111,12 @@ class _VerificationScreenState extends State<VerificationScreen> {
     }
     if (step == 0) {
       if (driver.hasApi) {
-        final message = await driver.saveDraft();
+        final message = await driver.persistDraft();
         if (!mounted) return;
         if (message != null) {
           _showError(message);
           return;
         }
-        notify(context, 'DRIVER_DRAFT_SAVED');
       }
       setState(() {
         step = 1;
@@ -145,18 +144,30 @@ class _VerificationScreenState extends State<VerificationScreen> {
     }
   }
 
+  /// Giữ dữ liệu đang nhập khi rời màn hình hoặc chuyển bước: không hiện thông báo.
   Future<bool> _save() async {
     final driver = context.read<DriverController>();
-    if (!driver.hasApi || !driver.canEdit) return true;
-    final message = await driver.saveDraft();
+    final message = await driver.persistDraft();
     if (!mounted) return false;
     if (message != null) {
       _showError(message);
       return false;
     }
     setState(() => error = null);
-    notify(context, 'DRIVER_DRAFT_SAVED');
     return true;
+  }
+
+  /// Người dùng bấm "Lưu nháp": lưu và báo đã lưu.
+  Future<void> _saveDraft() async {
+    final driver = context.read<DriverController>();
+    final message = await driver.saveDraft();
+    if (!mounted) return;
+    if (message != null) {
+      _showError(message);
+      return;
+    }
+    setState(() => error = null);
+    notify(context, 'DRIVER_DRAFT_SAVED');
   }
 
   Future<void> _back() async {
@@ -214,7 +225,7 @@ class _VerificationScreenState extends State<VerificationScreen> {
                       TextButton(
                         key: const ValueKey('save-driver-draft'),
                         onPressed: driver.canEdit && !driver.busy
-                            ? _save
+                            ? _saveDraft
                             : null,
                         child: const Text('Lưu nháp'),
                       ),
@@ -244,11 +255,9 @@ class _VerificationScreenState extends State<VerificationScreen> {
               controller: _scroll,
               padding: const EdgeInsets.fromLTRB(16, 0, 16, 6),
               children: [
-                if (driver.hasApi) ...[
+                if (driver.hasApi && driver.savedAt != null) ...[
                   Text(
-                    driver.savedAt == null
-                        ? 'Bản demo • Có thể lưu nháp và tiếp tục sau'
-                        : 'Bản nháp đã lưu lúc ${formatStamp(driver.savedAt)}',
+                    'Bản nháp đã lưu lúc ${formatStamp(driver.savedAt)}',
                     style: appText(size: 11, color: AppColors.secondary),
                   ),
                   const SizedBox(height: 6),
@@ -299,7 +308,7 @@ class _VerificationScreenState extends State<VerificationScreen> {
         // Ô do BE quyết định (kích thước thùng theo loại xe): đổi loại xe thì hiển thị lại.
         key: ValueKey(derived ? 'field-$key-${driver.fields[key]}' : 'field-$key'),
         initialValue: driver.fields[key],
-        readOnly: derived || driver.status != ApprovalStatus.draft || driver.busy,
+        readOnly: derived || !driver.canEdit || driver.busy,
         keyboardType: keyboard,
         style: appText(size: 14),
         onChanged: (value) => driver.setField(key, value),
@@ -418,14 +427,14 @@ class _VerificationScreenState extends State<VerificationScreen> {
           child: _field(
             driver,
             'payload',
-            'Tải trọng (kg)',
+            'Tải trọng',
             keyboard: TextInputType.number,
           ),
         ),
       ],
     ),
     const SizedBox(height: 14),
-    const SectionTitle('Kích thước thùng xe (m)', size: 14),
+    const SectionTitle('Kích thước thùng xe', size: 14),
     const SizedBox(height: 9),
     Row(
       crossAxisAlignment: CrossAxisAlignment.start,

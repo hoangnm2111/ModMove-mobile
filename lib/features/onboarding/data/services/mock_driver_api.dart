@@ -210,14 +210,6 @@ class MockDriverApi {
     final candidate = DriverApplicationDto.toJson(
       DriverApplicationDto.fromJson(body),
     );
-    if (_profile['status'] == 'rejected') {
-      if (jsonEncode(candidate['fields']) != jsonEncode(_profile['fields'])) {
-        throw const _ApiFailure(
-          422,
-          'Thông tin đã xét duyệt được giữ nguyên khi bổ sung giấy tờ.',
-        );
-      }
-    }
     final previous =
         (_profile['status'] == 'rejected' && _history.isNotEmpty
                 ? (_history.last as Map)['documents']
@@ -227,16 +219,6 @@ class MockDriverApi {
     for (final kind in DocumentKind.values) {
       final old = previous[kind.name] as Map;
       final next = incoming[kind.name] as Map;
-      if (old['accepted'] == true && next['reference'] != old['reference']) {
-        throw const _ApiFailure(
-          422,
-          'Không được thay giấy tờ đã được chấp nhận.',
-        );
-      }
-      if (old['accepted'] == true) {
-        incoming[kind.name] = jsonDecode(jsonEncode(old));
-        continue;
-      }
       // Decision flags are server-owned, never trusted from the client.
       next['accepted'] = old['accepted'];
       next['rejectionReason'] = old['rejectionReason'];

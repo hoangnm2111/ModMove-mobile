@@ -51,8 +51,10 @@ class DriverApplication {
     this.online = false,
     this.submittedAt,
     this.reviewedAt,
+    List<String> rejectionReasons = const [],
   }) : fields = Map.unmodifiable(fields),
-       documents = Map.unmodifiable(documents);
+       documents = Map.unmodifiable(documents),
+       rejectionReasons = List.unmodifiable(rejectionReasons);
   final ApprovalStatus status;
   final Map<String, String> fields;
   final Map<DocumentKind, VerificationDocument> documents;
@@ -60,11 +62,14 @@ class DriverApplication {
   final bool accountActive;
   final bool online;
   final DateTime? submittedAt, reviewedAt;
+
+  /// Lý do Admin từ chối, nguyên văn (mỗi dòng một mục).
+  final List<String> rejectionReasons;
   bool get canEdit =>
       status == ApprovalStatus.draft || status == ApprovalStatus.rejected;
   bool get canGoOnline => status == ApprovalStatus.approved && accountActive;
-  bool canEditDocument(DocumentKind kind) =>
-      canEdit && !documents[kind]!.accepted;
+  /// Hồ sơ còn sửa được thì mọi giấy tờ đều sửa được; chỉ mục bị từ chối mới bắt buộc làm lại.
+  bool canEditDocument(DocumentKind kind) => canEdit;
 }
 
 class ApplicationReceipt {

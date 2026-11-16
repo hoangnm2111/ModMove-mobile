@@ -283,16 +283,18 @@ class ProfileDetailRow extends StatelessWidget {
     padding: const EdgeInsets.symmetric(vertical: 10),
     child: Row(
       children: [
-        Expanded(
-          child: Text(
-            label,
-            style: appText(size: 12, color: AppColors.secondary),
+        if (label.isNotEmpty) ...[
+          Expanded(
+            child: Text(
+              label,
+              style: appText(size: 12, color: AppColors.secondary),
+            ),
           ),
-        ),
-        const SizedBox(width: 8),
+          const SizedBox(width: 8),
+        ],
         Flexible(
           child: Align(
-            alignment: Alignment.centerRight,
+            alignment: label.isEmpty ? Alignment.centerLeft : Alignment.centerRight,
             child: Text(
               value,
               textAlign: TextAlign.right,

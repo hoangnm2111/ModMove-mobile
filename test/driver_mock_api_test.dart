@@ -63,10 +63,6 @@ void main() {
       final before = DriverApplicationDto.toJson(
         (await repository.history()).single,
       );
-      await expectLater(
-        repository.upload(DocumentKind.licenseFront, photo),
-        throwsA(isA<ApplicationFailure>()),
-      );
       final license = await repository.upload(DocumentKind.licenseBack, photo);
       rejected = await repository.saveDraft(
         withDocuments(rejected, {

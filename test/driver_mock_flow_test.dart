@@ -247,7 +247,7 @@ void main() {
       await click(tester, find.byKey(const ValueKey('demo-reject')));
       expect(driver.status, ApprovalStatus.rejected);
       await click(tester, find.byTooltip('Quay lại'));
-      await click(tester, find.text('Cập nhật giấy tờ'));
+      await click(tester, find.text('Cập nhật hồ sơ'));
       await chooseSample(tester, DocumentKind.licenseBack, 'Xem / Thay ảnh');
       await click(tester, find.text('Tiếp tục'));
       await chooseSample(tester, DocumentKind.inspection, 'Thay ảnh');

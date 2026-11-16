@@ -86,7 +86,7 @@ void main() {
   });
 
   testWidgets(
-    'correction opens the relevant step and preserves accepted fields',
+    'correction opens the relevant step and keeps every field editable',
     (tester) async {
       tester.view.physicalSize = const Size(390, 844);
       tester.view.devicePixelRatio = 1;
@@ -106,10 +106,8 @@ void main() {
               ),
             )
             .readOnly,
-        isTrue,
+        isFalse,
       );
-      expect(find.text('Xem ảnh'), findsNWidgets(2));
-      expect(find.text('Thay ảnh'), findsOneWidget);
     },
   );
 
@@ -126,6 +124,6 @@ void main() {
     expect(find.byType(DriverProfileScreen), findsOneWidget);
     expect(find.text('Hồ sơ đang chờ duyệt'), findsOneWidget);
     expect(tester.widget<Switch>(find.byType(Switch)).onChanged, isNull);
-    expect(find.text('Cập nhật giấy tờ'), findsNothing);
+    expect(find.text('Cập nhật hồ sơ'), findsNothing);
   });
 }

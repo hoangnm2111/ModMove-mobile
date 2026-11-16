@@ -60,7 +60,7 @@ void main() {
     },
   );
   test(
-    'rejected items must be replaced while accepted documents remain locked',
+    'rejected items must be replaced while other documents can still be edited',
     () async {
       final repo = DemoDriverRepository(
         status: ApprovalStatus.rejected,
@@ -69,15 +69,14 @@ void main() {
       final photos = FakePhotos()..photo = SelectedPhoto('new.png', png);
       final driver = makeDriver(repo, photos);
       expect(await driver.submit(), isNotNull);
-      final original = driver.documents[DocumentKind.licenseFront];
+      // Giấy tờ không bị từ chối vẫn thay ảnh được (hồ sơ không còn khoá từng mục).
       expect(
         await driver.pickDocument(
           DocumentKind.licenseFront,
           PhotoSource.gallery,
         ),
-        isNotNull,
+        isNull,
       );
-      expect(driver.documents[DocumentKind.licenseFront], same(original));
       expect(
         await driver.pickDocument(
           DocumentKind.licenseBack,
