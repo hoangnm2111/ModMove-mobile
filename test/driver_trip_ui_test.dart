@@ -117,7 +117,7 @@ void main() {
       expect(find.text('Tải lại ảnh'), findsOneWidget);
       await clickTrip(tester, find.byKey(const Key('retry-overall')));
       await chooseCargo(tester, CargoPhotoKind.secured);
-      expect(find.text('Ảnh bằng chứng (2/2)'), findsOneWidget);
+      expect(find.text('Ảnh bằng chứng 2/2'), findsOneWidget);
       await tester.runAsync(() async {
         final context = tester.element(find.byType(Scaffold).last);
         for (final asset in ['mock-cargo-overall', 'mock-cargo-secured']) {

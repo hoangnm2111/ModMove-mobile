@@ -328,3 +328,19 @@ class IncidentBanner extends StatelessWidget {
     ),
   );
 }
+
+/// Hộp xác nhận trước khi ghi nhận đã thu tiền mặt. Trả về true khi tài xế đồng ý.
+Future<bool> confirmCashCollected(BuildContext context, String amount, String payer) async {
+  final ok = await showDialog<bool>(
+    context: context,
+    builder: (dialog) => AlertDialog(
+      title: const Text('Xác nhận thu tiền'),
+      content: Text('Bạn đã nhận đủ $amount tiền mặt từ $payer?'),
+      actions: [
+        TextButton(key: const Key('cash-confirm-no'), onPressed: () => Navigator.pop(dialog, false), child: const Text('Chưa')),
+        FilledButton(key: const Key('cash-confirm-yes'), onPressed: () => Navigator.pop(dialog, true), child: const Text('Đã nhận')),
+      ],
+    ),
+  );
+  return ok == true;
+}

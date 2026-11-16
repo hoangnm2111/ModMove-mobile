@@ -175,7 +175,7 @@ class CargoInspectionScreen extends StatelessWidget {
               ),
             ),
             const SizedBox(height: 14),
-            SectionTitle('Ảnh bằng chứng (${state.uploadedCount}/2)', size: 15),
+            SectionTitle('Ảnh bằng chứng ${state.uploadedCount}/2', size: 15),
             const SizedBox(height: 8),
             Row(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -204,15 +204,19 @@ class CargoInspectionScreen extends StatelessWidget {
                   'Xác nhận đã thu ${vnd(job.fare)} từ người gửi',
                   style: appText(size: 13, weight: FontWeight.w600),
                 ),
-                subtitle: const Text('Thu tiền trước khi xếp hàng lên xe.'),
                 value: state.cashCollected,
-                onChanged: state.busy
+                // Người gửi trả tiền thì chỉ thu được khi đang ở điểm lấy hàng; phải xác nhận trước khi ghi nhận.
+                onChanged: state.busy || !tripState.atPickup
                     ? null
-                    : (v) => context.read<EvidenceCubit>().setCashCollected(v!),
+                    : (v) async {
+                        final cubit = context.read<EvidenceCubit>();
+                        if (v == true && !await confirmCashCollected(context, vnd(job.fare), 'người gửi')) return;
+                        cubit.setCashCollected(v!);
+                      },
               ),
               const SizedBox(height: 8),
             ],
-            const SectionTitle('Ghi chú chênh lệch (nếu có)', size: 13),
+            const SectionTitle('Ghi chú chênh lệch', size: 13),
             const SizedBox(height: 6),
             TextFormField(
               key: ValueKey('note-${job.id}'),
