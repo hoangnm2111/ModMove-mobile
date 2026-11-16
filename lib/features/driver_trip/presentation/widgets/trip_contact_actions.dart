@@ -150,7 +150,7 @@ class _IncidentFormSheetState extends State<IncidentFormSheet> {
                 hintText: 'Mô tả vấn đề để điều phối viên hỗ trợ…',
               ),
             ),
-            Text('Ảnh (tùy chọn, tối đa 5, JPG/PNG ≤ 5 MB)', style: appText(size: 12, color: AppColors.secondary)),
+            Text('Ảnh đính kèm', style: appText(size: 12, color: AppColors.secondary)),
             const SizedBox(height: 6),
             Wrap(
               spacing: 8,

@@ -195,7 +195,7 @@ class JobDetailsScreen extends StatelessWidget {
                     padding: EdgeInsets.symmetric(horizontal: 14),
                     child: Divider(height: 1),
                   ),
-                  _fare('Phí nền tảng (10%)', job.commission),
+                  _fare('Phí nền tảng', job.commission),
                   ColoredBox(
                     color: AppColors.peach,
                     child: _fare('Thực nhận', job.net, total: true),

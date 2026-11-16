@@ -35,6 +35,12 @@ class ActiveTripState {
       session.trip != null &&
       session.fix!.point.distanceTo(session.trip!.job.dropoffPoint) <=
           arrivalRadiusM;
+  /// GPS mới và cách điểm lấy hàng không quá [arrivalRadiusM] (thu tiền người gửi chỉ làm được ở đây).
+  bool get atPickup =>
+      fresh &&
+      session.trip != null &&
+      session.fix!.point.distanceTo(session.trip!.job.pickupPoint) <=
+          arrivalRadiusM;
   bool get canArrive =>
       fresh &&
       distance <= arrivalRadiusM &&

@@ -183,20 +183,19 @@ class _DeliveryScreenState extends State<DeliveryScreen> {
                               needCash ? 'Cần thu ${vnd(job.fare)} từ $payer' : 'Đã thu ${vnd(job.fare)} từ $payer',
                               style: appText(size: 14, weight: FontWeight.w700),
                             ),
-                            if (needCash)
-                              Text(
-                                'Nhận đủ tiền mặt rồi bấm xác nhận.',
-                                style: appText(size: 12, color: AppColors.secondary),
-                              ),
                           ],
                         ),
                       ),
                       if (needCash)
                         FilledButton(
                           key: const Key('collect-cash'),
-                          onPressed: state.busy || paused
+                          // Người nhận trả tiền thì chỉ thu được khi đã đến điểm giao hàng.
+                          onPressed: state.busy || paused || !state.atDropoff
                               ? null
-                              : () => context.read<ActiveTripBloc>().add(CashCollected()),
+                              : () async {
+                                  final bloc = context.read<ActiveTripBloc>();
+                                  if (await confirmCashCollected(context, vnd(job.fare), payer)) bloc.add(CashCollected());
+                                },
                           child: const Text('Xác nhận thu tiền'),
                         )
                       else
