@@ -241,7 +241,7 @@ class _ChangePasswordState extends State<_ChangePassword> {
       TextField(
         controller: _next,
         obscureText: true,
-        decoration: const InputDecoration(labelText: 'Mật khẩu mới (8–100 ký tự)'),
+        decoration: const InputDecoration(labelText: 'Mật khẩu mới'),
       ),
       const SizedBox(height: 16),
       PrimaryButton(

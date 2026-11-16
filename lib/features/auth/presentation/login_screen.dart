@@ -67,7 +67,7 @@ class _LoginScreenState extends State<LoginScreen> {
         : !InputRules.phone(_phone.text)
         ? 'Số điện thoại không hợp lệ.'
         : !InputRules.email(_email.text)
-        ? 'Email không hợp lệ (không dùng dấu tiếng Việt).'
+        ? 'Email không hợp lệ.'
         : !InputRules.password(_password.text)
         ? 'Mật khẩu từ 8 đến 100 ký tự.'
         : null;
@@ -189,15 +189,6 @@ class _LoginScreenState extends State<LoginScreen> {
               child: TextButton(key: const Key('register-have-code'), onPressed: _busy ? null : _haveCode, child: const Text('Tôi đã có mã OTP')),
             ),
           const SizedBox(height: 16),
-          if (_register)
-            Notice(
-              _asDriver
-                  ? 'Mật khẩu 8–100 ký tự. Mã OTP 6 số gửi tới email, hiệu lực 5 phút. Sau khi xác minh, bạn nộp giấy phép lái xe và giấy tờ xe để được duyệt.'
-                  : 'Mật khẩu 8–100 ký tự. Mã OTP 6 số được gửi tới email, hiệu lực 5 phút.',
-              icon: 'info',
-            )
-          else
-            const Notice('Chưa có tài khoản? Chọn "Đăng ký" rồi chọn Khách hàng hoặc Tài xế.', icon: 'info'),
         ],
       ),
     ),

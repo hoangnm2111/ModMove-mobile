@@ -162,9 +162,9 @@ void main() {
     // Thẻ sự cố #22 chứa khoản hoàn #5; thẻ riêng chỉ còn khiếu nại #6.
     expect(find.text('Hoàn do sự cố #5'), findsOneWidget);
     expect(find.text('Bồi thường vỏ thùng móp'), findsOneWidget);
-    expect(find.text('Sự cố (2)'), findsOneWidget);
-    await tester.scrollUntilVisible(find.text('Hoàn tiền & khiếu nại (1)'), 300, scrollable: find.byType(Scrollable).first);
-    expect(find.text('Hoàn tiền & khiếu nại (1)'), findsOneWidget);
+    expect(find.text('Sự cố 2'), findsOneWidget);
+    await tester.scrollUntilVisible(find.text('Hoàn tiền và khiếu nại 1'), 300, scrollable: find.byType(Scrollable).first);
+    expect(find.text('Hoàn tiền và khiếu nại 1'), findsOneWidget);
     expect(find.text('Khiếu nại #6'), findsOneWidget);
     expect(find.text('Giao trễ 2 giờ'), findsOneWidget);
 
@@ -225,7 +225,7 @@ void main() {
     final order = OrderDetail.fromJson(orderDetailJson(status: 'InTransit'));
     await tester.pumpWidget(_app(backend, (api) => Scaffold(body: SingleChildScrollView(child: IncidentSheet(api: api, order: order)))));
     await tester.pumpAndSettle();
-    expect(find.textContaining('Tài xế chỉ nhận thông báo chung'), findsOneWidget);
+    expect(find.textContaining('Tài xế chỉ nhận thông báo chung'), findsNothing);
 
     // Không có nút "Lý do nhanh" và không có ô chọn loại; mô tả để trống.
     expect(find.text('Lý do nhanh'), findsNothing);

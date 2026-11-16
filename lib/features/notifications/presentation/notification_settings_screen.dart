@@ -30,8 +30,7 @@ class NotificationSettingsScreen extends StatelessWidget {
             ),
             const SizedBox(height: 12),
             const Text(
-              'Nhận thông báo khi tài xế nhận đơn, đến điểm lấy hàng, giao hàng, khi có kết quả '
-              'hoàn tiền, sự cố hoặc rút tiền. Chạm vào thông báo để xem thông tin mới nhất.',
+              'Nhận thông báo về đơn hàng, hoàn tiền, sự cố và rút tiền.',
               textAlign: TextAlign.center,
             ),
             const SizedBox(height: 24),
