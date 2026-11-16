@@ -10,12 +10,32 @@ String money(num value) {
   return '${n < 0 ? '-' : ''}$bufđ';
 }
 
+/// Quãng đường trong ô Ước tính cước phí: làm tròn LÊN (không bao giờ thấp hơn thực tế), không hiện số lẻ.
+String kmCeil(num value) => '${value.ceil()} km';
+
+/// Tiền trong ô Ước tính cước phí: làm tròn LÊN bội số 1.000đ cho "chẵn" (chỉ hiển thị ước tính;
+/// số tiền thật khi đặt đơn/thanh toán vẫn lấy nguyên giá trị BE trả về, không dùng hàm này).
+String moneyCeil1000(num value) => money((value / 1000).ceil() * 1000);
+
 String _two(int v) => v.toString().padLeft(2, '0');
 
-String dateTime(DateTime d) =>
-    '${_two(d.hour)}:${_two(d.minute)} ${_two(d.day)}/${_two(d.month)}/${d.year}';
-String timeOfDay(DateTime d) => '${_two(d.hour)}:${_two(d.minute)}';
-String date(DateTime d) => '${_two(d.day)}/${_two(d.month)}/${d.year}';
+/// Giờ Việt Nam (UTC+7) của một thời điểm, không phụ thuộc múi giờ của máy (DECISIONS 9.5: lưu UTC, hiển thị giờ VN).
+DateTime vietnamTime(DateTime d) => d.toUtc().add(const Duration(hours: 7));
+
+String dateTime(DateTime d) {
+  final v = vietnamTime(d);
+  return '${_two(v.hour)}:${_two(v.minute)} ${_two(v.day)}/${_two(v.month)}/${v.year}';
+}
+
+String timeOfDay(DateTime d) {
+  final v = vietnamTime(d);
+  return '${_two(v.hour)}:${_two(v.minute)}';
+}
+
+String date(DateTime d) {
+  final v = vietnamTime(d);
+  return '${_two(v.day)}/${_two(v.month)}/${v.year}';
+}
 
 String timeAgo(DateTime d, [DateTime? now]) {
   final s = (now ?? DateTime.now()).difference(d).inSeconds;
