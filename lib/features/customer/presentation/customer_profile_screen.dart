@@ -30,12 +30,13 @@ class CustomerProfileScreen extends StatelessWidget {
               child: ListView(
                 padding: const EdgeInsets.all(20),
                 children: [
-                  sectionTitle('Tài khoản của tôi'),
+                  const CustomerBrand(),
+                  const CustomerPageHeading('Tài khoản'),
                   if (s.busy) const LinearProgressIndicator(),
                   if (s.error != null) CustomerNotice(s.error!, error: true),
                   if (s.data != null) ...[
                     CustomerCard(
-                      color: AppColors.peach,
+                      color: Colors.white,
                       child: Row(
                         children: [
                           CircleAvatar(
@@ -44,7 +45,14 @@ class CustomerProfileScreen extends StatelessWidget {
                             child: Text(
                               s.data!.name.isEmpty
                                   ? 'M'
-                                  : s.data!.name.substring(0, 1),
+                                  : s.data!.name
+                                        .trim()
+                                        .split(RegExp(r'\s+'))
+                                        .where((p) => p.isNotEmpty)
+                                        .take(2)
+                                        .map((p) => p[0])
+                                        .join()
+                                        .toUpperCase(),
                               style: const TextStyle(
                                 color: Colors.white,
                                 fontSize: 24,
@@ -82,9 +90,9 @@ class CustomerProfileScreen extends StatelessWidget {
                         ],
                       ),
                     ),
-                    ListTile(
+                    _ProfileMenuTile(
                       leading: const Icon(Icons.person_outline),
-                      title: const Text('Chỉnh sửa thông tin'),
+                      title: const Text('Thông tin cá nhân'),
                       subtitle: Text(s.data!.phone),
                       trailing: const Icon(Icons.chevron_right),
                       onTap: () async {
@@ -103,7 +111,7 @@ class CustomerProfileScreen extends StatelessWidget {
                       },
                     ),
                   ],
-                  ListTile(
+                  _ProfileMenuTile(
                     leading: const Icon(Icons.lock_outline),
                     title: const Text('Đổi mật khẩu'),
                     trailing: const Icon(Icons.chevron_right),
@@ -117,28 +125,28 @@ class CustomerProfileScreen extends StatelessWidget {
                       ),
                     ),
                   ),
-                  ListTile(
+                  _ProfileMenuTile(
                     leading: const Icon(Icons.support_agent),
                     title: const Text('Sự cố & hỗ trợ'),
                     onTap: () => Navigator.pushNamed(context, '/incidents'),
                   ),
-                  ListTile(
+                  _ProfileMenuTile(
                     leading: const Icon(Icons.assignment_return_outlined),
                     title: const Text('Khiếu nại & hoàn tiền'),
                     onTap: () => Navigator.pushNamed(context, '/refunds'),
                   ),
-                  ListTile(
+                  _ProfileMenuTile(
                     leading: const Icon(Icons.star_outline),
                     title: const Text('Đánh giá của tôi'),
                     onTap: () => Navigator.pushNamed(context, '/ratings'),
                   ),
-                  ListTile(
+                  _ProfileMenuTile(
                     leading: const Icon(Icons.notifications_none),
                     title: const Text('Cài đặt thông báo'),
                     onTap: () => Navigator.pushNamed(context, '/notifications'),
                   ),
                   const Divider(),
-                  ListTile(
+                  _ProfileMenuTile(
                     leading: const Icon(Icons.logout),
                     title: const Text('Đăng xuất'),
                     onTap: () async {
@@ -167,7 +175,9 @@ class CustomerProfileScreen extends StatelessWidget {
                                     context,
                                     'Xóa tài khoản?',
                                     'Tài khoản sẽ bị ngừng hoạt động. Bạn không thể xóa khi còn đơn đang xử lý. Chỉ xác nhận nếu bạn muốn ngừng sử dụng tài khoản này.',
-                                    action: 'Xóa tài khoản',
+                                    action: 'Xác nhận xóa',
+                                    destructive: true,
+                                    acknowledge: true,
                                   );
                                   if (!confirmed || !context.mounted) return;
                                   final auth = context.read<AuthCubit>();
@@ -221,10 +231,33 @@ class _EditProfileState extends State<_EditProfile> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
+              const DeliveryBanner(height: 128),
+              const SizedBox(height: 22),
+              Center(
+                child: CircleAvatar(
+                  radius: 34,
+                  backgroundColor: AppColors.orange,
+                  child: Text(
+                    widget.profile.name.trim().isEmpty
+                        ? 'M'
+                        : widget.profile.name.trim()[0].toUpperCase(),
+                    style: appText(
+                      size: 28,
+                      weight: FontWeight.w700,
+                      color: Colors.white,
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 24),
               TextFormField(
                 controller: name,
                 maxLength: 100,
-                decoration: const InputDecoration(labelText: 'Họ và tên'),
+                decoration: const InputDecoration(
+                  labelText: 'Họ và tên',
+                  counterText: '',
+                  prefixIcon: Icon(Icons.person_outline),
+                ),
                 validator: (v) =>
                     (v ?? '').trim().isEmpty ? 'Nhập họ tên' : null,
               ),
@@ -232,13 +265,28 @@ class _EditProfileState extends State<_EditProfile> {
               TextFormField(
                 controller: phone,
                 keyboardType: TextInputType.phone,
-                decoration: const InputDecoration(labelText: 'Số điện thoại'),
+                decoration: const InputDecoration(
+                  labelText: 'Số điện thoại',
+                  prefixIcon: Icon(Icons.phone_outlined),
+                ),
                 validator: (v) => isVietnamesePhone(v ?? '')
                     ? null
                     : 'Số điện thoại chưa hợp lệ',
               ),
               const SizedBox(height: 18),
-              detailRow('Email đăng nhập', widget.profile.email),
+              CustomerCard(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    detailRow('Email đăng nhập', widget.profile.email),
+                    const SizedBox(height: 8),
+                    Text(
+                      'Email đăng nhập không thay đổi tại đây.',
+                      style: appText(size: 12, color: AppColors.secondary),
+                    ),
+                  ],
+                ),
+              ),
               const SizedBox(height: 18),
               if (s.error != null) CustomerNotice(s.error!, error: true),
               FilledButton(
@@ -274,6 +322,7 @@ class _ChangePasswordState extends State<_ChangePassword> {
       next = TextEditingController(),
       confirm = TextEditingController();
   final form = GlobalKey<FormState>();
+  final Set<TextEditingController> visible = {};
   @override
   void dispose() {
     current.dispose();
@@ -293,6 +342,12 @@ class _ChangePasswordState extends State<_ChangePassword> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
+              const CustomerIllustration(
+                'security',
+                height: 128,
+                title: 'Bảo vệ tài khoản của bạn',
+              ),
+              const SizedBox(height: 28),
               for (final entry in [
                 (current, 'Mật khẩu hiện tại'),
                 (next, 'Mật khẩu mới'),
@@ -302,10 +357,35 @@ class _ChangePasswordState extends State<_ChangePassword> {
                   padding: const EdgeInsets.only(bottom: 18),
                   child: TextFormField(
                     controller: entry.$1,
-                    obscureText: true,
+                    obscureText: !visible.contains(entry.$1),
                     enableSuggestions: false,
                     autocorrect: false,
-                    decoration: InputDecoration(labelText: entry.$2),
+                    decoration: InputDecoration(
+                      labelText: entry.$2,
+                      prefixIcon: const Padding(
+                        padding: EdgeInsets.all(14),
+                        child: AppIcon(
+                          'lock',
+                          size: 22,
+                          color: AppColors.secondary,
+                        ),
+                      ),
+                      suffixIcon: IconButton(
+                        tooltip: visible.contains(entry.$1)
+                            ? 'Ẩn mật khẩu'
+                            : 'Hiện mật khẩu',
+                        onPressed: () => setState(
+                          () => visible.contains(entry.$1)
+                              ? visible.remove(entry.$1)
+                              : visible.add(entry.$1),
+                        ),
+                        icon: AppIcon(
+                          visible.contains(entry.$1) ? 'eye-off' : 'eye',
+                          size: 22,
+                          color: AppColors.secondary,
+                        ),
+                      ),
+                    ),
                     validator: (v) => v == null || v.isEmpty
                         ? 'Nhập mật khẩu'
                         : entry.$1 == confirm && v != next.text
@@ -342,6 +422,32 @@ class _ChangePasswordState extends State<_ChangePassword> {
           ),
         ),
       ),
+    ),
+  );
+}
+
+class _ProfileMenuTile extends StatelessWidget {
+  const _ProfileMenuTile({
+    this.leading,
+    required this.title,
+    this.subtitle,
+    this.trailing,
+    this.onTap,
+  });
+  final Widget? leading, subtitle, trailing;
+  final Widget title;
+  final VoidCallback? onTap;
+  @override
+  Widget build(BuildContext context) => CustomerCard(
+    padding: 0,
+    child: ListTile(
+      leading: leading,
+      title: title,
+      subtitle: subtitle,
+      trailing:
+          trailing ??
+          const AppIcon('chevron-right', size: 18, color: AppColors.secondary),
+      onTap: onTap,
     ),
   );
 }
