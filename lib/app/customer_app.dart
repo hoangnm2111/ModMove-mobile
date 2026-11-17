@@ -91,7 +91,12 @@ class _CustomerAppState extends State<CustomerApp> {
         );
       case '/booking':
         screen = BlocProvider(
-          create: (_) => BookingCubit(repo)..initialize(),
+          create: (_) => BookingCubit(
+            repo,
+            initial: settings.arguments is BookingDraft
+                ? settings.arguments as BookingDraft
+                : null,
+          )..initialize(),
           child: CustomerBookingScreen(
             onCreated: (id) {
               paymentOrder = id;

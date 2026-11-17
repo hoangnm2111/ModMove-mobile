@@ -69,6 +69,13 @@ class _CustomerRefundScreenState extends State<CustomerRefundScreen> {
                         ),
                         detailRow('Loại yêu cầu', statusLabel(r.source)),
                         detailRow('Ngày gửi', dateLabel(r.created)),
+                        if (r.decidedAt != null)
+                          detailRow('Ngày xét duyệt', dateLabel(r.decidedAt!)),
+                        if (r.processedAt != null)
+                          detailRow(
+                            'Ngày chuyển khoản',
+                            dateLabel(r.processedAt!),
+                          ),
                         detailRow('Số tiền yêu cầu', money(r.amount)),
                         if (r.approved != null)
                           detailRow(

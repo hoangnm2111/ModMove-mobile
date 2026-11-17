@@ -43,6 +43,68 @@ Future<void> tapVisible(WidgetTester tester, Finder finder) async {
 
 void main() {
   testWidgets(
+    'rebook prefills addresses and Android back preserves the booking step',
+    (tester) async {
+      final t = CustomerTestApi();
+      addTearDown(t.close);
+      await t.login();
+      final c = BookingCubit(t.repository, initial: validDraft);
+      await c.initialize();
+      await mount(
+        tester,
+        t,
+        BlocProvider(
+          create: (_) => c,
+          child: CustomerBookingScreen(onCreated: (_) {}),
+        ),
+      );
+      expect(find.text(validDraft.pickup), findsOneWidget);
+      expect(find.text(validDraft.receiver), findsOneWidget);
+      await tapVisible(tester, find.text('Tiếp tục'));
+      expect(find.text('Bạn cần gửi gì?'), findsOneWidget);
+      await tester.binding.handlePopRoute();
+      await tester.pumpAndSettle();
+      expect(find.text('Hàng của bạn đi đâu?'), findsOneWidget);
+      expect(c.state.draft.photos, validDraft.photos);
+      expect(c.state.draft.receiver, validDraft.receiver);
+      await tester.pumpWidget(const SizedBox());
+    },
+  );
+  testWidgets(
+    'customer applies completed order and recipient filters then clears search',
+    (tester) async {
+      tester.view.physicalSize = const Size(390, 844);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.reset);
+      final t = CustomerTestApi();
+      addTearDown(t.close);
+      await t.login();
+      await mount(tester, t, const Scaffold(body: CustomerOrdersScreen()));
+      await tapVisible(tester, find.text('Lọc đơn hàng'));
+      await tapVisible(tester, find.text('Tất cả trạng thái'));
+      await tapVisible(tester, find.text('Hoàn thành').last);
+      await tester.enterText(
+        find.widgetWithText(TextFormField, 'Số điện thoại người nhận'),
+        '090',
+      );
+      await tapVisible(tester, find.text('Áp dụng bộ lọc'));
+      expect(t.requests.last.url.queryParameters['status'], 'Completed');
+      expect(t.requests.last.url.queryParameters['view'], 'History');
+      expect(t.requests.last.url.queryParameters['receiverPhone'], '090');
+      final search = find.byType(TextField).first;
+      await tester.enterText(search, 'MM-123');
+      await tester.testTextInput.receiveAction(TextInputAction.search);
+      await tester.pumpAndSettle();
+      expect(t.requests.last.url.queryParameters['search'], 'MM-123');
+      await tapVisible(tester, find.byTooltip('Xóa tìm kiếm'));
+      expect(t.requests.last.url.queryParameters['search'], isEmpty);
+      await tapVisible(tester, find.text('Bỏ lọc'));
+      expect(t.requests.last.url.queryParameters.containsKey('status'), false);
+      expect(tester.takeException(), isNull);
+      await tester.pumpWidget(const SizedBox());
+    },
+  );
+  testWidgets(
     'customer can move through booking wizard without losing edits and submits server quote',
     (tester) async {
       tester.view.physicalSize = const Size(390, 844);

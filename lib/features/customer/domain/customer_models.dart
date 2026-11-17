@@ -1,3 +1,5 @@
+import '../../../core/domain/account_input.dart';
+
 class CustomerFailure implements Exception {
   const CustomerFailure(this.message, {this.code = ''});
   final String message, code;
@@ -57,6 +59,23 @@ class Coupon {
 }
 
 class BookingDraft {
+  factory BookingDraft.fromOrder(OrderDetail order) => BookingDraft(
+    pickup: order.summary.pickup,
+    dropoff: order.summary.dropoff,
+    receiver: order.summary.receiver,
+    phone: order.summary.phone,
+    cargoType: order.cargoCode,
+    quantity: order.quantity,
+    weight: order.weight,
+    length: order.length,
+    width: order.width,
+    height: order.height,
+    photos: List.unmodifiable(order.photos),
+    notes: order.notes,
+    loading: order.loading,
+    payment: order.summary.paymentMethod,
+    payer: order.payer.isEmpty ? 'Sender' : order.payer,
+  );
   const BookingDraft({
     this.pickup = '',
     this.dropoff = '',
@@ -134,16 +153,28 @@ class BookingDraft {
     if (pickup.trim().isEmpty || dropoff.trim().isEmpty) {
       return 'Nhập đầy đủ địa chỉ lấy và giao hàng.';
     }
+    if (pickup.trim().length > 255 || dropoff.trim().length > 255) {
+      return 'Mỗi địa chỉ tối đa 255 ký tự.';
+    }
     if (receiver.trim().isEmpty ||
-        !RegExp(r'^(0[0-9]{9}|\+84[0-9]{9})$').hasMatch(phone.trim())) {
+        receiver.trim().length > 100 ||
+        !isVietnamesePhone(phone)) {
       return 'Nhập tên và số điện thoại Việt Nam hợp lệ của người nhận.';
     }
     if (cargoType.isEmpty ||
         quantity <= 0 ||
+        !weight.isFinite ||
         weight <= 0 ||
         weight > 100000 ||
         [length, width, height].any((n) => n < 1 || n > 2000)) {
       return 'Khai báo loại hàng, số lượng, cân nặng và kích thước hợp lệ.';
+    }
+    if (notes.trim().length > 500 || coupon.trim().length > 50) {
+      return 'Ghi chú tối đa 500 ký tự; mã giảm giá tối đa 50 ký tự.';
+    }
+    if (!['PayOS', 'Cash'].contains(payment) ||
+        (payment == 'Cash' && !['Sender', 'Receiver'].contains(payer))) {
+      return 'Chọn phương thức và người thanh toán hợp lệ.';
     }
     if (photos.isEmpty || photos.length > 5) {
       return 'Tải lên từ 1 đến 5 ảnh hàng hóa.';
@@ -212,6 +243,16 @@ class OrderSummary {
       status == 'Pending';
 }
 
+class CustomerOrderFilter {
+  const CustomerOrderFilter({this.status, this.from, this.to, this.phone = ''});
+  final String? status;
+  // Calendar dates in Vietnam, sent without conversion to UTC.
+  final DateTime? from, to;
+  final String phone;
+  bool get isEmpty =>
+      status == null && from == null && to == null && phone.isEmpty;
+}
+
 class OrderHistory {
   const OrderHistory(this.status, this.note, this.at);
   final String status, note;
@@ -222,6 +263,10 @@ class OrderDetail {
   const OrderDetail({
     required this.summary,
     required this.cargoType,
+    this.cargoCode = '',
+    this.pickupRejection = '',
+    this.pickupSubmissionCount = 0,
+    this.couponCode = '',
     required this.quantity,
     required this.weight,
     required this.length,
@@ -249,6 +294,8 @@ class OrderDetail {
     required this.payer,
   });
   final OrderSummary summary;
+  final String cargoCode, pickupRejection, couponCode;
+  final int pickupSubmissionCount;
   final String cargoType,
       notes,
       driverName,
@@ -373,6 +420,8 @@ class Refund {
     required this.reference,
     required this.photos,
     required this.created,
+    this.decidedAt,
+    this.processedAt,
   });
   final int id, orderId;
   final String orderCode,
@@ -391,6 +440,7 @@ class Refund {
   final bool waitingReply, needsBank;
   final List<String> photos;
   final DateTime created;
+  final DateTime? decidedAt, processedAt;
   bool get canWithdraw => source != 'Cancellation' && status == 'Requested';
   bool get canSetBank =>
       !['Processed', 'Rejected', 'Withdrawn'].contains(status);

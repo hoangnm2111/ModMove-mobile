@@ -135,15 +135,21 @@ class BookingState {
 }
 
 class BookingCubit extends Cubit<BookingState> {
-  BookingCubit(this.repository) : super(const BookingState());
+  BookingCubit(this.repository, {BookingDraft? initial})
+    : super(BookingState(draft: initial ?? const BookingDraft()));
   final CustomerRepository repository;
   int _revision = 0;
   Future<void> initialize() async {
-    if (state.busy || state.needsOrderCheck) return;
+    if (isClosed || state.busy || state.needsOrderCheck) return;
     emit(BookingState(draft: state.draft, busy: true));
     try {
       final c = await repository.catalog();
-      if (!isClosed) emit(BookingState(draft: state.draft, catalog: c));
+      if (!isClosed) {
+        final draft = c.cargoTypes.any((v) => v.code == state.draft.cargoType)
+            ? state.draft
+            : state.draft.copyWith(cargoType: '');
+        emit(BookingState(draft: draft, catalog: c));
+      }
     } catch (e) {
       if (!isClosed) {
         emit(BookingState(draft: state.draft, error: customerError(e)));
@@ -152,7 +158,8 @@ class BookingCubit extends Cubit<BookingState> {
   }
 
   void edit(BookingDraft draft) {
-    if (state.busy ||
+    if (isClosed ||
+        state.busy ||
         state.uploading ||
         state.created != null ||
         state.needsOrderCheck) {
@@ -222,6 +229,16 @@ class BookingCubit extends Cubit<BookingState> {
     if (state.busy || state.uploading || state.needsOrderCheck) return;
     final invalid = state.draft.validate();
     if (invalid != null) return error(invalid);
+    final vehicles = state.catalog?.vehicles.where(
+      (v) => v.id == state.draft.vehicleId,
+    );
+    if (vehicles == null ||
+        vehicles.isEmpty ||
+        !vehicles.first.fits(state.draft)) {
+      return error(
+        'Chọn lại loại xe phù hợp với tải trọng và kích thước hàng.',
+      );
+    }
     final revision = _revision;
     emit(BookingState(draft: state.draft, catalog: state.catalog, busy: true));
     try {
@@ -325,6 +342,8 @@ class CustomerOrderCubit extends Cubit<OrderState> {
   Timer? _timer;
   StreamSubscription<CustomerRealtimeEvent>? _subscription;
   bool _refreshing = false, _trackingBusy = false;
+  bool _trackingAgain = false;
+  int _trackingGeneration = 0;
   bool _closing = false;
   Completer<void>? _refreshDone;
   OrderState update({
@@ -393,6 +412,13 @@ class CustomerOrderCubit extends Cubit<OrderState> {
     try {
       final order = await repository.order(id);
       if (!isClosed) {
+        final previous = state.order;
+        final trackingChanged =
+            previous != null &&
+            (previous.driverPhone != order.driverPhone ||
+                previous.plate != order.plate ||
+                previous.summary.status != order.summary.status);
+        if (trackingChanged) _trackingGeneration++;
         final payment = state.payment;
         final keepQr =
             order.summary.needsPayment &&
@@ -402,12 +428,15 @@ class CustomerOrderCubit extends Cubit<OrderState> {
         emit(
           OrderState(
             order: order,
-            tracking: state.tracking,
+            tracking: trackingChanged ? null : state.tracking,
             payment: keepQr ? payment : null,
             acting: state.acting,
             trackingError: state.trackingError,
           ),
         );
+        if (trackingChanged && !order.summary.terminal) {
+          unawaited(loadTracking());
+        }
       }
     } catch (e) {
       if (!isClosed) {
@@ -420,12 +449,20 @@ class CustomerOrderCubit extends Cubit<OrderState> {
   }
 
   Future<void> loadTracking() async {
-    if (isClosed || _closing || _trackingBusy) return;
+    if (isClosed || _closing) return;
+    if (_trackingBusy) {
+      _trackingAgain = true;
+      return;
+    }
     _trackingBusy = true;
+    final generation = _trackingGeneration;
+    final before = state.tracking;
     try {
       var tracking = await repository.tracking(id);
+      if (isClosed || _closing || generation != _trackingGeneration) return;
       final latest = state.tracking;
-      if (latest?.at != null &&
+      if (!identical(latest, before) &&
+          latest?.at != null &&
           latest?.driver != null &&
           (tracking.at == null || latest!.at!.isAfter(tracking.at!))) {
         tracking = tracking.withLocation(latest!.driver!, latest.at!);
@@ -441,11 +478,17 @@ class CustomerOrderCubit extends Cubit<OrderState> {
         );
       }
     } catch (e) {
-      if (!isClosed) {
+      if (!isClosed && !_closing && generation == _trackingGeneration) {
         emit(update(acting: state.acting, trackingError: customerError(e)));
       }
     } finally {
       _trackingBusy = false;
+      if (_trackingAgain) {
+        _trackingAgain = false;
+        if (!isClosed && !_closing && state.order?.summary.terminal != true) {
+          unawaited(loadTracking());
+        }
+      }
     }
   }
 

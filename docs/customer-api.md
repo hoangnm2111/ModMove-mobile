@@ -1,6 +1,6 @@
 # Customer mobile — real API integration
 
-The production entry point uses the local backend at `http://10.0.2.2:5133` on Android Emulator. Customer has no mock repository, fallback fare, fake location or simulated payment completion. Login reads the role in the server response and opens either Customer or the existing Driver flow.
+The default entry point uses the local backend at `http://10.0.2.2:5133` on Android Emulator. Customer has no mock repository, fallback fare, fake location or simulated payment completion. Login reads the role in the server response and opens either Customer or the existing Driver flow.
 
 ```powershell
 flutter pub get
@@ -93,3 +93,28 @@ Live local API verification:
 
 Review images from the running app with API data are outside Git in `../output/customer-api-review-2026-11-16/`.
 No screenshots, credentials or local agent files belong in the commits.
+
+## Customer audit — 2026-11-17
+
+Rechecked all 18 requested functions against the current backend controllers, request validators and notification types. All 22 actions exposed by the seven Customer controllers have mobile repository calls and reachable UI flows. Shared authentication, account profile/password, FCM and public catalog APIs are also connected. No Customer mock implementation was added.
+
+Corrections and missing details completed:
+- FE-02 / FE-05 / FE-07: accept `+84` phone input but normalize it to `0xxxxxxxxx` for registration, profile and recipient API requests. The backend accepts only the domestic format.
+- FE-04: validate new passwords consistently in the authenticated change-password form as well as registration/reset.
+- FE-06: order history now filters by exact status, inclusive Vietnam calendar dates and recipient phone digits using the existing API query parameters; search and filters can be cleared.
+- FE-07 / FE-08 / FE-09: enforce address/coupon lengths, finite weight and vehicle capacity; Android back navigates to the previous booking step without losing inputs. Rebooking a cancelled/completed order pre-fills addresses, recipient, cargo and uploaded photos while requiring a new vehicle selection, quote and consent. Retired cargo types require a replacement selection without clearing other fields.
+- FE-12 / FE-17: show the pickup rejection reason, submission count, applied coupon and actual payment timestamp from order details.
+- FE-13: clear old-driver GPS after reassignment or a server response with no driver location; discard in-flight responses from the previous assignment. A fresh SignalR location during the current request remains authoritative. Handover ETA is labelled as the transfer between drivers rather than the destination.
+- FE-15 / FE-44: show refund decision/payout dates and provide a direct path from an order to complaints/refunds.
+
+Re-test on the UI: sign up/edit profile with `+84`, filter History by Completed/Cancelled and recipient digits, open a cancelled order and select **Đặt lại với thông tin này**, use Android back between booking steps, and inspect a rejected pickup proof/refund timeline.
+
+Validation after these changes: `flutter analyze --no-fatal-infos` passed, all **235 tests** passed with coverage, and `flutter build apk --debug` succeeded. The new tests include phone normalization, filter query parameters, rebooking, booking-step navigation, invalid vehicle capacity and driver reassignment/GPS races. These automated tests use isolated test fixtures; the app itself continues to use the real API.
+
+Limits remain explicit:
+- There is still no backend endpoint for editing an already submitted order. The supported workflow is cancellation followed by rebooking; the app does not pretend to edit the original order.
+- Authenticated password change uses the current password because that is the backend contract; OTP is used for password reset.
+- Google Maps needs the Android key. The tracking endpoint supplies GPS and ETA, not a road polyline; the app does not fabricate a route.
+- On this audit date, `localhost:5133/health` and `/api/public/VehicleTypes` returned HTTP 200 with an HTML document, not ModMove health/catalog responses. No running `ModMove.WebApi` process was found. These responses are not successful live API checks.
+- The checked local configuration still has no MapVina key, Cloudinary configuration or SMTP host. These are required for a Production startup; uploads, booking, emailed OTP and their full payment/delivery/refund cycle remain unverified against a live backend in this audit.
+- The VPS deployment bundle is prepared separately under `../output/modmove-vps-2026-11-17/`, pinned to backend commit `20d13c53944c9c8977a0a7f810e34001ca77c7cf`. No backend source was edited. Deployment awaits VPS SSH access and provider configuration; no remote service or DNS/HTTPS endpoint has been provisioned yet.

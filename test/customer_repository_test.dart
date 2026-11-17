@@ -1,4 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:modmove_mobile/core/domain/account_input.dart';
 import 'package:modmove_mobile/core/network/api_client.dart';
 import 'package:modmove_mobile/features/auth/data/remote_auth_repository.dart';
 import 'package:modmove_mobile/features/customer/domain/customer_models.dart';
@@ -8,6 +9,108 @@ import 'support/customer_fixtures.dart';
 import 'support/remote_fixtures.dart';
 
 void main() {
+  test(
+    'international Vietnam phone is normalized for signup, profile and booking',
+    () async {
+      final t = CustomerTestApi();
+      addTearDown(t.close);
+      await RemoteAuthRepository(t.api).register(
+        'Customer',
+        '+84901234567',
+        'c@test.local',
+        'Password123',
+        role: 'Customer',
+      );
+      expect(requestBody(t.requests.last)['phoneNumber'], '0901234567');
+      await t.login();
+      await t.repository.updateProfile('Customer', ' +84901234567 ');
+      expect(requestBody(t.requests.last)['phoneNumber'], '0901234567');
+      await t.repository.book(validDraft.copyWith(phone: '+84901234567'), fare);
+      expect(requestBody(t.requests.last)['receiverPhone'], '0901234567');
+      expect(isVietnamesePhone('+840901234567'), false);
+      expect(isVietnamesePhone('phone0901234567'), false);
+      expect(isValidNewPassword('12345678'), false);
+      expect(isValidNewPassword('Abc12345'), true);
+    },
+  );
+  test(
+    'history filters preserve calendar dates and combine server-side predicates',
+    () async {
+      final t = CustomerTestApi();
+      addTearDown(t.close);
+      await t.login();
+      await t.repository.orders(
+        page: 3,
+        view: 'History',
+        search: 'Q1 & Q2',
+        filter: CustomerOrderFilter(
+          status: 'Cancelled',
+          from: DateTime(2026, 11, 1),
+          to: DateTime(2026, 11, 17),
+          phone: '090',
+        ),
+      );
+      expect(t.requests.last.url.queryParameters, {
+        'page': '3',
+        'view': 'History',
+        'search': 'Q1 & Q2',
+        'status': 'Cancelled',
+        'fromDate': '2026-11-01',
+        'toDate': '2026-11-17',
+        'receiverPhone': '090',
+      });
+    },
+  );
+  test(
+    'invalid oversized or non-finite booking values never reach the API',
+    () async {
+      final t = CustomerTestApi();
+      addTearDown(t.close);
+      await t.login();
+      for (final draft in [
+        validDraft.copyWith(pickup: 'x' * 256),
+        validDraft.copyWith(weight: double.nan),
+        validDraft.copyWith(weight: double.infinity),
+        validDraft.copyWith(coupon: 'A' * 51),
+        validDraft.copyWith(payment: 'Cash', payer: ''),
+      ]) {
+        await expectLater(
+          t.repository.book(draft, fare),
+          throwsA(isA<CustomerFailure>()),
+        );
+      }
+      expect(t.requests, isEmpty);
+    },
+  );
+  test(
+    'rebooking preserves cargo codes but requires fresh vehicle, fare and consent',
+    () async {
+      final t = CustomerTestApi(
+        handler: (r) async {
+          if (r.url.path.endsWith('/orders/1')) {
+            final j = customerOrder(status: 'Cancelled');
+            j['couponCode'] = 'EXPIRED';
+            (j['proof'] as Map)['rejectionReason'] = 'Chụp lại tem niêm phong';
+            (j['proof'] as Map)['pickupSubmissionCount'] = 3;
+            return jsonResponse(j);
+          }
+          return null;
+        },
+      );
+      addTearDown(t.close);
+      await t.login();
+      final order = await t.repository.order(1);
+      final draft = BookingDraft.fromOrder(order);
+      expect(draft.cargoType, 'OTHER');
+      expect(draft.receiver, order.summary.receiver);
+      expect(draft.notes, order.notes);
+      expect(draft.vehicleId, isNull);
+      expect(draft.coupon, isEmpty);
+      expect(draft.committed, false);
+      expect(order.pickupSubmissionCount, 3);
+      expect(order.pickupRejection, 'Chụp lại tem niêm phong');
+    },
+  );
   test(
     'registration role uses separate real endpoint and reset uses OTP contract',
     () async {

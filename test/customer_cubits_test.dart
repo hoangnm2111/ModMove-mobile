@@ -9,6 +9,40 @@ import 'support/remote_fixtures.dart';
 
 void main() {
   test(
+    'rebooking retired cargo asks for a new type and keeps the other inputs',
+    () async {
+      final t = CustomerTestApi();
+      addTearDown(t.close);
+      final c = BookingCubit(
+        t.repository,
+        initial: validDraft.copyWith(cargoType: 'RETIRED'),
+      );
+      addTearDown(c.close);
+      await c.initialize();
+      expect(c.state.draft.cargoType, isEmpty);
+      expect(c.state.draft.photos, validDraft.photos);
+      expect(c.state.draft.pickup, validDraft.pickup);
+      expect(c.state.fare, isNull);
+    },
+  );
+  test(
+    'changing cargo beyond the selected vehicle prevents requesting an invalid quote',
+    () async {
+      final t = CustomerTestApi();
+      addTearDown(t.close);
+      final c = BookingCubit(t.repository);
+      addTearDown(c.close);
+      await c.initialize();
+      c.edit(validDraft.copyWith(weight: 600));
+      await c.estimate();
+      expect(c.state.error, contains('Chọn lại loại xe'));
+      expect(
+        t.requests.where((r) => r.url.path.endsWith('/FareEstimate')),
+        isEmpty,
+      );
+    },
+  );
+  test(
     'leaving during SignalR connection does not restart polling after disposal',
     () async {
       final t = CustomerTestApi();
@@ -141,6 +175,7 @@ void main() {
         (BookingDraft d) => d.copyWith(loading: true),
         (BookingDraft d) => d.copyWith(coupon: 'NEW'),
       ]) {
+        c.edit(validDraft);
         await c.estimate();
         expect(c.state.fare, isNotNull);
         c.edit(change(c.state.draft));
@@ -297,6 +332,90 @@ void main() {
         t.requests.where((r) => r.url.path.endsWith('/tracking')).length,
         1,
       );
+    },
+  );
+  test(
+    'server removal of driver GPS clears the previously displayed location',
+    () async {
+      var removed = false;
+      final t = CustomerTestApi(
+        handler: (r) async {
+          if (removed && r.url.path.endsWith('/tracking')) {
+            return jsonResponse({
+              'pickup': {'latitude': 10.7, 'longitude': 106.7},
+              'dropoff': {'latitude': 10.8, 'longitude': 106.8},
+              'driver': null,
+              'eta': null,
+            });
+          }
+          return null;
+        },
+      );
+      addTearDown(t.close);
+      await t.login();
+      final c = CustomerOrderCubit(t.repository, 1, TestCustomerRealtime());
+      addTearDown(c.close);
+      await c.initialize();
+      await c.loadTracking();
+      expect(c.state.tracking!.driver, isNotNull);
+      removed = true;
+      await c.loadTracking();
+      expect(c.state.tracking!.driver, isNull);
+      expect(c.state.tracking!.minutes, isNull);
+    },
+  );
+  test(
+    'reassigned driver discards an in-flight GPS response for the old driver',
+    () async {
+      var changed = false, trackingCalls = 0;
+      final pending = Completer<void>(), entered = Completer<void>();
+      final t = CustomerTestApi(
+        handler: (r) async {
+          if (r.url.path.endsWith('/orders/1')) {
+            final raw = customerOrder();
+            if (changed) (raw['driver'] as Map)['phoneNumber'] = '0901111111';
+            return jsonResponse(raw);
+          }
+          if (r.url.path.endsWith('/tracking')) {
+            final call = ++trackingCalls;
+            if (call == 2) {
+              entered.complete();
+              await pending.future;
+            }
+            return jsonResponse({
+              'pickup': {'latitude': 10.7, 'longitude': 106.7},
+              'dropoff': {'latitude': 10.8, 'longitude': 106.8},
+              'driver': call <= 2
+                  ? {
+                      'latitude': 10.75,
+                      'longitude': 106.75,
+                      'at': DateTime.now().toUtc().toIso8601String(),
+                      'isStale': false,
+                    }
+                  : null,
+              'eta': null,
+            });
+          }
+          return null;
+        },
+      );
+      addTearDown(t.close);
+      await t.login();
+      final c = CustomerOrderCubit(t.repository, 1, TestCustomerRealtime());
+      addTearDown(c.close);
+      await c.initialize();
+      await c.loadTracking();
+      final old = c.loadTracking();
+      await entered.future;
+      changed = true;
+      await c.refresh();
+      expect(c.state.tracking, isNull);
+      final next = c.stream.firstWhere((s) => s.tracking != null);
+      pending.complete();
+      await old;
+      final updated = await next.timeout(const Duration(seconds: 2));
+      expect(updated.tracking!.driver, isNull);
+      expect(trackingCalls, 3);
     },
   );
   test(

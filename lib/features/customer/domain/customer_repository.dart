@@ -16,6 +16,7 @@ abstract interface class CustomerRepository {
     int page = 1,
     String view = 'All',
     String search = '',
+    CustomerOrderFilter filter = const CustomerOrderFilter(),
   });
   Future<OrderDetail> order(int id);
   Future<void> cancel(int id, String code, String reason);

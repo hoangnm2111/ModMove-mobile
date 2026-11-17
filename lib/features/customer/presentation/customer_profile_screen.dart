@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import '../../../core/domain/account_input.dart';
 import '../../auth/presentation/auth_cubit.dart';
 import '../domain/customer_models.dart';
 import '../domain/customer_repository.dart';
@@ -232,10 +233,7 @@ class _EditProfileState extends State<_EditProfile> {
                 controller: phone,
                 keyboardType: TextInputType.phone,
                 decoration: const InputDecoration(labelText: 'Số điện thoại'),
-                validator: (v) =>
-                    RegExp(
-                      r'^(0[0-9]{9}|\+84[0-9]{9})$',
-                    ).hasMatch((v ?? '').trim())
+                validator: (v) => isVietnamesePhone(v ?? '')
                     ? null
                     : 'Số điện thoại chưa hợp lệ',
               ),
@@ -312,6 +310,8 @@ class _ChangePasswordState extends State<_ChangePassword> {
                         ? 'Nhập mật khẩu'
                         : entry.$1 == confirm && v != next.text
                         ? 'Mật khẩu không khớp'
+                        : entry.$1 == next && !isValidNewPassword(v)
+                        ? 'Mật khẩu 8–100 ký tự, gồm chữ và số'
                         : null,
                   ),
                 ),

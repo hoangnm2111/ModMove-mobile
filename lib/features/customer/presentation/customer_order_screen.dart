@@ -202,6 +202,13 @@ class _CustomerOrderScreenState extends State<CustomerOrderScreen>
                   ),
                   const SizedBox(height: 12),
                   PhotoStrip(o.pickupPhotos),
+                  if (o.pickupSubmissionCount > 0)
+                    Text(
+                      'Lần gửi ảnh: ${o.pickupSubmissionCount}/5',
+                      style: appText(size: 12),
+                    ),
+                  if (o.pickupRejection.isNotEmpty)
+                    CustomerNotice('Nội dung cần sửa: ${o.pickupRejection}'),
                   const SizedBox(height: 16),
                   if (o.canReview)
                     Row(
@@ -298,6 +305,13 @@ class _CustomerOrderScreenState extends State<CustomerOrderScreen>
                         'Trạng thái',
                         statusLabel(o.summary.paymentStatus),
                       ),
+                      if (o.paymentPaidAt != null)
+                        detailRow(
+                          'Thời điểm thanh toán',
+                          dateLabel(o.paymentPaidAt!),
+                        ),
+                      if (o.couponCode.isNotEmpty)
+                        detailRow('Mã giảm giá', o.couponCode),
                       if (o.summary.paymentMethod == 'Cash')
                         detailRow(
                           'Người trả tiền',
@@ -353,6 +367,22 @@ class _CustomerOrderScreenState extends State<CustomerOrderScreen>
                   ),
                   child: const Text('Theo dõi sự cố và yêu cầu hoàn tiền'),
                 ),
+                TextButton(
+                  onPressed: () => Navigator.pushNamed(context, '/refunds'),
+                  child: const Text('Xem khiếu nại và khoản hoàn tiền'),
+                ),
+                if (o.summary.terminal)
+                  OutlinedButton.icon(
+                    icon: const Icon(Icons.add_box_outlined),
+                    label: const Text('Đặt lại với thông tin này'),
+                    onPressed: s.acting
+                        ? null
+                        : () => Navigator.pushNamed(
+                            context,
+                            '/booking',
+                            arguments: BookingDraft.fromOrder(o),
+                          ),
+                  ),
                 if (o.summary.canCancel)
                   TextButton(
                     onPressed: s.acting
@@ -686,7 +716,12 @@ class _DriverPositionInfo extends StatelessWidget {
           stale
               ? 'GPS tài xế đã cũ hoặc mất kết nối. Vị trí hiển thị là lần ghi nhận cuối.'
               : tracking.minutes != null
-              ? 'Dự kiến đến ${tracking.target == 'Pickup' ? 'điểm lấy' : 'điểm giao'}: ${tracking.minutes} phút.'
+              ? 'Dự kiến đến ${switch (tracking.target) {
+                  'Pickup' => 'điểm lấy hàng',
+                  'Handover' => 'điểm bàn giao giữa hai tài xế',
+                  'Dropoff' => 'điểm giao hàng',
+                  _ => 'điểm đến',
+                }}: ${tracking.minutes} phút.'
               : 'Vị trí tài xế được cập nhật lúc ${dateLabel(tracking.at!)}. Chưa có thời gian đến mới.',
         );
       },

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import '../../../core/domain/account_input.dart';
 import '../domain/customer_models.dart';
 import '../domain/customer_repository.dart';
 import '../domain/customer_places.dart';
@@ -19,6 +20,15 @@ class _CustomerBookingScreenState extends State<CustomerBookingScreen> {
   final _pickup = TextEditingController(), _dropoff = TextEditingController();
   final _coupon = TextEditingController();
   int step = 0;
+  @override
+  void initState() {
+    super.initState();
+    final draft = context.read<BookingCubit>().state.draft;
+    _pickup.text = draft.pickup;
+    _dropoff.text = draft.dropoff;
+    _coupon.text = draft.coupon;
+  }
+
   @override
   void dispose() {
     _pickup.dispose();
@@ -66,14 +76,17 @@ class _CustomerBookingScreenState extends State<CustomerBookingScreen> {
     bool number = false,
     int? maxLength,
     int lines = 1,
+    TextInputType? keyboard,
   }) => Padding(
     padding: const EdgeInsets.only(bottom: 16),
     child: TextFormField(
       key: ValueKey(label),
       initialValue: value,
-      keyboardType: number
-          ? const TextInputType.numberWithOptions(decimal: true)
-          : TextInputType.text,
+      keyboardType:
+          keyboard ??
+          (number
+              ? const TextInputType.numberWithOptions(decimal: true)
+              : TextInputType.text),
       maxLength: maxLength,
       maxLines: lines,
       decoration: InputDecoration(labelText: label, counterText: ''),
@@ -99,8 +112,7 @@ class _CustomerBookingScreenState extends State<CustomerBookingScreen> {
   void next() {
     if (!_form.currentState!.validate()) return;
     final d = cubit.state.draft;
-    if (step == 0 &&
-        !RegExp(r'^(0[0-9]{9}|\+84[0-9]{9})$').hasMatch(d.phone.trim())) {
+    if (step == 0 && !isVietnamesePhone(d.phone)) {
       cubit.error('Nhập số điện thoại Việt Nam hợp lệ của người nhận.');
       return;
     }
@@ -108,6 +120,8 @@ class _CustomerBookingScreenState extends State<CustomerBookingScreen> {
         (d.photos.isEmpty ||
             d.cargoType.isEmpty ||
             d.quantity < 1 ||
+            !d.weight.isFinite ||
+            d.weight > 100000 ||
             d.weight <= 0 ||
             [d.length, d.width, d.height].any((v) => v < 1 || v > 2000))) {
       cubit.error(
@@ -173,7 +187,10 @@ class _CustomerBookingScreenState extends State<CustomerBookingScreen> {
     builder: (context, s) {
       final d = s.draft, catalog = s.catalog, locked = s.busy || s.uploading;
       return PopScope(
-        canPop: !locked,
+        canPop: !locked && step == 0,
+        onPopInvokedWithResult: (didPop, _) {
+          if (!didPop && !locked && step > 0) setState(() => step--);
+        },
         child: Scaffold(
           appBar: AppBar(
             title: const Text('Đặt giao hàng'),
@@ -299,7 +316,9 @@ class _CustomerBookingScreenState extends State<CustomerBookingScreen> {
                             const SizedBox(height: 20),
                             TextFormField(
                               controller: _pickup,
+                              maxLength: 255,
                               decoration: InputDecoration(
+                                counterText: '',
                                 labelText: 'Địa chỉ lấy hàng',
                                 prefixIcon: const Icon(
                                   Icons.trip_origin,
@@ -320,7 +339,9 @@ class _CustomerBookingScreenState extends State<CustomerBookingScreen> {
                             const SizedBox(height: 18),
                             TextFormField(
                               controller: _dropoff,
+                              maxLength: 255,
                               decoration: InputDecoration(
+                                counterText: '',
                                 labelText: 'Địa chỉ giao hàng',
                                 prefixIcon: const Icon(
                                   Icons.location_on_outlined,
@@ -349,7 +370,7 @@ class _CustomerBookingScreenState extends State<CustomerBookingScreen> {
                               'Số điện thoại người nhận',
                               d.phone,
                               (v) => cubit.edit(d.copyWith(phone: v)),
-                              number: true,
+                              keyboard: TextInputType.phone,
                               maxLength: 12,
                             ),
                           ],
@@ -624,7 +645,9 @@ class _CustomerBookingScreenState extends State<CustomerBookingScreen> {
                             const SizedBox(height: 18),
                             TextFormField(
                               controller: _coupon,
+                              maxLength: 50,
                               decoration: InputDecoration(
+                                counterText: '',
                                 labelText: 'Mã giảm giá',
                                 suffixIcon: IconButton(
                                   tooltip: 'Chọn ưu đãi',

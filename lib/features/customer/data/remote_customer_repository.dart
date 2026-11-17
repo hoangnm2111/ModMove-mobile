@@ -1,5 +1,6 @@
 import 'dart:typed_data';
 import '../../../core/network/api_client.dart';
+import '../../../core/domain/account_input.dart';
 import '../domain/customer_models.dart';
 import '../domain/customer_repository.dart';
 
@@ -161,7 +162,7 @@ class RemoteCustomerRepository implements CustomerRepository {
       );
     body.addAll({
       'receiverName': d.receiver.trim(),
-      'receiverPhone': d.phone.trim(),
+      'receiverPhone': normalizeVietnamesePhone(d.phone),
       'cargo': {
         'cargoType': d.cargoType,
         'quantity': d.quantity,
@@ -227,7 +228,7 @@ class RemoteCustomerRepository implements CustomerRepository {
   Future<void> updateProfile(String name, String phone) => command(
     'PUT',
     '/api/account/Profile',
-    {'fullName': name.trim(), 'phoneNumber': phone.trim()},
+    {'fullName': name.trim(), 'phoneNumber': normalizeVietnamesePhone(phone)},
   );
   @override
   Future<void> changePassword(String current, String next) => command(
@@ -256,14 +257,17 @@ class RemoteCustomerRepository implements CustomerRepository {
     int page = 1,
     String view = 'All',
     String search = '',
+    CustomerOrderFilter filter = const CustomerOrderFilter(),
   }) => guard(
     () async => this.page(
       await get(
-        '$root/orders?${Uri(queryParameters: {'page': '$page', 'view': view, 'search': search}).query}',
+        '$root/orders?${Uri(queryParameters: {'page': '$page', 'view': view, 'search': search, if (filter.status != null) 'status': filter.status!, if (filter.from != null) 'fromDate': _calendarDate(filter.from!), if (filter.to != null) 'toDate': _calendarDate(filter.to!), if (filter.phone.trim().isNotEmpty) 'receiverPhone': filter.phone.trim()}).query}',
       ),
       summary,
     ),
   );
+  static String _calendarDate(DateTime date) =>
+      '${date.year.toString().padLeft(4, '0')}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}';
   @override
   Future<OrderDetail> order(int id) => guard(() async {
     final j = obj(await get('$root/orders/$id'));
@@ -276,6 +280,10 @@ class RemoteCustomerRepository implements CustomerRepository {
       cargoType: txt(c, 'cargoTypeName').isEmpty
           ? txt(c, 'cargoType')
           : txt(c, 'cargoTypeName'),
+      cargoCode: txt(c, 'cargoType'),
+      pickupRejection: txt(p, 'rejectionReason'),
+      pickupSubmissionCount: integer(p, 'pickupSubmissionCount'),
+      couponCode: txt(j, 'couponCode'),
       quantity: integer(c, 'quantity'),
       weight: numValue(c, 'weightKg'),
       length: integer(c, 'lengthCm'),
@@ -443,6 +451,8 @@ class RemoteCustomerRepository implements CustomerRepository {
     reference: txt(j, 'bankReferenceCode'),
     photos: strings(j['evidenceUrls']),
     created: time(j, 'createdAt'),
+    decidedAt: optionalTime(j, 'decidedAt'),
+    processedAt: optionalTime(j, 'processedAt'),
   );
   @override
   Future<PageResult<Refund>> refunds(int p) =>

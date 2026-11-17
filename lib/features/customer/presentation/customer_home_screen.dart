@@ -393,18 +393,22 @@ class CustomerOrdersScreen extends StatefulWidget {
 
 class _CustomerOrdersScreenState extends State<CustomerOrdersScreen> {
   String view = 'Active', search = '';
+  CustomerOrderFilter filter = const CustomerOrderFilter();
+  final searchInput = TextEditingController();
   late final PagedCubit<OrderSummary> cubit;
   @override
   void initState() {
     super.initState();
     final repo = context.read<CustomerRepository>();
-    cubit = PagedCubit((p) => repo.orders(page: p, view: view, search: search))
-      ..load();
+    cubit = PagedCubit(
+      (p) => repo.orders(page: p, view: view, search: search, filter: filter),
+    )..load();
   }
 
   @override
   void dispose() {
     cubit.close();
+    searchInput.dispose();
     super.dispose();
   }
 
@@ -426,21 +430,80 @@ class _CustomerOrdersScreenState extends State<CustomerOrdersScreen> {
               ],
               selected: {view},
               onSelectionChanged: (v) {
-                setState(() => view = v.first);
+                setState(() {
+                  view = v.first;
+                  filter = CustomerOrderFilter(
+                    from: filter.from,
+                    to: filter.to,
+                    phone: filter.phone,
+                  );
+                });
                 cubit.load();
               },
             ),
             const SizedBox(height: 16),
             TextField(
-              decoration: const InputDecoration(
+              controller: searchInput,
+              maxLength: 100,
+              decoration: InputDecoration(
+                counterText: '',
                 hintText: 'Mã đơn, địa chỉ hoặc người nhận',
-                prefixIcon: Icon(Icons.search),
+                prefixIcon: const Icon(Icons.search),
+                suffixIcon: IconButton(
+                  tooltip: 'Xóa tìm kiếm',
+                  icon: const Icon(Icons.clear),
+                  onPressed: () {
+                    searchInput.clear();
+                    search = '';
+                    cubit.load();
+                  },
+                ),
               ),
               textInputAction: TextInputAction.search,
               onSubmitted: (v) {
                 search = v.trim();
                 cubit.load();
               },
+            ),
+            Row(
+              children: [
+                Expanded(
+                  child: TextButton.icon(
+                    icon: const Icon(Icons.filter_list),
+                    label: Text(
+                      filter.isEmpty ? 'Lọc đơn hàng' : 'Đang áp dụng bộ lọc',
+                    ),
+                    onPressed: () async {
+                      final value =
+                          await showModalBottomSheet<CustomerOrderFilter>(
+                            context: context,
+                            isScrollControlled: true,
+                            showDragHandle: true,
+                            builder: (_) => _OrderFilterSheet(filter),
+                          );
+                      if (value == null || !mounted) return;
+                      setState(() {
+                        filter = value;
+                        if (value.status != null && view != 'All') {
+                          view =
+                              ['Completed', 'Cancelled'].contains(value.status)
+                              ? 'History'
+                              : 'Active';
+                        }
+                      });
+                      cubit.load();
+                    },
+                  ),
+                ),
+                if (!filter.isEmpty)
+                  TextButton(
+                    onPressed: () {
+                      setState(() => filter = const CustomerOrderFilter());
+                      cubit.load();
+                    },
+                    child: const Text('Bỏ lọc'),
+                  ),
+              ],
             ),
             const SizedBox(height: 18),
             if (s.busy) const LinearProgressIndicator(),
@@ -466,6 +529,139 @@ class _CustomerOrdersScreenState extends State<CustomerOrdersScreen> {
                 onPressed: s.busy ? null : () => cubit.load(more: true),
                 child: const Text('Xem thêm đơn'),
               ),
+          ],
+        ),
+      ),
+    ),
+  );
+}
+
+class _OrderFilterSheet extends StatefulWidget {
+  const _OrderFilterSheet(this.value);
+  final CustomerOrderFilter value;
+  @override
+  State<_OrderFilterSheet> createState() => _OrderFilterSheetState();
+}
+
+class _OrderFilterSheetState extends State<_OrderFilterSheet> {
+  late String status = widget.value.status ?? '';
+  late final phone = TextEditingController(text: widget.value.phone);
+  late DateTime? from = widget.value.from, to = widget.value.to;
+  final form = GlobalKey<FormState>();
+  @override
+  void dispose() {
+    phone.dispose();
+    super.dispose();
+  }
+
+  String date(DateTime value) => '${value.day}/${value.month}/${value.year}';
+  @override
+  Widget build(BuildContext context) => SafeArea(
+    child: SingleChildScrollView(
+      padding: EdgeInsets.fromLTRB(
+        20,
+        0,
+        20,
+        20 + MediaQuery.viewInsetsOf(context).bottom,
+      ),
+      child: Form(
+        key: form,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            sectionTitle('Lọc đơn hàng'),
+            DropdownButtonFormField<String>(
+              initialValue: status,
+              isExpanded: true,
+              decoration: const InputDecoration(labelText: 'Trạng thái'),
+              items: [
+                const DropdownMenuItem(
+                  value: '',
+                  child: Text('Tất cả trạng thái'),
+                ),
+                for (final value in [
+                  'Pending',
+                  'Accepted',
+                  'Arrived',
+                  'PickedUp',
+                  'InTransit',
+                  'Delivered',
+                  'Completed',
+                  'Cancelled',
+                ])
+                  DropdownMenuItem(
+                    value: value,
+                    child: Text(statusLabel(value)),
+                  ),
+              ],
+              onChanged: (value) => setState(() => status = value ?? ''),
+            ),
+            const SizedBox(height: 18),
+            TextFormField(
+              controller: phone,
+              maxLength: 15,
+              keyboardType: TextInputType.phone,
+              decoration: const InputDecoration(
+                labelText: 'Số điện thoại người nhận',
+                helperText: 'Có thể nhập một phần số điện thoại',
+              ),
+              validator: (value) =>
+                  (value ?? '').trim().isEmpty ||
+                      RegExp(r'^[0-9]{1,15}$').hasMatch(value!.trim())
+                  ? null
+                  : 'Chỉ nhập từ 1 đến 15 chữ số',
+            ),
+            const SizedBox(height: 12),
+            OutlinedButton.icon(
+              icon: const Icon(Icons.date_range),
+              label: Text(
+                from == null
+                    ? 'Chọn khoảng ngày tạo đơn'
+                    : '${date(from!)} – ${date(to ?? from!)}',
+              ),
+              onPressed: () async {
+                final range = await showDateRangePicker(
+                  context: context,
+                  firstDate: DateTime(2020),
+                  lastDate: DateTime.now(),
+                  initialDateRange: from == null
+                      ? null
+                      : DateTimeRange(start: from!, end: to ?? from!),
+                  helpText: 'Ngày tạo đơn (giờ Việt Nam)',
+                  saveText: 'Chọn',
+                );
+                if (range != null && mounted) {
+                  setState(() {
+                    from = range.start;
+                    to = range.end;
+                  });
+                }
+              },
+            ),
+            if (from != null)
+              TextButton(
+                onPressed: () => setState(() {
+                  from = null;
+                  to = null;
+                }),
+                child: const Text('Bỏ khoảng ngày'),
+              ),
+            const SizedBox(height: 18),
+            FilledButton(
+              onPressed: () {
+                if (!form.currentState!.validate()) return;
+                Navigator.pop(
+                  context,
+                  CustomerOrderFilter(
+                    status: status.isEmpty ? null : status,
+                    from: from,
+                    to: to,
+                    phone: phone.text.trim(),
+                  ),
+                );
+              },
+              child: const Text('Áp dụng bộ lọc'),
+            ),
           ],
         ),
       ),
