@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../core/network/api_client.dart';
-import '../core/theme/app_theme.dart';
+import '../core/theme/customer_theme.dart';
 import '../features/customer/domain/customer_models.dart';
 import '../features/customer/domain/customer_repository.dart';
 import '../features/customer/domain/customer_places.dart';
@@ -178,7 +178,7 @@ class _CustomerAppState extends State<CustomerApp> {
       ],
       child: MaterialApp(
         debugShowCheckedModeBanner: false,
-        theme: buildAppTheme(),
+        theme: buildCustomerTheme(),
         navigatorKey: navigator,
         onGenerateRoute: route,
       ),

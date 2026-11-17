@@ -14,7 +14,8 @@
   `docs/design/iteration-2-asset-prompts.json`.
 
 These are separate assets used by native Flutter controls. App screens are not
-flattened images. All displayed vehicle specifications and fares are demo data.
+flattened images. The remote Customer and Driver flows use vehicle specifications
+and fares from the API. Demo values exist only in the separate mock Driver mode.
 
 With a configured key, the driver map is a native Google Maps view. Its top-down
 vehicle marker is drawn once in `driver_map_marker.dart` and supplied to the SDK
@@ -28,3 +29,19 @@ animated waves using Flutter Canvas; it is explicitly labelled as a mock map.
 `documents/identity.svg`, which is an abstract document labelled DEMO. The mock
 onboarding picker uses it to exercise upload/retry without real personal papers.
 It is not a photographed identity document.
+
+## Customer redesign V1
+
+- `images/customer-email.png`, `customer-security.png` and
+  `customer-notifications.png`: transparent decorative illustrations generated
+  with the built-in image tool, matching the approved Customer designs.
+- `icons/customer-{parcel,cargo,moving}.svg`: original two-color category icons.
+- `mail`, `search`, `star`, `coupon`, `eye-off`, `logout`, `edit`, `trash`,
+  `ruler`, `history`: new SVG controls extending the existing stroke icon set.
+- The existing logo, delivery banner, vehicle cutouts and bundled Inter fonts
+  are reused. Customer styles are scoped separately from Driver density.
+- Prompts and the full asset inventory are in
+  `docs/design/customer-asset-prompts.json`.
+
+Customer screens never use generated shipment evidence, sample QR codes or a
+raster map. Those areas render API data, real uploads and native Google Maps.

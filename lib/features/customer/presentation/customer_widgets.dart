@@ -2,9 +2,12 @@ import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../../core/theme/app_theme.dart';
+import '../../../core/widgets/app_widgets.dart';
 import '../../../core/formatting/currency.dart';
 export '../../../core/formatting/currency.dart';
 export '../../../core/theme/app_theme.dart';
+export '../../../core/widgets/app_widgets.dart' show AppIcon;
+export '../../../core/widgets/customer_visuals.dart';
 
 String money(num value) => formatVnd(value.round());
 
@@ -127,27 +130,61 @@ class StatusPill extends StatelessWidget {
   const StatusPill(this.status, {super.key});
   final String status;
   @override
-  Widget build(BuildContext context) => Container(
-    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-    decoration: BoxDecoration(
-      color: ['Completed', 'Paid', 'Approved'].contains(status)
-          ? AppColors.greenBg
-          : AppColors.peach,
-      borderRadius: BorderRadius.circular(20),
-    ),
-    child: Text(
-      statusLabel(status),
-      style: appText(
-        size: 12,
-        weight: FontWeight.w600,
-        color: AppColors.orange,
+  Widget build(BuildContext context) {
+    final good = [
+      'InTransit',
+      'Delivered',
+      'Completed',
+      'Paid',
+      'Approved',
+      'Resolved',
+      'Processed',
+      'Verified',
+    ].contains(status);
+    final bad = ['Cancelled', 'Rejected', 'Failed'].contains(status);
+    final color = good
+        ? AppColors.green
+        : bad
+        ? AppColors.red
+        : AppColors.amber;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      decoration: BoxDecoration(
+        color: good
+            ? AppColors.greenBg
+            : bad
+            ? AppColors.redBg
+            : AppColors.amberBg,
+        borderRadius: BorderRadius.circular(20),
       ),
-    ),
-  );
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          AppIcon(
+            good
+                ? 'check'
+                : bad
+                ? 'close'
+                : 'clock',
+            size: 13,
+            color: color,
+          ),
+          const SizedBox(width: 5),
+          Flexible(
+            child: Text(
+              statusLabel(status),
+              style: appText(size: 11, weight: FontWeight.w600, color: color),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 }
 
 class PhotoStrip extends StatelessWidget {
-  const PhotoStrip(this.urls, {super.key, this.remove});
+  const PhotoStrip(this.urls, {super.key, this.remove, this.large = false});
+  final bool large;
   final List<String> urls;
   final void Function(String)? remove;
   @override
@@ -157,8 +194,11 @@ class PhotoStrip extends StatelessWidget {
     children: urls
         .map(
           (url) => SizedBox(
-            width: 96,
-            height: 108,
+            width: large
+                ? (MediaQuery.sizeOf(context).width - 80) /
+                      (urls.length == 1 ? 1 : 2)
+                : 96,
+            height: large ? (urls.length == 1 ? 236 : 188) : 108,
             child: Stack(
               children: [
                 Positioned.fill(
@@ -185,9 +225,32 @@ class PhotoStrip extends StatelessWidget {
                       child: Image.network(
                         url,
                         fit: BoxFit.cover,
-                        errorBuilder: (_, _, _) => const ColoredBox(
-                          color: AppColors.pale,
-                          child: Icon(Icons.broken_image_outlined),
+                        errorBuilder: (_, _, _) => Container(
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            border: Border.all(color: AppColors.line),
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: const Center(
+                            child: Column(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(
+                                  Icons.broken_image_outlined,
+                                  color: AppColors.muted,
+                                ),
+                                SizedBox(height: 6),
+                                Text(
+                                  'Ảnh chưa tải được',
+                                  textAlign: TextAlign.center,
+                                  style: TextStyle(
+                                    fontSize: 11,
+                                    color: AppColors.secondary,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
                         ),
                       ),
                     ),
@@ -262,25 +325,82 @@ Future<bool> confirmCustomerAction(
   String title,
   String message, {
   String action = 'Xác nhận',
-}) async =>
-    await showDialog<bool>(
-      context: context,
-      builder: (c) => AlertDialog(
-        title: Text(title),
-        content: Text(message),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(c, false),
-            child: const Text('Quay lại'),
+  bool destructive = false,
+  bool acknowledge = false,
+}) async {
+  var checked = false;
+  return await showModalBottomSheet<bool>(
+        context: context,
+        showDragHandle: true,
+        isScrollControlled: true,
+        builder: (c) => StatefulBuilder(
+          builder: (c, update) => SafeArea(
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.fromLTRB(24, 0, 24, 24),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Center(
+                    child: Container(
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        color: destructive ? AppColors.redBg : AppColors.peach,
+                        borderRadius: BorderRadius.circular(18),
+                      ),
+                      child: AppIcon(
+                        destructive ? 'trash' : 'shield',
+                        size: 34,
+                        color: destructive ? AppColors.red : AppColors.orange,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 20),
+                  Text(
+                    title,
+                    textAlign: TextAlign.center,
+                    style: appText(size: 23, weight: FontWeight.w800),
+                  ),
+                  const SizedBox(height: 12),
+                  Text(
+                    message,
+                    textAlign: TextAlign.center,
+                    style: appText(color: AppColors.secondary),
+                  ),
+                  if (acknowledge) ...[
+                    const SizedBox(height: 16),
+                    CheckboxListTile(
+                      value: checked,
+                      onChanged: (v) => update(() => checked = v ?? false),
+                      contentPadding: EdgeInsets.zero,
+                      controlAffinity: ListTileControlAffinity.leading,
+                      title: const Text('Tôi hiểu và muốn xóa tài khoản'),
+                    ),
+                  ],
+                  const SizedBox(height: 24),
+                  OutlinedButton(
+                    onPressed: () => Navigator.pop(c, false),
+                    child: Text(acknowledge ? 'Giữ tài khoản' : 'Quay lại'),
+                  ),
+                  const SizedBox(height: 12),
+                  FilledButton(
+                    style: destructive
+                        ? FilledButton.styleFrom(backgroundColor: AppColors.red)
+                        : null,
+                    onPressed: acknowledge && !checked
+                        ? null
+                        : () => Navigator.pop(c, true),
+                    child: Text(action),
+                  ),
+                ],
+              ),
+            ),
           ),
-          FilledButton(
-            onPressed: () => Navigator.pop(c, true),
-            child: Text(action),
-          ),
-        ],
-      ),
-    ) ??
-    false;
+        ),
+      ) ??
+      false;
+}
+
 Widget priceBreakdown(
   double distance,
   double service,
@@ -292,6 +412,102 @@ Widget priceBreakdown(
     detailRow('Bốc xếp', money(service)),
     detailRow('Giảm giá', '−${money(discount)}'),
     const Divider(),
-    detailRow('Tổng thanh toán', money(total), strong: true),
+    Padding(
+      padding: const EdgeInsets.only(top: 6),
+      child: Row(
+        children: [
+          Expanded(
+            child: Text(
+              'Tổng thanh toán',
+              style: appText(weight: FontWeight.w700),
+            ),
+          ),
+          Text(
+            money(total),
+            style: appText(
+              size: 23,
+              weight: FontWeight.w800,
+              color: AppColors.orange,
+            ),
+          ),
+        ],
+      ),
+    ),
   ],
 );
+
+class CustomerTimelineStep extends StatelessWidget {
+  const CustomerTimelineStep({
+    super.key,
+    required this.title,
+    required this.subtitle,
+    this.done = false,
+    this.current = false,
+    this.last = false,
+  });
+  final String title, subtitle;
+  final bool done, current, last;
+  @override
+  Widget build(BuildContext context) => Padding(
+    padding: const EdgeInsets.only(bottom: 16),
+    child: Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Column(
+          children: [
+            Container(
+              width: 26,
+              height: 26,
+              alignment: Alignment.center,
+              decoration: BoxDecoration(
+                color: done ? AppColors.green : Colors.white,
+                shape: BoxShape.circle,
+                border: Border.all(
+                  color: done
+                      ? AppColors.green
+                      : current
+                      ? AppColors.orange
+                      : AppColors.line,
+                  width: 2,
+                ),
+              ),
+              child: done
+                  ? const AppIcon('check', size: 16, color: Colors.white)
+                  : current
+                  ? const Icon(Icons.circle, size: 12, color: AppColors.orange)
+                  : null,
+            ),
+            if (!last)
+              Container(
+                width: 2,
+                height: 30,
+                margin: const EdgeInsets.only(top: 5),
+                color: done ? AppColors.green : AppColors.line,
+              ),
+          ],
+        ),
+        const SizedBox(width: 14),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                title,
+                style: appText(
+                  size: 16,
+                  weight: FontWeight.w700,
+                  color: current ? AppColors.orange : AppColors.ink,
+                ),
+              ),
+              const SizedBox(height: 5),
+              Text(
+                subtitle,
+                style: appText(size: 13, color: AppColors.secondary),
+              ),
+            ],
+          ),
+        ),
+      ],
+    ),
+  );
+}
