@@ -26,7 +26,12 @@ class CustomerRatingsScreen extends StatelessWidget {
               if (s.busy) const LinearProgressIndicator(),
               if (s.error != null) CustomerNotice(s.error!, error: true),
               if (!s.busy && s.items.isEmpty)
-                const Text('Bạn chưa gửi đánh giá nào.'),
+                const CustomerEmptyState(
+                  title: 'Chưa có đánh giá',
+                  message:
+                      'Bạn có thể đánh giá sau khi hoàn thành chuyến giao.',
+                  icon: 'star',
+                ),
               for (final r in s.items)
                 CustomerCard(
                   child: Column(
@@ -145,10 +150,36 @@ class _CustomerRateScreenState extends State<CustomerRateScreen> {
                   ),
                 ],
                 if (s.data case final d?) ...[
-                  const Icon(
-                    Icons.local_shipping_outlined,
-                    color: AppColors.orange,
-                    size: 70,
+                  const DeliveryBanner(height: 108),
+                  const SizedBox(height: 24),
+                  Text(
+                    'Chuyến giao của bạn thế nào?',
+                    textAlign: TextAlign.center,
+                    style: appText(size: 23, weight: FontWeight.w800),
+                  ),
+                  const SizedBox(height: 24),
+                  Center(
+                    child: CircleAvatar(
+                      radius: 34,
+                      backgroundColor: AppColors.peach,
+                      child: Text(
+                        d.order.driverName.trim().isEmpty
+                            ? 'M'
+                            : d.order.driverName
+                                  .trim()
+                                  .split(RegExp(r'\s+'))
+                                  .where((p) => p.isNotEmpty)
+                                  .take(2)
+                                  .map((p) => p[0])
+                                  .join()
+                                  .toUpperCase(),
+                        style: appText(
+                          size: 24,
+                          weight: FontWeight.w700,
+                          color: AppColors.orange,
+                        ),
+                      ),
+                    ),
                   ),
                   const SizedBox(height: 20),
                   Text(
@@ -190,10 +221,25 @@ class _CustomerRateScreenState extends State<CustomerRateScreen> {
                             i < stars
                                 ? Icons.star_rounded
                                 : Icons.star_outline_rounded,
-                            color: AppColors.amber,
+                            color: AppColors.orange,
                             size: 38,
                           ),
                         ),
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      [
+                        'Rất không hài lòng',
+                        'Chưa hài lòng',
+                        'Bình thường',
+                        'Hài lòng',
+                        'Rất hài lòng',
+                      ][stars - 1],
+                      textAlign: TextAlign.center,
+                      style: appText(
+                        color: AppColors.orange,
+                        weight: FontWeight.w600,
                       ),
                     ),
                     const SizedBox(height: 24),
