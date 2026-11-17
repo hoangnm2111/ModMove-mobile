@@ -36,6 +36,8 @@ It is not a photographed identity document.
   `customer-notifications.png`: transparent decorative illustrations generated
   with the built-in image tool, matching the approved Customer designs.
 - `icons/customer-{parcel,cargo,moving}.svg`: original two-color category icons.
+- `illustrations/customer-orders-empty.svg`: original vector parcel, history
+  sheet and clock illustration for the redesigned empty order list.
 - `mail`, `search`, `star`, `coupon`, `eye-off`, `logout`, `edit`, `trash`,
   `ruler`, `history`: new SVG controls extending the existing stroke icon set.
 - The existing logo, delivery banner, vehicle cutouts and bundled Inter fonts

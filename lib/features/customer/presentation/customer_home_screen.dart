@@ -7,6 +7,7 @@ import '../domain/customer_repository.dart';
 import 'customer_cubits.dart';
 import 'customer_widgets.dart';
 import 'customer_profile_screen.dart';
+import 'customer_orders_widgets.dart';
 
 class CustomerHomeScreen extends StatefulWidget {
   const CustomerHomeScreen({super.key, this.guest = false});
@@ -419,6 +420,7 @@ class _CustomerOrdersScreenState extends State<CustomerOrdersScreen> {
   CustomerOrderFilter filter = const CustomerOrderFilter();
   final searchInput = TextEditingController();
   late final PagedCubit<OrderSummary> cubit;
+
   @override
   void initState() {
     super.initState();
@@ -436,125 +438,285 @@ class _CustomerOrdersScreenState extends State<CustomerOrdersScreen> {
     super.dispose();
   }
 
+  void selectView(String value) {
+    if (view == value) return;
+    FocusScope.of(context).unfocus();
+    setState(() {
+      view = value;
+      filter = CustomerOrderFilter(
+        from: filter.from,
+        to: filter.to,
+        phone: filter.phone,
+      );
+    });
+    cubit.load();
+  }
+
+  void clearSearch() {
+    searchInput.clear();
+    setState(() => search = '');
+    cubit.load();
+  }
+
+  void resetCriteria() {
+    FocusScope.of(context).unfocus();
+    searchInput.clear();
+    setState(() {
+      search = '';
+      filter = const CustomerOrderFilter();
+    });
+    cubit.load();
+  }
+
+  Future<void> book() async {
+    await Navigator.pushNamed(context, '/booking');
+    if (mounted) cubit.load();
+  }
+
+  Future<void> openFilters() async {
+    FocusScope.of(context).unfocus();
+    final value = await showModalBottomSheet<CustomerOrderFilter>(
+      context: context,
+      isScrollControlled: true,
+      showDragHandle: true,
+      builder: (_) => _OrderFilterSheet(filter),
+    );
+    if (value == null || !mounted) return;
+    setState(() {
+      filter = value;
+      if (value.status != null && view != 'All') {
+        view = ['Completed', 'Cancelled'].contains(value.status)
+            ? 'History'
+            : 'Active';
+      }
+    });
+    cubit.load();
+  }
+
+  Widget header() => Container(
+    color: Colors.white,
+    padding: const EdgeInsets.fromLTRB(20, 20, 20, 20),
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Đơn hàng',
+                    style: appText(size: 30, weight: FontWeight.w800),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    'Mọi chuyến giao, trong tầm tay.',
+                    style: appText(size: 13, color: AppColors.secondary),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(width: 12),
+            const Padding(
+              padding: EdgeInsets.only(top: 3),
+              child: AppLogo(size: 40),
+            ),
+          ],
+        ),
+        const SizedBox(height: 24),
+        CustomerOrderTabs(value: view, onChanged: selectView),
+        const SizedBox(height: 20),
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.center,
+          children: [
+            Expanded(
+              child: ValueListenableBuilder<TextEditingValue>(
+                valueListenable: searchInput,
+                builder: (context, value, _) => TextField(
+                  controller: searchInput,
+                  maxLength: 100,
+                  textInputAction: TextInputAction.search,
+                  decoration: InputDecoration(
+                    counterText: '',
+                    fillColor: AppColors.pale,
+                    contentPadding: const EdgeInsets.symmetric(
+                      horizontal: 14,
+                      vertical: 14,
+                    ),
+                    hintText: 'Tìm mã đơn, người nhận…',
+                    hintStyle: appText(size: 13, color: AppColors.muted),
+                    prefixIcon: const Padding(
+                      padding: EdgeInsets.all(14),
+                      child: AppIcon(
+                        'search',
+                        size: 20,
+                        color: AppColors.secondary,
+                      ),
+                    ),
+                    suffixIcon: value.text.isEmpty
+                        ? null
+                        : IconButton(
+                            tooltip: 'Xóa tìm kiếm',
+                            icon: const AppIcon(
+                              'close',
+                              size: 18,
+                              color: AppColors.secondary,
+                            ),
+                            onPressed: clearSearch,
+                          ),
+                  ),
+                  onSubmitted: (value) {
+                    setState(() => search = value.trim());
+                    cubit.load();
+                  },
+                ),
+              ),
+            ),
+            const SizedBox(width: 10),
+            Badge(
+              isLabelVisible: !filter.isEmpty,
+              backgroundColor: AppColors.orange,
+              child: IconButton(
+                tooltip: 'Lọc đơn hàng',
+                onPressed: openFilters,
+                style: IconButton.styleFrom(
+                  minimumSize: const Size(50, 50),
+                  backgroundColor: filter.isEmpty
+                      ? AppColors.pale
+                      : AppColors.peach,
+                  foregroundColor: filter.isEmpty
+                      ? AppColors.ink
+                      : AppColors.orange,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                  side: BorderSide(
+                    color: filter.isEmpty ? AppColors.line : AppColors.orange,
+                  ),
+                ),
+                icon: const Icon(Icons.tune_rounded, size: 23),
+              ),
+            ),
+          ],
+        ),
+        if (search.isNotEmpty || !filter.isEmpty) ...[
+          const SizedBox(height: 10),
+          Wrap(
+            spacing: 8,
+            runSpacing: 4,
+            crossAxisAlignment: WrapCrossAlignment.center,
+            children: [
+              if (search.isNotEmpty)
+                InputChip(
+                  label: ConstrainedBox(
+                    constraints: BoxConstraints(
+                      maxWidth: MediaQuery.sizeOf(context).width - 130,
+                    ),
+                    child: Text(
+                      'Tìm: $search',
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                  onDeleted: clearSearch,
+                  deleteButtonTooltipMessage: 'Xóa tìm kiếm',
+                  backgroundColor: AppColors.peach,
+                  side: BorderSide.none,
+                ),
+              if (!filter.isEmpty)
+                TextButton.icon(
+                  onPressed: () {
+                    setState(() => filter = const CustomerOrderFilter());
+                    cubit.load();
+                  },
+                  icon: const AppIcon(
+                    'close',
+                    size: 16,
+                    color: AppColors.orange,
+                  ),
+                  label: const Text('Bỏ lọc'),
+                ),
+            ],
+          ),
+        ],
+      ],
+    ),
+  );
+
   @override
   Widget build(BuildContext context) => BlocProvider.value(
     value: cubit,
     child: BlocBuilder<PagedCubit<OrderSummary>, ListState<OrderSummary>>(
       builder: (context, s) => RefreshIndicator(
         onRefresh: () => cubit.load(),
-        child: ListView(
-          padding: const EdgeInsets.all(20),
-          children: [
-            const CustomerBrand(compact: true),
-            const SizedBox(height: 16),
-            const DeliveryBanner(height: 96),
-            const CustomerPageHeading('Đơn hàng'),
-            SegmentedButton<String>(
-              segments: const [
-                ButtonSegment(value: 'Active', label: Text('Đang giao')),
-                ButtonSegment(value: 'History', label: Text('Lịch sử')),
-                ButtonSegment(value: 'All', label: Text('Tất cả')),
-              ],
-              selected: {view},
-              onSelectionChanged: (v) {
-                setState(() {
-                  view = v.first;
-                  filter = CustomerOrderFilter(
-                    from: filter.from,
-                    to: filter.to,
-                    phone: filter.phone,
-                  );
-                });
-                cubit.load();
-              },
-            ),
-            const SizedBox(height: 16),
-            TextField(
-              controller: searchInput,
-              maxLength: 100,
-              decoration: InputDecoration(
-                counterText: '',
-                hintText: 'Mã đơn, địa chỉ hoặc người nhận',
-                prefixIcon: const Icon(Icons.search),
-                suffixIcon: IconButton(
-                  tooltip: 'Xóa tìm kiếm',
-                  icon: const Icon(Icons.clear),
-                  onPressed: () {
-                    searchInput.clear();
-                    search = '';
-                    cubit.load();
-                  },
+        child: CustomScrollView(
+          physics: const AlwaysScrollableScrollPhysics(),
+          keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
+          slivers: [
+            SliverToBoxAdapter(child: header()),
+            if (s.busy)
+              const SliverToBoxAdapter(
+                child: LinearProgressIndicator(minHeight: 2),
+              ),
+            if (s.error != null)
+              SliverPadding(
+                padding: const EdgeInsets.all(20),
+                sliver: SliverToBoxAdapter(
+                  child: Column(
+                    children: [
+                      CustomerNotice(s.error!, error: true),
+                      OutlinedButton.icon(
+                        onPressed: s.busy ? null : () => cubit.load(),
+                        icon: const AppIcon(
+                          'refresh',
+                          color: AppColors.orange,
+                          size: 18,
+                        ),
+                        label: const Text('Thử lại'),
+                      ),
+                    ],
+                  ),
                 ),
               ),
-              textInputAction: TextInputAction.search,
-              onSubmitted: (v) {
-                search = v.trim();
-                cubit.load();
-              },
-            ),
-            Row(
-              children: [
-                Expanded(
-                  child: TextButton.icon(
-                    icon: const Icon(Icons.filter_list),
-                    label: Text(
-                      filter.isEmpty ? 'Lọc đơn hàng' : 'Đang áp dụng bộ lọc',
-                    ),
-                    onPressed: () async {
-                      final value =
-                          await showModalBottomSheet<CustomerOrderFilter>(
-                            context: context,
-                            isScrollControlled: true,
-                            showDragHandle: true,
-                            builder: (_) => _OrderFilterSheet(filter),
-                          );
-                      if (value == null || !mounted) return;
-                      setState(() {
-                        filter = value;
-                        if (value.status != null && view != 'All') {
-                          view =
-                              ['Completed', 'Cancelled'].contains(value.status)
-                              ? 'History'
-                              : 'Active';
-                        }
-                      });
-                      cubit.load();
+            if (!s.busy && s.error == null && s.items.isEmpty)
+              SliverFillRemaining(
+                hasScrollBody: false,
+                child: CustomerOrdersEmpty(
+                  view: view,
+                  filtered: search.isNotEmpty || !filter.isEmpty,
+                  onBook: book,
+                  onReset: resetCriteria,
+                  onActive: () => selectView('Active'),
+                ),
+              ),
+            if (s.items.isNotEmpty)
+              SliverPadding(
+                padding: const EdgeInsets.fromLTRB(20, 20, 20, 6),
+                sliver: SliverList.builder(
+                  itemCount: s.items.length,
+                  itemBuilder: (_, index) => CustomerOrderTile(
+                    s.items[index],
+                    onTap: () async {
+                      await Navigator.pushNamed(
+                        context,
+                        '/order',
+                        arguments: s.items[index].id,
+                      );
+                      if (mounted) cubit.load();
                     },
                   ),
                 ),
-                if (!filter.isEmpty)
-                  TextButton(
-                    onPressed: () {
-                      setState(() => filter = const CustomerOrderFilter());
-                      cubit.load();
-                    },
-                    child: const Text('Bỏ lọc'),
-                  ),
-              ],
-            ),
-            const SizedBox(height: 18),
-            if (s.busy) const LinearProgressIndicator(),
-            if (s.error != null) CustomerNotice(s.error!, error: true),
-            if (!s.busy && s.items.isEmpty)
-              const CustomerCard(
-                child: Text('Không có đơn phù hợp. Kéo xuống để tải lại.'),
-              ),
-            for (final order in s.items)
-              CustomerOrderTile(
-                order,
-                onTap: () async {
-                  await Navigator.pushNamed(
-                    context,
-                    '/order',
-                    arguments: order.id,
-                  );
-                  if (mounted) cubit.load();
-                },
               ),
             if (s.hasNext)
-              OutlinedButton(
-                onPressed: s.busy ? null : () => cubit.load(more: true),
-                child: const Text('Xem thêm đơn'),
+              SliverPadding(
+                padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
+                sliver: SliverToBoxAdapter(
+                  child: OutlinedButton(
+                    onPressed: s.busy ? null : () => cubit.load(more: true),
+                    child: const Text('Xem thêm đơn'),
+                  ),
+                ),
               ),
           ],
         ),

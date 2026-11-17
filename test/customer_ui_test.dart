@@ -44,6 +44,101 @@ Future<void> tapVisible(WidgetTester tester, Finder finder) async {
 
 void main() {
   testWidgets(
+    'empty history fits narrow large text and links to active orders and booking',
+    (tester) async {
+      tester.view.physicalSize = const Size(320, 720);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.reset);
+      final t = CustomerTestApi(
+        handler: (r) async =>
+            r.url.path.endsWith('/orders') ? jsonResponse(pageJson([])) : null,
+      );
+      addTearDown(t.close);
+      await t.login();
+      await tester.pumpWidget(
+        RepositoryProvider<CustomerRepository>.value(
+          value: t.repository,
+          child: MaterialApp(
+            theme: buildCustomerTheme(),
+            builder: (context, child) => MediaQuery(
+              data: MediaQuery.of(
+                context,
+              ).copyWith(textScaler: const TextScaler.linear(1.4)),
+              child: child!,
+            ),
+            routes: {
+              '/booking': (_) =>
+                  const Scaffold(body: Text('Booking destination')),
+            },
+            home: const Scaffold(
+              body: CustomerOrdersScreen(initialView: 'History'),
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      expect(find.text('Chưa có lịch sử giao hàng'), findsOneWidget);
+      await tapVisible(tester, find.text('Xem đơn đang giao'));
+      expect(t.requests.last.url.queryParameters['view'], 'Active');
+      expect(find.text('Chưa có đơn đang giao'), findsOneWidget);
+      await tapVisible(tester, find.text('Đặt giao hàng'));
+      expect(find.text('Booking destination'), findsOneWidget);
+      expect(tester.takeException(), isNull);
+      await tester.pumpWidget(const SizedBox());
+    },
+  );
+
+  testWidgets(
+    'order failure stays distinct from empty results and search can reset',
+    (tester) async {
+      var fail = true;
+      final t = CustomerTestApi(
+        handler: (r) async => r.url.path.endsWith('/orders')
+            ? fail
+                  ? jsonResponse({'title': 'Unavailable'}, 503)
+                  : jsonResponse(pageJson([]))
+            : null,
+      );
+      addTearDown(t.close);
+      await t.login();
+      await mount(
+        tester,
+        t,
+        const Scaffold(body: CustomerOrdersScreen(initialView: 'History')),
+      );
+      expect(find.text('Thử lại'), findsOneWidget);
+      expect(find.text('Chưa có lịch sử giao hàng'), findsNothing);
+      fail = false;
+      await tapVisible(tester, find.text('Thử lại'));
+      expect(find.text('Chưa có lịch sử giao hàng'), findsOneWidget);
+      await tester.enterText(find.byType(TextField), 'MM-unknown');
+      await tester.testTextInput.receiveAction(TextInputAction.search);
+      await tester.pumpAndSettle();
+      expect(find.text('Không tìm thấy đơn phù hợp'), findsOneWidget);
+      await tapVisible(tester, find.text('Xóa tìm kiếm & bộ lọc'));
+      expect(t.requests.last.url.queryParameters['search'], isEmpty);
+      expect(t.requests.last.url.queryParameters['view'], 'History');
+      expect(find.text('Chưa có lịch sử giao hàng'), findsOneWidget);
+      final count = t.requests.length;
+      final scroll = tester.state<ScrollableState>(
+        find
+            .descendant(
+              of: find.byType(CustomScrollView),
+              matching: find.byType(Scrollable),
+            )
+            .first,
+      );
+      scroll.position.jumpTo(scroll.position.minScrollExtent);
+      await tester.pumpAndSettle();
+      await tester.drag(find.byType(CustomScrollView), const Offset(0, 350));
+      await tester.pumpAndSettle();
+      expect(t.requests.length, greaterThan(count));
+      expect(tester.takeException(), isNull);
+      await tester.pumpWidget(const SizedBox());
+    },
+  );
+
+  testWidgets(
     'rebook prefills addresses and Android back preserves the booking step',
     (tester) async {
       final t = CustomerTestApi();
@@ -81,7 +176,7 @@ void main() {
       addTearDown(t.close);
       await t.login();
       await mount(tester, t, const Scaffold(body: CustomerOrdersScreen()));
-      await tapVisible(tester, find.text('Lọc đơn hàng'));
+      await tapVisible(tester, find.byTooltip('Lọc đơn hàng'));
       await tapVisible(tester, find.text('Tất cả trạng thái'));
       await tapVisible(tester, find.text('Hoàn thành').last);
       await tester.enterText(
@@ -97,7 +192,7 @@ void main() {
       await tester.testTextInput.receiveAction(TextInputAction.search);
       await tester.pumpAndSettle();
       expect(t.requests.last.url.queryParameters['search'], 'MM-123');
-      await tapVisible(tester, find.byTooltip('Xóa tìm kiếm'));
+      await tapVisible(tester, find.byTooltip('Xóa tìm kiếm').first);
       expect(t.requests.last.url.queryParameters['search'], isEmpty);
       await tapVisible(tester, find.text('Bỏ lọc'));
       expect(t.requests.last.url.queryParameters.containsKey('status'), false);
