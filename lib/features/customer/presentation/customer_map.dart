@@ -8,18 +8,61 @@ import 'customer_cubits.dart';
 import 'customer_widgets.dart';
 
 class CustomerTrackingMap extends StatefulWidget {
-  const CustomerTrackingMap(this.snapshot, {super.key});
+  const CustomerTrackingMap(this.snapshot, {super.key, this.searching = false});
+  final bool searching;
   final TrackingSnapshot snapshot;
   @override
   State<CustomerTrackingMap> createState() => _CustomerTrackingMapState();
 }
 
-class _CustomerTrackingMapState extends State<CustomerTrackingMap> {
+class _CustomerTrackingMapState extends State<CustomerTrackingMap>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController pulse = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 1800),
+  );
+  bool mapsReady = false;
+  void syncPulse() {
+    final animate =
+        mapsReady &&
+        widget.searching &&
+        !(MediaQuery.maybeOf(context)?.disableAnimations ?? false);
+    if (animate && !pulse.isAnimating) {
+      pulse.repeat();
+    } else if (!animate) {
+      pulse.stop();
+    }
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    configured.then((ready) {
+      if (mounted) {
+        mapsReady = ready;
+        syncPulse();
+      }
+    });
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    syncPulse();
+  }
+
+  @override
+  void didUpdateWidget(covariant CustomerTrackingMap oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    syncPulse();
+  }
+
   late final Future<bool> configured = MapsConfiguration.isConfigured();
   GoogleMapController? controller;
   LatLng point(GeoPosition p) => LatLng(p.latitude, p.longitude);
   @override
   void dispose() {
+    pulse.dispose();
     controller?.dispose();
     super.dispose();
   }
@@ -34,42 +77,66 @@ class _CustomerTrackingMapState extends State<CustomerTrackingMap> {
           'Bản đồ Google chưa được cấu hình trên bản cài đặt này. Địa chỉ và trạng thái bên dưới vẫn được cập nhật từ hệ thống.',
         );
       }
-      return ClipRRect(
-        borderRadius: BorderRadius.circular(18),
-        child: SizedBox(
-          height: 290,
-          child: GoogleMap(
-            initialCameraPosition: CameraPosition(
-              target: point(t.driver ?? t.pickup),
-              zoom: 13,
-            ),
-            onMapCreated: (c) => controller = c,
-            myLocationButtonEnabled: false,
-            zoomControlsEnabled: true,
-            markers: {
-              Marker(
-                markerId: const MarkerId('pickup'),
-                position: point(t.pickup),
-                infoWindow: const InfoWindow(title: 'Điểm lấy hàng'),
+      return AnimatedBuilder(
+        animation: pulse,
+        builder: (context, _) => ClipRRect(
+          borderRadius: BorderRadius.circular(18),
+          child: SizedBox(
+            height: widget.searching ? 330 : 310,
+            child: GoogleMap(
+              initialCameraPosition: CameraPosition(
+                target: point(t.driver ?? t.pickup),
+                zoom: 13,
               ),
-              Marker(
-                markerId: const MarkerId('dropoff'),
-                position: point(t.dropoff),
-                icon: BitmapDescriptor.defaultMarkerWithHue(
-                  BitmapDescriptor.hueGreen,
-                ),
-                infoWindow: const InfoWindow(title: 'Điểm giao hàng'),
-              ),
-              if (t.driver != null)
+              onMapCreated: (c) => controller = c,
+              myLocationButtonEnabled: false,
+              zoomControlsEnabled: true,
+              circles: widget.searching
+                  ? {
+                      Circle(
+                        circleId: const CircleId('search-area'),
+                        center: point(t.pickup),
+                        radius: 100 + 250 * pulse.value,
+                        fillColor: AppColors.orange.withValues(
+                          alpha: .16 * (1 - pulse.value),
+                        ),
+                        strokeColor: AppColors.orange.withValues(
+                          alpha: .28 * (1 - pulse.value),
+                        ),
+                        strokeWidth: 1,
+                      ),
+                    }
+                  : {},
+              markers: {
                 Marker(
-                  markerId: const MarkerId('driver'),
-                  position: point(t.driver!),
+                  markerId: const MarkerId('pickup'),
+                  position: point(t.pickup),
+                  icon: BitmapDescriptor.defaultMarkerWithHue(
+                    BitmapDescriptor.hueGreen,
+                  ),
+                  infoWindow: const InfoWindow(title: 'Điểm lấy hàng'),
+                ),
+                Marker(
+                  markerId: const MarkerId('dropoff'),
+                  position: point(t.dropoff),
                   icon: BitmapDescriptor.defaultMarkerWithHue(
                     BitmapDescriptor.hueOrange,
                   ),
-                  infoWindow: const InfoWindow(title: 'Vị trí cuối của tài xế'),
+                  infoWindow: const InfoWindow(title: 'Điểm giao hàng'),
                 ),
-            },
+                if (t.driver != null)
+                  Marker(
+                    markerId: const MarkerId('driver'),
+                    position: point(t.driver!),
+                    icon: BitmapDescriptor.defaultMarkerWithHue(
+                      BitmapDescriptor.hueOrange,
+                    ),
+                    infoWindow: const InfoWindow(
+                      title: 'Vị trí cuối của tài xế',
+                    ),
+                  ),
+              },
+            ),
           ),
         ),
       );
@@ -145,7 +212,8 @@ class PlaceCubit extends Cubit<PlaceState> {
 }
 
 class CustomerPlaceScreen extends StatefulWidget {
-  const CustomerPlaceScreen({super.key});
+  const CustomerPlaceScreen({super.key, this.title = 'Chọn địa chỉ'});
+  final String title;
   @override
   State<CustomerPlaceScreen> createState() => _CustomerPlaceScreenState();
 }
@@ -177,7 +245,7 @@ class _CustomerPlaceScreenState extends State<CustomerPlaceScreen> {
       }
     },
     builder: (context, s) => Scaffold(
-      appBar: AppBar(title: const Text('Chọn địa chỉ')),
+      appBar: AppBar(title: Text(widget.title)),
       body: SafeArea(
         child: Column(
           children: [
@@ -188,7 +256,11 @@ class _CustomerPlaceScreenState extends State<CustomerPlaceScreen> {
                 textInputAction: TextInputAction.search,
                 onSubmitted: context.read<PlaceCubit>().search,
                 decoration: InputDecoration(
-                  hintText: 'Số nhà, đường, phường, thành phố',
+                  hintText: 'Tìm địa chỉ: số nhà, đường, thành phố',
+                  prefixIcon: const Padding(
+                    padding: EdgeInsets.all(14),
+                    child: AppIcon('search', color: AppColors.secondary),
+                  ),
                   suffixIcon: IconButton(
                     onPressed: () =>
                         context.read<PlaceCubit>().search(query.text),
@@ -251,6 +323,9 @@ class _CustomerPlaceScreenState extends State<CustomerPlaceScreen> {
                         Marker(
                           markerId: const MarkerId('selected'),
                           position: LatLng(p.latitude, p.longitude),
+                          icon: BitmapDescriptor.defaultMarkerWithHue(
+                            BitmapDescriptor.hueOrange,
+                          ),
                         ),
                     },
                   );
@@ -265,7 +340,23 @@ class _CustomerPlaceScreenState extends State<CustomerPlaceScreen> {
                   if (s.selected != null)
                     Padding(
                       padding: const EdgeInsets.only(bottom: 12),
-                      child: Text(s.selected!.address),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Vị trí đã chọn',
+                            style: appText(size: 20, weight: FontWeight.w700),
+                          ),
+                          const SizedBox(height: 8),
+                          Row(
+                            children: [
+                              const AppIcon('map-pin', color: AppColors.orange),
+                              const SizedBox(width: 10),
+                              Expanded(child: Text(s.selected!.address)),
+                            ],
+                          ),
+                        ],
+                      ),
                     ),
                   OutlinedButton.icon(
                     onPressed: s.busy

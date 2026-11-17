@@ -7,6 +7,7 @@ import '../domain/customer_places.dart';
 import 'customer_cubits.dart';
 import 'customer_map.dart';
 import 'customer_widgets.dart';
+import 'customer_booking_widgets.dart';
 
 class CustomerBookingScreen extends StatefulWidget {
   const CustomerBookingScreen({super.key, required this.onCreated});
@@ -56,7 +57,9 @@ class _CustomerBookingScreenState extends State<CustomerBookingScreen> {
       MaterialPageRoute(
         builder: (_) => BlocProvider(
           create: (_) => PlaceCubit(context.read<CustomerPlaces>()),
-          child: const CustomerPlaceScreen(),
+          child: CustomerPlaceScreen(
+            title: pickup ? 'Chọn điểm lấy hàng' : 'Chọn điểm giao hàng',
+          ),
         ),
       ),
     );
@@ -193,7 +196,7 @@ class _CustomerBookingScreenState extends State<CustomerBookingScreen> {
         },
         child: Scaffold(
           appBar: AppBar(
-            title: const Text('Đặt giao hàng'),
+            title: const CustomerBrand(compact: true),
             leading: IconButton(
               icon: const Icon(Icons.arrow_back),
               onPressed: locked
@@ -205,32 +208,56 @@ class _CustomerBookingScreenState extends State<CustomerBookingScreen> {
           ),
           bottomNavigationBar: catalog == null
               ? null
-              : SafeArea(
-                  child: Padding(
-                    padding: const EdgeInsets.fromLTRB(20, 10, 20, 14),
-                    child: FilledButton(
-                      onPressed: locked
-                          ? null
-                          : s.needsOrderCheck
-                          ? checkCreatedOrder
-                          : step == 3
-                          ? cubit.submit
-                          : next,
-                      child: Padding(
-                        padding: const EdgeInsets.all(8),
-                        child: Text(
-                          s.busy
-                              ? 'Đang xử lý…'
-                              : s.uploading
-                              ? 'Đang tải ảnh…'
+              : CustomerActionBar(
+                  child: Row(
+                    children: [
+                      if (step >= 2 && s.fare != null) ...[
+                        Column(
+                          mainAxisSize: MainAxisSize.min,
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              step == 3 ? 'Tổng thanh toán' : 'Tạm tính',
+                              style: appText(
+                                size: 12,
+                                color: AppColors.secondary,
+                              ),
+                            ),
+                            Text(
+                              money(s.fare!.total),
+                              style: appText(
+                                size: 22,
+                                weight: FontWeight.w800,
+                                color: AppColors.orange,
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(width: 18),
+                      ],
+                      Expanded(
+                        child: FilledButton(
+                          onPressed: locked
+                              ? null
                               : s.needsOrderCheck
-                              ? 'Kiểm tra đơn vừa gửi'
+                              ? checkCreatedOrder
                               : step == 3
-                              ? 'Xác nhận đặt đơn'
-                              : 'Tiếp tục',
+                              ? cubit.submit
+                              : next,
+                          child: Text(
+                            s.busy
+                                ? 'Đang xử lý…'
+                                : s.uploading
+                                ? 'Đang tải ảnh…'
+                                : s.needsOrderCheck
+                                ? 'Kiểm tra đơn vừa gửi'
+                                : step == 3
+                                ? 'Xác nhận đặt đơn'
+                                : 'Tiếp tục',
+                          ),
                         ),
                       ),
-                    ),
+                    ],
                   ),
                 ),
           body: catalog == null
@@ -260,51 +287,17 @@ class _CustomerBookingScreenState extends State<CustomerBookingScreen> {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.stretch,
                         children: [
-                          Row(
-                            children: List.generate(
-                              4,
-                              (i) => Expanded(
-                                child: Padding(
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 3,
-                                  ),
-                                  child: Column(
-                                    children: [
-                                      Container(
-                                        height: 4,
-                                        decoration: BoxDecoration(
-                                          color: i <= step
-                                              ? AppColors.orange
-                                              : AppColors.line,
-                                          borderRadius: BorderRadius.circular(
-                                            5,
-                                          ),
-                                        ),
-                                      ),
-                                      const SizedBox(height: 8),
-                                      Text(
-                                        [
-                                          'Địa chỉ',
-                                          'Hàng hóa',
-                                          'Loại xe',
-                                          'Thanh toán',
-                                        ][i],
-                                        style: appText(
-                                          size: 11,
-                                          weight: i == step
-                                              ? FontWeight.w700
-                                              : FontWeight.w400,
-                                          color: i <= step
-                                              ? AppColors.orange
-                                              : AppColors.secondary,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                              ),
-                            ),
+                          Text(
+                            [
+                              'Đặt giao hàng',
+                              'Thông tin hàng hóa',
+                              'Chọn phương tiện',
+                              'Thanh toán',
+                            ][step],
+                            style: appText(size: 27, weight: FontWeight.w800),
                           ),
+                          const SizedBox(height: 24),
+                          BookingProgress(step),
                           const SizedBox(height: 24),
                           if (s.error != null)
                             CustomerNotice(s.error!, error: true),
@@ -322,7 +315,7 @@ class _CustomerBookingScreenState extends State<CustomerBookingScreen> {
                                 labelText: 'Địa chỉ lấy hàng',
                                 prefixIcon: const Icon(
                                   Icons.trip_origin,
-                                  color: AppColors.orange,
+                                  color: AppColors.green,
                                 ),
                                 suffixIcon: IconButton(
                                   tooltip: 'Chọn trên bản đồ',
@@ -345,7 +338,7 @@ class _CustomerBookingScreenState extends State<CustomerBookingScreen> {
                                 labelText: 'Địa chỉ giao hàng',
                                 prefixIcon: const Icon(
                                   Icons.location_on_outlined,
-                                  color: AppColors.green,
+                                  color: AppColors.orange,
                                 ),
                                 suffixIcon: IconButton(
                                   tooltip: 'Chọn trên bản đồ',
@@ -376,121 +369,161 @@ class _CustomerBookingScreenState extends State<CustomerBookingScreen> {
                           ],
                           if (step == 1) ...[
                             sectionTitle('Bạn cần gửi gì?'),
-                            DropdownButtonFormField<String>(
-                              initialValue: d.cargoType.isEmpty
-                                  ? null
-                                  : d.cargoType,
-                              isExpanded: true,
-                              decoration: const InputDecoration(
-                                labelText: 'Loại hàng',
-                              ),
-                              items: catalog.cargoTypes
-                                  .map(
-                                    (c) => DropdownMenuItem(
-                                      value: c.code,
-                                      child: Text(c.name),
+                            Wrap(
+                              spacing: 8,
+                              runSpacing: 8,
+                              children: [
+                                for (final type in catalog.cargoTypes)
+                                  ChoiceChip(
+                                    selected: d.cargoType == type.code,
+                                    showCheckmark: false,
+                                    avatar: AppIcon(
+                                      'customer-parcel',
+                                      size: 20,
+                                      color: d.cargoType == type.code
+                                          ? AppColors.orange
+                                          : AppColors.secondary,
                                     ),
-                                  )
-                                  .toList(),
-                              onChanged: (v) =>
-                                  cubit.edit(d.copyWith(cargoType: v)),
-                              validator: (v) =>
-                                  v == null ? 'Chọn loại hàng' : null,
+                                    label: Text(type.name),
+                                    backgroundColor: Colors.white,
+                                    selectedColor: AppColors.peach,
+                                    labelStyle: appText(
+                                      color: d.cargoType == type.code
+                                          ? AppColors.orange
+                                          : AppColors.ink,
+                                    ),
+                                    side: BorderSide(
+                                      color: d.cargoType == type.code
+                                          ? AppColors.orange
+                                          : AppColors.line,
+                                    ),
+                                    padding: const EdgeInsets.all(10),
+                                    onSelected: (_) => cubit.edit(
+                                      d.copyWith(cargoType: type.code),
+                                    ),
+                                  ),
+                              ],
                             ),
                             const SizedBox(height: 18),
-                            Row(
-                              children: [
-                                Expanded(
-                                  child: field(
-                                    'Số kiện',
-                                    d.quantity.toString(),
-                                    (v) => cubit.edit(
-                                      d.copyWith(
-                                        quantity: int.tryParse(v) ?? 0,
+                            CustomerCard(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.stretch,
+                                children: [
+                                  Row(
+                                    children: [
+                                      Expanded(
+                                        child: field(
+                                          'Số kiện',
+                                          d.quantity.toString(),
+                                          (v) => cubit.edit(
+                                            d.copyWith(
+                                              quantity: int.tryParse(v) ?? 0,
+                                            ),
+                                          ),
+                                          number: true,
+                                        ),
                                       ),
-                                    ),
-                                    number: true,
-                                  ),
-                                ),
-                                const SizedBox(width: 12),
-                                Expanded(
-                                  child: field(
-                                    'Tổng cân nặng (kg)',
-                                    d.weight == 0 ? '' : d.weight.toString(),
-                                    (v) => cubit.edit(
-                                      d.copyWith(
-                                        weight: double.tryParse(v) ?? 0,
+                                      const SizedBox(width: 12),
+                                      Expanded(
+                                        child: field(
+                                          'Tổng cân nặng (kg)',
+                                          d.weight == 0
+                                              ? ''
+                                              : d.weight.toString(),
+                                          (v) => cubit.edit(
+                                            d.copyWith(
+                                              weight: double.tryParse(v) ?? 0,
+                                            ),
+                                          ),
+                                          number: true,
+                                        ),
                                       ),
-                                    ),
-                                    number: true,
+                                    ],
                                   ),
-                                ),
-                              ],
-                            ),
-                            const Text('Kích thước kiện lớn nhất'),
-                            const SizedBox(height: 12),
-                            Row(
-                              children: [
-                                Expanded(
-                                  child: field(
-                                    'Dài (cm)',
-                                    d.length == 0 ? '' : '${d.length}',
-                                    (v) => cubit.edit(
-                                      d.copyWith(length: int.tryParse(v) ?? 0),
-                                    ),
-                                    number: true,
+                                  const Text('Kích thước kiện lớn nhất'),
+                                  const SizedBox(height: 12),
+                                  Row(
+                                    children: [
+                                      Expanded(
+                                        child: field(
+                                          'Dài (cm)',
+                                          d.length == 0 ? '' : '${d.length}',
+                                          (v) => cubit.edit(
+                                            d.copyWith(
+                                              length: int.tryParse(v) ?? 0,
+                                            ),
+                                          ),
+                                          number: true,
+                                        ),
+                                      ),
+                                      const SizedBox(width: 8),
+                                      Expanded(
+                                        child: field(
+                                          'Rộng (cm)',
+                                          d.width == 0 ? '' : '${d.width}',
+                                          (v) => cubit.edit(
+                                            d.copyWith(
+                                              width: int.tryParse(v) ?? 0,
+                                            ),
+                                          ),
+                                          number: true,
+                                        ),
+                                      ),
+                                      const SizedBox(width: 8),
+                                      Expanded(
+                                        child: field(
+                                          'Cao (cm)',
+                                          d.height == 0 ? '' : '${d.height}',
+                                          (v) => cubit.edit(
+                                            d.copyWith(
+                                              height: int.tryParse(v) ?? 0,
+                                            ),
+                                          ),
+                                          number: true,
+                                        ),
+                                      ),
+                                    ],
                                   ),
-                                ),
-                                const SizedBox(width: 8),
-                                Expanded(
-                                  child: field(
-                                    'Rộng (cm)',
-                                    d.width == 0 ? '' : '${d.width}',
-                                    (v) => cubit.edit(
-                                      d.copyWith(width: int.tryParse(v) ?? 0),
-                                    ),
-                                    number: true,
-                                  ),
-                                ),
-                                const SizedBox(width: 8),
-                                Expanded(
-                                  child: field(
-                                    'Cao (cm)',
-                                    d.height == 0 ? '' : '${d.height}',
-                                    (v) => cubit.edit(
-                                      d.copyWith(height: int.tryParse(v) ?? 0),
-                                    ),
-                                    number: true,
-                                  ),
-                                ),
-                              ],
-                            ),
-                            sectionTitle('Ảnh hàng hóa · ${d.photos.length}/5'),
-                            const Text(
-                              'Chụp rõ hàng và bao bì. Từ 1–5 ảnh JPG/PNG, tối đa 5 MB mỗi ảnh.',
-                            ),
-                            const SizedBox(height: 14),
-                            PhotoStrip(
-                              d.photos,
-                              remove: (url) => cubit.edit(
-                                d.copyWith(
-                                  photos: d.photos
-                                      .where((p) => p != url)
-                                      .toList(),
-                                ),
+                                ],
                               ),
                             ),
-                            const SizedBox(height: 10),
-                            if (d.photos.length < 5)
-                              OutlinedButton.icon(
-                                onPressed: addPhoto,
-                                icon: const Icon(Icons.add_a_photo_outlined),
-                                label: Text(
-                                  s.uploading
-                                      ? 'Đang tải ảnh…'
-                                      : 'Thêm ảnh hàng hóa',
-                                ),
+                            CustomerCard(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.stretch,
+                                children: [
+                                  sectionTitle(
+                                    'Ảnh hàng hóa · ${d.photos.length}/5',
+                                  ),
+                                  const Text(
+                                    'Chụp rõ hàng và bao bì. Từ 1–5 ảnh JPG/PNG, tối đa 5 MB mỗi ảnh.',
+                                  ),
+                                  const SizedBox(height: 14),
+                                  PhotoStrip(
+                                    d.photos,
+                                    remove: (url) => cubit.edit(
+                                      d.copyWith(
+                                        photos: d.photos
+                                            .where((p) => p != url)
+                                            .toList(),
+                                      ),
+                                    ),
+                                  ),
+                                  const SizedBox(height: 10),
+                                  if (d.photos.length < 5)
+                                    OutlinedButton.icon(
+                                      onPressed: addPhoto,
+                                      icon: const Icon(
+                                        Icons.add_a_photo_outlined,
+                                      ),
+                                      label: Text(
+                                        s.uploading
+                                            ? 'Đang tải ảnh…'
+                                            : 'Thêm ảnh hàng hóa',
+                                      ),
+                                    ),
+                                ],
                               ),
+                            ),
                             const SizedBox(height: 18),
                             TextFormField(
                               initialValue: d.notes,
@@ -511,37 +544,11 @@ class _CustomerBookingScreenState extends State<CustomerBookingScreen> {
                             ),
                             const SizedBox(height: 16),
                             for (final vehicle in catalog.vehicles)
-                              CustomerCard(
-                                color: d.vehicleId == vehicle.id
-                                    ? AppColors.peach
-                                    : Colors.white,
-                                padding: 0,
-                                child: ListTile(
-                                  contentPadding: const EdgeInsets.all(14),
-                                  leading: Icon(
-                                    Icons.local_shipping_outlined,
-                                    color: vehicle.fits(d)
-                                        ? AppColors.orange
-                                        : AppColors.muted,
-                                    size: 30,
-                                  ),
-                                  title: Text(
-                                    vehicle.name,
-                                    style: appText(weight: FontWeight.w700),
-                                  ),
-                                  subtitle: Text(
-                                    '${vehicle.weight.toStringAsFixed(0)} kg · ${vehicle.length} × ${vehicle.width} × ${vehicle.height} cm${vehicle.fits(d) ? '' : '\nHàng vượt sức chứa của xe'}',
-                                  ),
-                                  trailing: Icon(
-                                    d.vehicleId == vehicle.id
-                                        ? Icons.radio_button_checked
-                                        : Icons.radio_button_off,
-                                    color: AppColors.orange,
-                                  ),
-                                  enabled: vehicle.fits(d),
-                                  onTap: () => cubit.edit(
-                                    d.copyWith(vehicleId: vehicle.id),
-                                  ),
+                              BookingVehicleCard(
+                                vehicle: vehicle,
+                                draft: d,
+                                onTap: () => cubit.edit(
+                                  d.copyWith(vehicleId: vehicle.id),
                                 ),
                               ),
                             SwitchListTile.adaptive(
@@ -586,8 +593,11 @@ class _CustomerBookingScreenState extends State<CustomerBookingScreen> {
                               child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
-                                  detailRow('Lấy hàng', d.pickup),
-                                  detailRow('Giao đến', d.dropoff),
+                                  CustomerRouteSummary(
+                                    pickup: d.pickup,
+                                    dropoff: d.dropoff,
+                                  ),
+                                  const SizedBox(height: 12),
                                   detailRow(
                                     'Người nhận',
                                     '${d.receiver} · ${d.phone}',
@@ -603,22 +613,19 @@ class _CustomerBookingScreenState extends State<CustomerBookingScreen> {
                                 ],
                               ),
                             ),
-                            SegmentedButton<String>(
-                              segments: const [
-                                ButtonSegment(
-                                  value: 'PayOS',
-                                  label: Text('PayOS / QR'),
-                                  icon: Icon(Icons.qr_code_2),
-                                ),
-                                ButtonSegment(
-                                  value: 'Cash',
-                                  label: Text('Tiền mặt'),
-                                  icon: Icon(Icons.payments_outlined),
-                                ),
-                              ],
-                              selected: {d.payment},
-                              onSelectionChanged: (v) =>
-                                  cubit.edit(d.copyWith(payment: v.first)),
+                            BookingPaymentChoice(
+                              value: 'PayOS',
+                              selected: d.payment,
+                              subtitle: 'Quét mã QR bằng ứng dụng ngân hàng',
+                              onTap: () =>
+                                  cubit.edit(d.copyWith(payment: 'PayOS')),
+                            ),
+                            BookingPaymentChoice(
+                              value: 'Cash',
+                              selected: d.payment,
+                              subtitle: 'Người gửi hoặc người nhận thanh toán',
+                              onTap: () =>
+                                  cubit.edit(d.copyWith(payment: 'Cash')),
                             ),
                             if (d.payment == 'Cash')
                               Padding(
@@ -671,7 +678,7 @@ class _CustomerBookingScreenState extends State<CustomerBookingScreen> {
                             ),
                             if (s.fare != null)
                               CustomerCard(
-                                color: AppColors.peach,
+                                color: Colors.white,
                                 child: priceBreakdown(
                                   s.fare!.distanceFee,
                                   s.fare!.serviceFee,
