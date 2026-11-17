@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:modmove_mobile/core/theme/app_theme.dart';
+import 'package:modmove_mobile/core/theme/customer_theme.dart';
 import 'package:modmove_mobile/features/customer/domain/customer_repository.dart';
 import 'package:modmove_mobile/features/customer/presentation/customer_cubits.dart';
 import 'package:modmove_mobile/features/customer/presentation/customer_booking_screen.dart';
@@ -21,7 +21,7 @@ Future<void> mount(
     RepositoryProvider<CustomerRepository>.value(
       value: t.repository,
       child: MaterialApp(
-        theme: buildAppTheme(),
+        theme: buildCustomerTheme(),
         builder: (context, child) => MediaQuery(
           data: MediaQuery.of(
             context,
@@ -37,6 +37,7 @@ Future<void> mount(
 
 Future<void> tapVisible(WidgetTester tester, Finder finder) async {
   await tester.ensureVisible(finder);
+  await tester.pumpAndSettle();
   await tester.tap(finder);
   await tester.pumpAndSettle();
 }
