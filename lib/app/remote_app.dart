@@ -4,6 +4,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import '../core/network/api_client.dart';
 import '../core/platform/secure_session_store.dart';
 import '../core/theme/app_theme.dart';
+import '../core/theme/customer_theme.dart';
 import '../features/auth/data/remote_auth_repository.dart';
 import '../features/auth/presentation/auth_cubit.dart';
 import '../features/auth/presentation/auth_screen.dart';
@@ -109,7 +110,7 @@ class _RemoteAppState extends State<RemoteApp> with WidgetsBindingObserver {
             )
           : MaterialApp(
               debugShowCheckedModeBanner: false,
-              theme: buildAppTheme(),
+              theme: buildCustomerTheme(),
               home: const AuthScreen(),
             ),
     ),
