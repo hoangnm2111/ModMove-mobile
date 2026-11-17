@@ -6,6 +6,7 @@ import '../domain/customer_models.dart';
 import 'customer_cubits.dart';
 import 'customer_map.dart';
 import 'customer_widgets.dart';
+import 'customer_payment_receipt.dart';
 
 class CustomerOrderScreen extends StatefulWidget {
   const CustomerOrderScreen({super.key});
@@ -82,7 +83,19 @@ class _CustomerOrderScreenState extends State<CustomerOrderScreen>
       final cubit = context.read<CustomerOrderCubit>(), o = s.order;
       return Scaffold(
         appBar: AppBar(
-          title: Text(o?.summary.code ?? 'Chi tiết đơn hàng'),
+          title: Text(
+            o == null
+                ? 'Chi tiết đơn hàng'
+                : o.summary.needsPayment
+                ? 'Thanh toán đơn hàng'
+                : o.canReview
+                ? 'Kiểm tra hàng hóa'
+                : o.canConfirm
+                ? 'Xác nhận nhận hàng'
+                : o.summary.status == 'Pending'
+                ? 'Đang tìm tài xế'
+                : 'Theo dõi đơn hàng',
+          ),
           actions: [
             IconButton(
               tooltip: 'Tải lại',
@@ -116,7 +129,9 @@ class _CustomerOrderScreenState extends State<CustomerOrderScreen>
                       ),
                       const SizedBox(height: 14),
                       Text(
-                        _headline(o.summary.status),
+                        o.summary.needsPayment
+                            ? 'Thanh toán để tìm tài xế'
+                            : _headline(o.summary.status),
                         style: appText(size: 23, weight: FontWeight.w800),
                       ),
                       const SizedBox(height: 8),
@@ -143,13 +158,27 @@ class _CustomerOrderScreenState extends State<CustomerOrderScreen>
                     ],
                   ),
                 ),
+                if (o.summary.needsPayment)
+                  _OrderPayment(
+                    order: o,
+                    payment: s.payment,
+                    busy: s.acting,
+                    onCreate: cubit.createPayment,
+                    onRefresh: cubit.refresh,
+                  ),
                 if (o.pendingDriverIncident)
                   const CustomerNotice(
                     'Chuyến đang tạm dừng do sự cố tài xế. Điều phối đang xử lý; bạn chưa thể duyệt ảnh lấy hàng.',
                   ),
-                if (!o.summary.terminal) ...[
+                if (!o.summary.terminal &&
+                    !o.summary.needsPayment &&
+                    !o.canReview &&
+                    !o.canConfirm) ...[
                   if (s.tracking != null) ...[
-                    CustomerTrackingMap(s.tracking!),
+                    CustomerTrackingMap(
+                      s.tracking!,
+                      searching: o.summary.status == 'Pending',
+                    ),
                     const SizedBox(height: 14),
                     if (s.tracking!.driver != null)
                       _DriverPositionInfo(s.tracking!),
@@ -162,34 +191,6 @@ class _CustomerOrderScreenState extends State<CustomerOrderScreen>
                     label: const Text('Cập nhật vị trí và thời gian đến'),
                   ),
                 ],
-                CustomerCard(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      sectionTitle('Hành trình'),
-                      detailRow('Lấy hàng', o.summary.pickup),
-                      detailRow('Giao hàng', o.summary.dropoff),
-                      detailRow(
-                        'Người nhận',
-                        '${o.summary.receiver} · ${o.summary.phone}',
-                      ),
-                      detailRow('Loại xe', o.summary.vehicle),
-                      if (o.driverName.isNotEmpty) ...[
-                        const Divider(),
-                        detailRow('Tài xế', o.driverName),
-                        detailRow('Biển số xe', o.plate),
-                        OutlinedButton.icon(
-                          onPressed: () => openExternal(
-                            context,
-                            Uri(scheme: 'tel', path: o.driverPhone),
-                          ),
-                          icon: const Icon(Icons.call_outlined),
-                          label: Text('Gọi tài xế · ${o.driverPhone}'),
-                        ),
-                      ],
-                    ],
-                  ),
-                ),
                 if (o.pickupPhotos.isNotEmpty) ...[
                   sectionTitle('Ảnh kiểm tra khi lấy hàng'),
                   Text(
@@ -201,7 +202,7 @@ class _CustomerOrderScreenState extends State<CustomerOrderScreen>
                     }}',
                   ),
                   const SizedBox(height: 12),
-                  PhotoStrip(o.pickupPhotos),
+                  PhotoStrip(o.pickupPhotos, large: true),
                   if (o.pickupSubmissionCount > 0)
                     Text(
                       'Lần gửi ảnh: ${o.pickupSubmissionCount}/5',
@@ -211,16 +212,17 @@ class _CustomerOrderScreenState extends State<CustomerOrderScreen>
                     CustomerNotice('Nội dung cần sửa: ${o.pickupRejection}'),
                   const SizedBox(height: 16),
                   if (o.canReview)
-                    Row(
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
-                        Expanded(
+                        SizedBox(
                           child: OutlinedButton(
                             onPressed: s.acting ? null : () => review(o, false),
                             child: const Text('Yêu cầu chụp lại'),
                           ),
                         ),
-                        const SizedBox(width: 12),
-                        Expanded(
+                        const SizedBox(height: 12),
+                        SizedBox(
                           child: FilledButton(
                             onPressed: s.acting ? null : () => review(o, true),
                             child: const Text('Duyệt ảnh'),
@@ -231,7 +233,7 @@ class _CustomerOrderScreenState extends State<CustomerOrderScreen>
                 ],
                 if (o.deliveryPhoto.isNotEmpty) ...[
                   sectionTitle('Bằng chứng giao hàng'),
-                  PhotoStrip([o.deliveryPhoto]),
+                  PhotoStrip([o.deliveryPhoto], large: true),
                   const SizedBox(height: 12),
                 ],
                 if (o.canConfirm) ...[
@@ -273,6 +275,37 @@ class _CustomerOrderScreenState extends State<CustomerOrderScreen>
                     icon: const Icon(Icons.star_outline),
                     label: const Text('Đánh giá chuyến giao'),
                   ),
+                CustomerCard(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      sectionTitle('Hành trình'),
+                      CustomerRouteSummary(
+                        pickup: o.summary.pickup,
+                        dropoff: o.summary.dropoff,
+                      ),
+                      const SizedBox(height: 12),
+                      detailRow(
+                        'Người nhận',
+                        '${o.summary.receiver} · ${o.summary.phone}',
+                      ),
+                      detailRow('Loại xe', o.summary.vehicle),
+                      if (o.driverName.isNotEmpty) ...[
+                        const Divider(),
+                        detailRow('Tài xế', o.driverName),
+                        detailRow('Biển số xe', o.plate),
+                        OutlinedButton.icon(
+                          onPressed: () => openExternal(
+                            context,
+                            Uri(scheme: 'tel', path: o.driverPhone),
+                          ),
+                          icon: const Icon(Icons.call_outlined),
+                          label: Text('Gọi tài xế · ${o.driverPhone}'),
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
                 sectionTitle('Hàng hóa của bạn'),
                 CustomerCard(
                   child: Column(
@@ -323,17 +356,24 @@ class _CustomerOrderScreenState extends State<CustomerOrderScreen>
                         o.discount,
                         o.summary.total,
                       ),
+                      if (o.summary.paymentStatus == 'Paid')
+                        TextButton.icon(
+                          onPressed: () => Navigator.push(
+                            context,
+                            MaterialPageRoute<void>(
+                              builder: (_) => CustomerPaymentReceipt(o),
+                            ),
+                          ),
+                          icon: const AppIcon(
+                            'receipt',
+                            size: 18,
+                            color: AppColors.orange,
+                          ),
+                          label: const Text('Xem biên nhận thanh toán'),
+                        ),
                     ],
                   ),
                 ),
-                if (o.summary.needsPayment)
-                  _OrderPayment(
-                    order: o,
-                    payment: s.payment,
-                    busy: s.acting,
-                    onCreate: cubit.createPayment,
-                    onRefresh: cubit.refresh,
-                  ),
                 sectionTitle('Tiến trình đơn hàng'),
                 for (final h in o.history)
                   ListTile(
@@ -389,18 +429,17 @@ class _CustomerOrderScreenState extends State<CustomerOrderScreen>
                         ? null
                         : () async {
                             final result =
-                                await Navigator.push<(String, String)>(
-                                  context,
-                                  MaterialPageRoute(
-                                    builder: (_) => BlocProvider(
-                                      create: (_) =>
-                                          ResourceCubit<List<Choice>>(
-                                            () => cubit.repository.choices(
-                                              'cancellation-reasons',
-                                            ),
-                                          )..load(),
-                                      child: const _CancelOrder(),
-                                    ),
+                                await showModalBottomSheet<(String, String)>(
+                                  context: context,
+                                  isScrollControlled: true,
+                                  showDragHandle: true,
+                                  builder: (_) => BlocProvider(
+                                    create: (_) => ResourceCubit<List<Choice>>(
+                                      () => cubit.repository.choices(
+                                        'cancellation-reasons',
+                                      ),
+                                    )..load(),
+                                    child: const _CancelOrder(),
                                   ),
                                 );
                             if (result != null) {
@@ -423,7 +462,7 @@ class _CustomerOrderScreenState extends State<CustomerOrderScreen>
     },
   );
   String _headline(String status) => switch (status) {
-    'Pending' => 'Đang chuẩn bị hành trình',
+    'Pending' => 'Đang kết nối tài xế gần bạn',
     'Accepted' => 'Tài xế đã nhận chuyến',
     'Arrived' => 'Tài xế đã đến lấy hàng',
     'PickedUp' => 'Kiểm tra ảnh hàng hóa',
@@ -500,9 +539,9 @@ class _CancelOrderState extends State<_CancelOrder> {
   }
 
   @override
-  Widget build(BuildContext context) => Scaffold(
-    appBar: AppBar(title: const Text('Hủy đơn hàng')),
-    body: BlocBuilder<ResourceCubit<List<Choice>>, ResourceState<List<Choice>>>(
+  Widget build(BuildContext context) => SizedBox(
+    height: MediaQuery.sizeOf(context).height * .78,
+    child: BlocBuilder<ResourceCubit<List<Choice>>, ResourceState<List<Choice>>>(
       builder: (context, s) => SingleChildScrollView(
         padding: const EdgeInsets.all(20),
         child: Form(
@@ -510,6 +549,7 @@ class _CancelOrderState extends State<_CancelOrder> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
+              const CustomerPageHeading('Hủy đơn hàng?'),
               const CustomerNotice(
                 'Chỉ hủy được khi đang tìm tài xế hoặc tài xế chưa đến. Đơn PayOS đã trả tiền sẽ được hệ thống tạo yêu cầu hoàn tiền.',
               ),
@@ -557,6 +597,7 @@ class _CancelOrderState extends State<_CancelOrder> {
                               'Xác nhận hủy đơn?',
                               'Thao tác này không thể hoàn tác.',
                               action: 'Hủy đơn',
+                              destructive: true,
                             ) &&
                             context.mounted) {
                           Navigator.pop(context, (code!, reason.text.trim()));
@@ -593,12 +634,29 @@ class _OrderPayment extends StatelessWidget {
         final expired = expires != null && !now.isBefore(expires);
         final url = expired ? '' : payment?.url ?? order.checkoutUrl;
         return CustomerCard(
-          color: AppColors.peach,
+          color: Colors.white,
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               Text(
-                'Thanh toán PayOS',
+                order.summary.code,
+                textAlign: TextAlign.center,
+                style: appText(size: 15, weight: FontWeight.w700),
+              ),
+              const SizedBox(height: 12),
+              Text(
+                money(order.summary.total),
+                textAlign: TextAlign.center,
+                style: appText(
+                  size: 38,
+                  weight: FontWeight.w800,
+                  color: AppColors.orange,
+                ),
+              ),
+              const SizedBox(height: 10),
+              Text(
+                'PayOS / VietQR',
+                textAlign: TextAlign.center,
                 style: appText(size: 18, weight: FontWeight.w700),
               ),
               const SizedBox(height: 12),
@@ -611,7 +669,17 @@ class _OrderPayment extends StatelessWidget {
                   ),
                 ),
               if (expires != null && !expired)
-                Text('Mã hết hạn: ${dateLabel(expires)}'),
+                Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 16),
+                  child: Text(
+                    'Mã hết hạn sau ${expires.difference(now).inMinutes.toString().padLeft(2, '0')}:${(expires.difference(now).inSeconds % 60).toString().padLeft(2, '0')}',
+                    textAlign: TextAlign.center,
+                    style: appText(
+                      color: AppColors.amber,
+                      weight: FontWeight.w700,
+                    ),
+                  ),
+                ),
               if (expired)
                 const Text(
                   'Mã thanh toán đã hết hạn. Hãy tạo mã mới cho đơn này.',
@@ -629,7 +697,8 @@ class _OrderPayment extends StatelessWidget {
                     expired ? 'Tạo lại mã PayOS' : 'Tạo mã thanh toán PayOS',
                   ),
                 ),
-              TextButton(
+              const SizedBox(height: 12),
+              OutlinedButton(
                 onPressed: busy ? null : onRefresh,
                 child: const Text('Kiểm tra kết quả thanh toán'),
               ),
