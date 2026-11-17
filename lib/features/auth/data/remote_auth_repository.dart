@@ -1,4 +1,5 @@
 import '../../../core/network/api_client.dart';
+import '../../../core/domain/account_input.dart';
 import '../domain/auth_repository.dart';
 
 class RemoteAuthRepository implements AuthRepository {
@@ -45,7 +46,7 @@ class RemoteAuthRepository implements AuthRepository {
       authenticated: false,
       body: {
         'fullName': name.trim(),
-        'phoneNumber': phone.trim(),
+        'phoneNumber': normalizeVietnamesePhone(phone),
         'email': email.trim(),
         'password': password,
       },

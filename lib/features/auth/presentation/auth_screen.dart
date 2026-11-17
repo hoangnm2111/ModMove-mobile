@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../core/theme/app_theme.dart';
+import '../../../core/domain/account_input.dart';
 import '../../../core/widgets/app_logo.dart';
 import 'auth_cubit.dart';
 
@@ -46,8 +47,7 @@ class _AuthScreenState extends State<AuthScreen> {
             !RegExp(r'^[^\s@]+@[^\s@]+\.[^\s@]+$').hasMatch(v.trim())) {
           return 'Email chưa hợp lệ';
         }
-        if (c == _phone &&
-            !RegExp(r'^(0[0-9]{9}|\+84[0-9]{9})$').hasMatch(v.trim())) {
+        if (c == _phone && !isVietnamesePhone(v)) {
           return 'Số điện thoại chưa hợp lệ';
         }
         if (c == _otp && !RegExp(r'^[0-9]{6}$').hasMatch(v.trim())) {
@@ -56,10 +56,7 @@ class _AuthScreenState extends State<AuthScreen> {
         final stage = context.read<AuthCubit>().state.stage;
         if (c == _password &&
             [AuthStage.register, AuthStage.reset].contains(stage) &&
-            (v.length < 8 ||
-                v.length > 100 ||
-                !RegExp('[a-zA-Z]').hasMatch(v) ||
-                !RegExp('[0-9]').hasMatch(v))) {
+            !isValidNewPassword(v)) {
           return 'Mật khẩu 8–100 ký tự, gồm chữ và số';
         }
         return null;
