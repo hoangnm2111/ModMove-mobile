@@ -5,6 +5,7 @@ import '../domain/customer_repository.dart';
 import '../domain/customer_places.dart';
 import 'customer_cubits.dart';
 import 'customer_widgets.dart';
+import 'customer_incident_screen.dart';
 
 class CustomerSupportList extends StatelessWidget {
   const CustomerSupportList({super.key, required this.refunds, this.orderId});
@@ -133,6 +134,23 @@ class CustomerSupportList extends StatelessWidget {
                             Wrap(
                               spacing: 8,
                               children: [
+                                FilledButton(
+                                  onPressed: () async {
+                                    await Navigator.push(
+                                      context,
+                                      MaterialPageRoute<void>(
+                                        builder: (_) =>
+                                            CustomerIncidentScreen(i),
+                                      ),
+                                    );
+                                    if (context.mounted) {
+                                      context
+                                          .read<PagedCubit<Incident>>()
+                                          .load();
+                                    }
+                                  },
+                                  child: const Text('Xem chi tiết'),
+                                ),
                                 TextButton(
                                   onPressed: () => Navigator.pushNamed(
                                     context,
@@ -170,6 +188,8 @@ class CustomerSupportList extends StatelessWidget {
     child: ListView(
       padding: const EdgeInsets.all(20),
       children: [
+        const DeliveryBanner(height: 100),
+        const SizedBox(height: 20),
         CustomerNotice(
           refunds
               ? 'Theo dõi kết quả xét duyệt và khoản hoàn tiền của bạn.'
@@ -184,7 +204,13 @@ class CustomerSupportList extends StatelessWidget {
           ),
         ],
         if (!s.busy && s.items.isEmpty)
-          const CustomerCard(child: Text('Chưa có yêu cầu nào.')),
+          const CustomerCard(
+            child: CustomerEmptyState(
+              title: 'Chưa có yêu cầu',
+              message: 'Các sự cố và phản hồi của bạn sẽ xuất hiện tại đây.',
+              icon: 'shield',
+            ),
+          ),
         ...items,
         if (s.hasNext)
           OutlinedButton(
@@ -344,230 +370,258 @@ class _CustomerSupportFormState extends State<CustomerSupportForm> {
       body: BlocBuilder<ResourceCubit<SupportFormData>, ResourceState<SupportFormData>>(
         builder: (context, ds) => BlocBuilder<ActionCubit, ActionState>(
           builder: (context, a) => BlocBuilder<CustomerEvidenceCubit, EvidenceState>(
-            builder: (context, e) =>
-                BlocBuilder<
-                  ResourceCubit<GeoPosition>,
-                  ResourceState<GeoPosition>
-                >(
-                  builder: (context, gpsState) {
-                    final gps = gpsState.data, gpsError = gpsState.error;
-                    final locating = gpsState.busy;
-                    final d = ds.data;
-                    final eligible =
-                        d != null &&
-                        (incident
-                            ? d.order.summary.canReport
-                            : widget.kind == CustomerSupportKind.complaint
-                            ? d.order.canComplainAt(DateTime.now())
-                            : d.order.summary.paymentMethod == 'PayOS' &&
-                                  d.order.summary.paymentStatus == 'Paid');
-                    return SingleChildScrollView(
-                      padding: const EdgeInsets.all(20),
-                      child: Form(
-                        key: form,
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.stretch,
-                          children: [
-                            if (ds.busy) const LinearProgressIndicator(),
-                            if (ds.error != null) ...[
-                              CustomerNotice(ds.error!, error: true),
-                              TextButton(
-                                onPressed: data.load,
-                                child: const Text('Thử lại'),
-                              ),
-                            ],
-                            if (d != null) ...[
-                              CustomerCard(
-                                color: AppColors.peach,
-                                child: Column(
-                                  children: [
-                                    detailRow('Đơn hàng', d.order.summary.code),
-                                    detailRow(
-                                      'Tổng cước',
-                                      money(d.order.summary.total),
-                                    ),
-                                    detailRow(
-                                      'Trạng thái',
-                                      statusLabel(d.order.summary.status),
+            builder: (context, e) => BlocBuilder<ResourceCubit<GeoPosition>, ResourceState<GeoPosition>>(
+              builder: (context, gpsState) {
+                final gps = gpsState.data, gpsError = gpsState.error;
+                final locating = gpsState.busy;
+                final d = ds.data;
+                final eligible =
+                    d != null &&
+                    (incident
+                        ? d.order.summary.canReport
+                        : widget.kind == CustomerSupportKind.complaint
+                        ? d.order.canComplainAt(DateTime.now())
+                        : d.order.summary.paymentMethod == 'PayOS' &&
+                              d.order.summary.paymentStatus == 'Paid');
+                return SingleChildScrollView(
+                  padding: const EdgeInsets.all(20),
+                  child: Form(
+                    key: form,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        if (ds.busy) const LinearProgressIndicator(),
+                        if (ds.error != null) ...[
+                          CustomerNotice(ds.error!, error: true),
+                          TextButton(
+                            onPressed: data.load,
+                            child: const Text('Thử lại'),
+                          ),
+                        ],
+                        if (d != null) ...[
+                          const DeliveryBanner(height: 90),
+                          const SizedBox(height: 16),
+                          CustomerCard(
+                            color: AppColors.peach,
+                            child: Column(
+                              children: [
+                                detailRow('Đơn hàng', d.order.summary.code),
+                                const SizedBox(height: 10),
+                                CustomerRouteSummary(
+                                  pickup: d.order.summary.pickup,
+                                  dropoff: d.order.summary.dropoff,
+                                ),
+                                const Divider(height: 24),
+                                detailRow(
+                                  'Tổng cước',
+                                  money(d.order.summary.total),
+                                ),
+                                detailRow(
+                                  'Trạng thái',
+                                  statusLabel(d.order.summary.status),
+                                ),
+                              ],
+                            ),
+                          ),
+                          if (!eligible)
+                            CustomerNotice(
+                              incident
+                                  ? 'Chỉ báo sự cố từ lúc tài xế đến lấy hàng đến trước khi giao xong.'
+                                  : widget.kind == CustomerSupportKind.complaint
+                                  ? 'Chỉ khiếu nại trong 24 giờ sau giao hàng và trước khi xác nhận hoàn thành.'
+                                  : 'Hoàn tiền do sự cố chỉ áp dụng cho đơn PayOS đã thanh toán.',
+                            ),
+                          if (eligible)
+                            AbsorbPointer(
+                              absorbing: a.busy || e.busy,
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.stretch,
+                                children: [
+                                  if (incident) ...[
+                                    sectionTitle('Loại sự cố'),
+                                    LayoutBuilder(
+                                      builder: (context, constraints) => Wrap(
+                                        spacing: 10,
+                                        runSpacing: 10,
+                                        children: [
+                                          for (final entry in [
+                                            ('DamagedCargo', 'box'),
+                                            ('Accident', 'warning'),
+                                            ('VehicleBreakdown', 'van'),
+                                            ('Other', 'help'),
+                                          ])
+                                            SizedBox(
+                                              width:
+                                                  (constraints.maxWidth - 10) /
+                                                  2,
+                                              child: ChoiceChip(
+                                                avatar: AppIcon(
+                                                  entry.$2,
+                                                  size: 20,
+                                                  color: type == entry.$1
+                                                      ? AppColors.orange
+                                                      : AppColors.secondary,
+                                                ),
+                                                label: Text(
+                                                  statusLabel(entry.$1),
+                                                  style: appText(
+                                                    size: 12,
+                                                    color: type == entry.$1
+                                                        ? AppColors.orange
+                                                        : AppColors.ink,
+                                                  ),
+                                                ),
+                                                showCheckmark: false,
+                                                selectedColor: AppColors.peach,
+                                                backgroundColor: Colors.white,
+                                                side: BorderSide(
+                                                  color: type == entry.$1
+                                                      ? AppColors.orange
+                                                      : AppColors.line,
+                                                ),
+                                                padding:
+                                                    const EdgeInsets.symmetric(
+                                                      horizontal: 8,
+                                                      vertical: 14,
+                                                    ),
+                                                shape: RoundedRectangleBorder(
+                                                  borderRadius:
+                                                      BorderRadius.circular(14),
+                                                ),
+                                                selected: type == entry.$1,
+                                                onSelected: (_) => setState(
+                                                  () => type = entry.$1,
+                                                ),
+                                              ),
+                                            ),
+                                        ],
+                                      ),
                                     ),
                                   ],
-                                ),
-                              ),
-                              if (!eligible)
-                                CustomerNotice(
-                                  incident
-                                      ? 'Chỉ báo sự cố từ lúc tài xế đến lấy hàng đến trước khi giao xong.'
-                                      : widget.kind ==
-                                            CustomerSupportKind.complaint
-                                      ? 'Chỉ khiếu nại trong 24 giờ sau giao hàng và trước khi xác nhận hoàn thành.'
-                                      : 'Hoàn tiền do sự cố chỉ áp dụng cho đơn PayOS đã thanh toán.',
-                                ),
-                              if (eligible)
-                                AbsorbPointer(
-                                  absorbing: a.busy || e.busy,
-                                  child: Column(
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment.stretch,
-                                    children: [
-                                      if (incident)
-                                        DropdownButtonFormField<String>(
-                                          initialValue: type,
-                                          decoration: const InputDecoration(
-                                            labelText: 'Loại sự cố',
-                                          ),
-                                          items:
-                                              [
-                                                    'DamagedCargo',
-                                                    'Accident',
-                                                    'VehicleBreakdown',
-                                                    'Other',
-                                                  ]
-                                                  .map(
-                                                    (v) => DropdownMenuItem(
-                                                      value: v,
-                                                      child: Text(
-                                                        statusLabel(v),
-                                                      ),
-                                                    ),
-                                                  )
-                                                  .toList(),
-                                          onChanged: (v) =>
-                                              setState(() => type = v!),
-                                        ),
-                                      if (widget.kind ==
-                                          CustomerSupportKind.complaint)
-                                        DropdownButtonFormField<String>(
-                                          initialValue: reason,
-                                          isExpanded: true,
-                                          decoration: const InputDecoration(
-                                            labelText: 'Lý do khiếu nại',
-                                          ),
-                                          items: d.reasons
-                                              .map(
-                                                (v) => DropdownMenuItem(
-                                                  value: v.code,
-                                                  child: Text(v.name),
-                                                ),
-                                              )
-                                              .toList(),
-                                          onChanged: (v) =>
-                                              setState(() => reason = v),
-                                          validator: (v) => v == null
-                                              ? 'Chọn lý do khiếu nại'
-                                              : null,
-                                        ),
-                                      const SizedBox(height: 18),
-                                      TextFormField(
-                                        controller: description,
-                                        maxLines: 4,
-                                        maxLength: 1000,
-                                        decoration: const InputDecoration(
-                                          labelText: 'Mô tả chi tiết',
-                                        ),
-                                        validator: (v) =>
-                                            (v ?? '').trim().isEmpty
-                                            ? 'Nhập nội dung cần hỗ trợ'
-                                            : null,
+                                  if (widget.kind ==
+                                      CustomerSupportKind.complaint)
+                                    DropdownButtonFormField<String>(
+                                      initialValue: reason,
+                                      isExpanded: true,
+                                      decoration: const InputDecoration(
+                                        labelText: 'Lý do khiếu nại',
                                       ),
-                                      sectionTitle(
-                                        'Ảnh minh chứng · ${e.photos.length}/5',
-                                      ),
-                                      PhotoStrip(
-                                        e.photos,
-                                        remove: evidence.remove,
-                                      ),
-                                      if (e.photos.length < 5)
-                                        OutlinedButton.icon(
-                                          onPressed: addPhoto,
-                                          icon: const Icon(
-                                            Icons.add_a_photo_outlined,
-                                          ),
-                                          label: Text(
-                                            e.busy
-                                                ? 'Đang tải ảnh…'
-                                                : 'Thêm ảnh minh chứng',
-                                          ),
-                                        ),
-                                      if (e.error != null)
-                                        CustomerNotice(e.error!, error: true),
-                                      if (incident) ...[
-                                        const SizedBox(height: 12),
-                                        OutlinedButton.icon(
-                                          onPressed: locating
-                                              ? null
-                                              : location.load,
-                                          icon: const Icon(Icons.my_location),
-                                          label: Text(
-                                            locating
-                                                ? 'Đang lấy vị trí…'
-                                                : gps == null
-                                                ? 'Đính kèm vị trí hiện tại'
-                                                : 'Cập nhật GPS đã đính kèm',
-                                          ),
-                                        ),
-                                        if (gps != null)
-                                          detailRow(
-                                            'GPS',
-                                            '${gps.latitude.toStringAsFixed(5)}, ${gps.longitude.toStringAsFixed(5)}',
-                                          ),
-                                        if (gpsError != null)
-                                          CustomerNotice(gpsError, error: true),
-                                      ],
-                                      if (!incident) ...[
-                                        sectionTitle('Số tiền yêu cầu'),
-                                        TextFormField(
-                                          controller: amount,
-                                          keyboardType: TextInputType.number,
-                                          decoration: InputDecoration(
-                                            labelText: 'Số tiền (VND)',
-                                            helperText:
-                                                'Lớn hơn 0 và không vượt ${money(d.order.summary.total)}',
-                                          ),
-                                          validator: (v) {
-                                            final n = int.tryParse(v ?? '');
-                                            return n == null ||
-                                                    n <= 0 ||
-                                                    n > d.order.summary.total
-                                                ? 'Số tiền chưa hợp lệ'
-                                                : null;
-                                          },
-                                        ),
-                                        sectionTitle(
-                                          'Tài khoản nhận hoàn tiền',
-                                        ),
-                                        BankAccountFields(
-                                          banks: d.banks,
-                                          selected: bank,
-                                          onBank: (v) =>
-                                              setState(() => bank = v),
-                                          number: account,
-                                          holder: holder,
-                                        ),
-                                        const CustomerNotice(
-                                          'Số tiền được hoàn phụ thuộc kết quả xét duyệt và tổng các khoản hoàn của đơn. Gửi yêu cầu chưa có nghĩa là đã được hoàn tiền.',
-                                        ),
-                                      ],
-                                    ],
+                                      items: d.reasons
+                                          .map(
+                                            (v) => DropdownMenuItem(
+                                              value: v.code,
+                                              child: Text(v.name),
+                                            ),
+                                          )
+                                          .toList(),
+                                      onChanged: (v) =>
+                                          setState(() => reason = v),
+                                      validator: (v) => v == null
+                                          ? 'Chọn lý do khiếu nại'
+                                          : null,
+                                    ),
+                                  const SizedBox(height: 18),
+                                  TextFormField(
+                                    controller: description,
+                                    maxLines: 4,
+                                    maxLength: 1000,
+                                    decoration: const InputDecoration(
+                                      labelText: 'Mô tả chi tiết',
+                                    ),
+                                    validator: (v) => (v ?? '').trim().isEmpty
+                                        ? 'Nhập nội dung cần hỗ trợ'
+                                        : null,
                                   ),
-                                ),
-                              if (a.error != null)
-                                CustomerNotice(a.error!, error: true),
-                              FilledButton(
-                                onPressed:
-                                    !eligible || a.busy || e.busy || locating
-                                    ? null
-                                    : () => submit(d),
-                                child: Text(
-                                  a.busy ? 'Đang gửi…' : 'Gửi yêu cầu',
-                                ),
+                                  sectionTitle(
+                                    'Ảnh minh chứng · ${e.photos.length}/5',
+                                  ),
+                                  PhotoStrip(e.photos, remove: evidence.remove),
+                                  if (e.photos.length < 5)
+                                    OutlinedButton.icon(
+                                      onPressed: addPhoto,
+                                      icon: const Icon(
+                                        Icons.add_a_photo_outlined,
+                                      ),
+                                      label: Text(
+                                        e.busy
+                                            ? 'Đang tải ảnh…'
+                                            : 'Thêm ảnh minh chứng',
+                                      ),
+                                    ),
+                                  if (e.error != null)
+                                    CustomerNotice(e.error!, error: true),
+                                  if (incident) ...[
+                                    const SizedBox(height: 12),
+                                    OutlinedButton.icon(
+                                      onPressed: locating
+                                          ? null
+                                          : location.load,
+                                      icon: const Icon(Icons.my_location),
+                                      label: Text(
+                                        locating
+                                            ? 'Đang lấy vị trí…'
+                                            : gps == null
+                                            ? 'Đính kèm vị trí hiện tại'
+                                            : 'Cập nhật GPS đã đính kèm',
+                                      ),
+                                    ),
+                                    if (gps != null)
+                                      detailRow(
+                                        'GPS',
+                                        '${gps.latitude.toStringAsFixed(5)}, ${gps.longitude.toStringAsFixed(5)}',
+                                      ),
+                                    if (gpsError != null)
+                                      CustomerNotice(gpsError, error: true),
+                                  ],
+                                  if (!incident) ...[
+                                    sectionTitle('Số tiền yêu cầu'),
+                                    TextFormField(
+                                      controller: amount,
+                                      keyboardType: TextInputType.number,
+                                      decoration: InputDecoration(
+                                        labelText: 'Số tiền (VND)',
+                                        helperText:
+                                            'Lớn hơn 0 và không vượt ${money(d.order.summary.total)}',
+                                      ),
+                                      validator: (v) {
+                                        final n = int.tryParse(v ?? '');
+                                        return n == null ||
+                                                n <= 0 ||
+                                                n > d.order.summary.total
+                                            ? 'Số tiền chưa hợp lệ'
+                                            : null;
+                                      },
+                                    ),
+                                    sectionTitle('Tài khoản nhận hoàn tiền'),
+                                    BankAccountFields(
+                                      banks: d.banks,
+                                      selected: bank,
+                                      onBank: (v) => setState(() => bank = v),
+                                      number: account,
+                                      holder: holder,
+                                    ),
+                                    const CustomerNotice(
+                                      'Số tiền được hoàn phụ thuộc kết quả xét duyệt và tổng các khoản hoàn của đơn. Gửi yêu cầu chưa có nghĩa là đã được hoàn tiền.',
+                                    ),
+                                  ],
+                                ],
                               ),
-                            ],
-                          ],
-                        ),
-                      ),
-                    );
-                  },
-                ),
+                            ),
+                          if (a.error != null)
+                            CustomerNotice(a.error!, error: true),
+                          FilledButton(
+                            onPressed: !eligible || a.busy || e.busy || locating
+                                ? null
+                                : () => submit(d),
+                            child: Text(a.busy ? 'Đang gửi…' : 'Gửi yêu cầu'),
+                          ),
+                        ],
+                      ],
+                    ),
+                  ),
+                );
+              },
+            ),
           ),
         ),
       ),

@@ -38,7 +38,7 @@ class _CustomerRefundScreenState extends State<CustomerRefundScreen> {
       BlocProvider.value(value: action),
     ],
     child: Scaffold(
-      appBar: AppBar(title: const Text('Chi tiết yêu cầu')),
+      appBar: AppBar(title: const Text('Chi tiết hoàn tiền')),
       body: BlocBuilder<ResourceCubit<Refund>, ResourceState<Refund>>(
         builder: (context, s) => BlocBuilder<ActionCubit, ActionState>(
           builder: (context, a) => RefreshIndicator(
@@ -56,6 +56,8 @@ class _CustomerRefundScreenState extends State<CustomerRefundScreen> {
                 ],
                 if (a.error != null) CustomerNotice(a.error!, error: true),
                 if (s.data case final r?) ...[
+                  const DeliveryBanner(height: 104),
+                  const SizedBox(height: 20),
                   CustomerCard(
                     color: AppColors.peach,
                     child: Column(
@@ -63,6 +65,15 @@ class _CustomerRefundScreenState extends State<CustomerRefundScreen> {
                       children: [
                         StatusPill(r.status),
                         const SizedBox(height: 14),
+                        Text(
+                          money(r.amount),
+                          style: appText(
+                            size: 36,
+                            weight: FontWeight.w800,
+                            color: AppColors.orange,
+                          ),
+                        ),
+                        const SizedBox(height: 12),
                         Text(
                           r.orderCode,
                           style: appText(size: 22, weight: FontWeight.w700),
@@ -85,6 +96,32 @@ class _CustomerRefundScreenState extends State<CustomerRefundScreen> {
                           ),
                       ],
                     ),
+                  ),
+                  CustomerTimelineStep(
+                    title: 'Đã gửi yêu cầu',
+                    subtitle: dateLabel(r.created),
+                    done: true,
+                  ),
+                  CustomerTimelineStep(
+                    title: 'Xét duyệt',
+                    subtitle: r.decidedAt == null
+                        ? statusLabel(r.status)
+                        : dateLabel(r.decidedAt!),
+                    done: r.decidedAt != null,
+                    current: r.status == 'Requested',
+                  ),
+                  CustomerTimelineStep(
+                    title: r.status == 'Processed'
+                        ? 'Đã hoàn tiền'
+                        : 'Kết quả hoàn tiền',
+                    subtitle: r.processedAt == null
+                        ? (r.decision.isEmpty
+                              ? statusLabel(r.status)
+                              : r.decision)
+                        : dateLabel(r.processedAt!),
+                    done: r.status == 'Processed',
+                    current: r.status == 'Processing',
+                    last: true,
                   ),
                   sectionTitle('Nội dung yêu cầu'),
                   Text(r.reason),
@@ -160,6 +197,7 @@ class _CustomerRefundScreenState extends State<CustomerRefundScreen> {
                                     'Rút yêu cầu?',
                                     'Yêu cầu đang xét duyệt sẽ được rút lại.',
                                     action: 'Rút yêu cầu',
+                                    destructive: true,
                                   ) ||
                                   !context.mounted) {
                                 return;
