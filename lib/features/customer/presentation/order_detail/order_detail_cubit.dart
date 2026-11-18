@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../../../core/network/api_exception.dart';
@@ -17,9 +19,26 @@ class OrderDetailState {
 
 /// Chi tiết đơn: GET /customer/Orders/{id} + sự cố + hoàn tiền + đánh giá + tracking.
 class OrderDetailCubit extends Cubit<OrderDetailState> {
-  OrderDetailCubit(this.api, this.orderId) : super(const OrderDetailState());
+  /// [locations] = sự kiện `LocationUpdated` của SignalR (B12): đổi vị trí tài xế ngay, không đợi lần tải 60 giây.
+  OrderDetailCubit(this.api, this.orderId, {Stream<Map<String, Object?>>? locations}) : super(const OrderDetailState()) {
+    _locations = locations?.listen(_onLocation, onError: (_) {});
+  }
   final CustomerApi api;
   final int orderId;
+  StreamSubscription<Map<String, Object?>>? _locations;
+
+  @override
+  Future<void> close() {
+    _locations?.cancel();
+    return super.close();
+  }
+
+  void _onLocation(Map<String, Object?> p) {
+    final t = state.tracking;
+    final lat = p['latitude'], lng = p['longitude'];
+    if (t == null || p['orderId'] != orderId || lat is! num || lng is! num) return;
+    _emitWith(tracking: t.withDriver(GeoPoint(lat.toDouble(), lng.toDouble()), DateTime.tryParse('${p['at']}')?.toLocal()));
+  }
 
   Future<void> load({bool withTracking = true}) async {
     try {

@@ -13,6 +13,7 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(find.text('Tiếp tục'));
     await tester.pumpAndSettle();
+    // Không còn ô nhập số CCCD/GPLX (2026-11-18); thiếu ảnh thì không sang bước sau.
     expect(find.text('Số CCCD'), findsNothing);
     expect(find.text('Số giấy phép lái xe'), findsNothing);
     expect(find.text('Giấy tờ cá nhân'), findsOneWidget);

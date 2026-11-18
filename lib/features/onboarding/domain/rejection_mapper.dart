@@ -7,7 +7,7 @@ class RejectionSummary {
   /// Giấy tờ bị từ chối → lý do (phần sau dấu `:`).
   final Map<DocumentKind, String> documents;
 
-  /// Lý do không gắn với giấy tờ nào (số CCCD, biển số, ghi chú khác…), giữ nguyên chữ của Admin.
+  /// Lý do không gắn với giấy tờ nào (biển số, ghi chú khác…), giữ nguyên chữ của Admin.
   final List<String> others;
 
   /// Lý do khi mục thông tin xe (loại xe, biển số, tải trọng) bị từ chối; null nếu không bị từ chối.

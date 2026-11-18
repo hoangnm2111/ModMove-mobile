@@ -1,5 +1,3 @@
-import java.util.Properties
-
 plugins {
     id("com.android.application")
     // The Flutter Gradle Plugin must be applied after the Android and Kotlin Gradle plugins.
@@ -10,14 +8,6 @@ plugins {
 if (file("google-services.json").exists()) {
     apply(plugin = "com.google.gms.google-services")
 }
-
-val mapsSecrets = Properties().apply {
-    val secretsFile = rootProject.file("secrets.properties")
-    if (secretsFile.exists()) secretsFile.inputStream().use { load(it) }
-}
-val mapsApiKey = providers.environmentVariable("MAPS_API_KEY").orNull
-    ?.takeIf { it.isNotBlank() }
-    ?: mapsSecrets.getProperty("MAPS_API_KEY", "")
 
 android {
     namespace = "vn.modmove.modmove_mobile"
@@ -38,7 +28,6 @@ android {
         targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode
         versionName = flutter.versionName
-        manifestPlaceholders["MAPS_API_KEY"] = mapsApiKey.trim()
     }
 
     buildTypes {
@@ -58,6 +47,8 @@ kotlin {
 
 dependencies {
     coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.1.4")
+    // MainActivity must init the MapVina SDK with a key; same artifact mapvina_gl resolves.
+    implementation("io.github.mapvina:android-sdk-opengl:1.0.2")
 }
 
 flutter {
