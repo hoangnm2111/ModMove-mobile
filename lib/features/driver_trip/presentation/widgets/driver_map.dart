@@ -19,7 +19,9 @@ const _keyChannel = MethodChannel('vn.modmove/mapvina');
 const _emptyStyle = '{"version":8,"sources":{},"layers":[]}';
 const _orange = '#F66818';
 const _loadTimeout = Duration(seconds: 12); // the plugin has no "style failed" callback
-const _roadRefreshMeters = 150; // don't ask the server for a new road on every GPS poll
+// Each road costs one of MapVina Free's 200 routes/day, shared with fare estimates and customer ETA.
+// shortcut: refreshed per 1 km driven, not when the driver leaves the drawn road; add an off-route check if drivers complain.
+const _roadRefreshMeters = 1000;
 
 /// Bản đồ MapVina: vị trí tài xế, vòng nhận đơn và đường thật tới điểm lấy hàng.
 class DriverMap extends StatefulWidget {

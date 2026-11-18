@@ -82,20 +82,11 @@ class ApiClient {
     if (token != null) req.headers['Authorization'] = 'Bearer $token';
     req.headers['Accept'] = 'application/json';
 
-    http.Response res;
-    try {
-      res = await http.Response.fromStream(await _http.send(req).timeout(AppConfig.requestTimeout));
-    } on TimeoutException {
-      throw ApiException.network;
-    } on SocketException {
-      throw ApiException.network;
-    } on http.ClientException {
-      throw ApiException.network;
-    }
+    final res = await _network(_http.send(req).then(http.Response.fromStream));
 
     final isAuthCall = req.url.path.contains('/public/Auth/');
     if (res.statusCode == 401 && !retried && !isAuthCall && sessions.current != null) {
-      final newToken = await (_refreshing ??= _refresh().whenComplete(() => _refreshing = null));
+      final newToken = await _refreshOnce();
       if (newToken != null) return _execute(build, retried: true);
       onSessionExpired?.call();
     }
@@ -106,20 +97,59 @@ class ApiClient {
     throw ApiException.fromProblem(res.statusCode, data is Map<String, dynamic> ? data : null);
   }
 
+  /// Access token còn hạn ít nhất 60 giây; sắp hết thì refresh trước. SignalR cần hàm này vì khi
+  /// kết nối lại nó không đi qua [_execute] nên không tự refresh khi bị 401. `null` = hết phiên.
+  Future<String?> freshToken() async {
+    final token = sessions.current?.accessToken;
+    if (token == null || !_expiresSoon(token)) return token;
+    final next = await _refreshOnce();
+    if (next == null) onSessionExpired?.call();
+    return next;
+  }
+
+  /// Một lần refresh cho nhiều request đồng thời (refresh token chỉ dùng được một lần).
+  Future<String?> _refreshOnce() => _refreshing ??= _refresh().whenComplete(() => _refreshing = null);
+
+  /// `null` = server từ chối refresh token (hết phiên thật). Mất mạng, 429, 5xx: ném [ApiException]
+  /// và giữ phiên, để sóng yếu đúng lúc token hết hạn không đăng xuất người dùng.
   Future<String?> _refresh() async {
     final current = sessions.current;
     if (current == null) return null;
+    final res = await _network(
+      _http.post(_uri('/public/Auth/refresh'), headers: {'Content-Type': 'application/json'}, body: jsonEncode({'refreshToken': current.refreshToken})),
+    );
+    if (res.statusCode == 429 || res.statusCode >= 500) {
+      final body = _tryJson(utf8.decode(res.bodyBytes));
+      throw ApiException.fromProblem(res.statusCode, body is Map<String, dynamic> ? body : null);
+    }
+    if (res.statusCode != 200) return null;
+    final j = jsonDecode(utf8.decode(res.bodyBytes)) as Map<String, dynamic>;
+    final next = current.withTokens(j['accessToken'] as String, j['refreshToken'] as String);
+    await sessions.save(next);
+    return next.accessToken;
+  }
+
+  /// Timeout, mất mạng → [ApiException.network].
+  static Future<T> _network<T>(Future<T> request) async {
     try {
-      final res = await _http
-          .post(_uri('/public/Auth/refresh'), headers: {'Content-Type': 'application/json'}, body: jsonEncode({'refreshToken': current.refreshToken}))
-          .timeout(AppConfig.requestTimeout);
-      if (res.statusCode != 200) return null;
-      final j = jsonDecode(utf8.decode(res.bodyBytes)) as Map<String, dynamic>;
-      final next = current.withTokens(j['accessToken'] as String, j['refreshToken'] as String);
-      await sessions.save(next);
-      return next.accessToken;
+      return await request.timeout(AppConfig.requestTimeout);
+    } on TimeoutException {
+      throw ApiException.network;
+    } on SocketException {
+      throw ApiException.network;
+    } on http.ClientException {
+      throw ApiException.network;
+    }
+  }
+
+  /// Đọc `exp` của JWT; không đọc được thì để server quyết định.
+  static bool _expiresSoon(String jwt) {
+    try {
+      final payload = jsonDecode(utf8.decode(base64Url.decode(base64Url.normalize(jwt.split('.')[1])))) as Map;
+      final exp = DateTime.fromMillisecondsSinceEpoch((payload['exp'] as num).toInt() * 1000);
+      return DateTime.now().isAfter(exp.subtract(const Duration(seconds: 60)));
     } catch (_) {
-      return null;
+      return false;
     }
   }
 
