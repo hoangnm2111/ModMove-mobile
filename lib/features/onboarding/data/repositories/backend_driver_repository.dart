@@ -107,9 +107,11 @@ class BackendDriverRepository implements DriverProfileRepository, VehicleTypeCat
           };
 
     final urls = ((onboarding['documentUrls'] as List?) ?? const []).cast<String>();
-    final reasons = approval == ApprovalStatus.rejected ? ((onboarding['rejectionReasons'] as List?) ?? const []).cast<String>() : const <String>[];
-    // Chỉ giấy tờ Admin chọn từ chối mới bị đánh dấu phải làm lại; các giấy tờ còn lại giữ nguyên ảnh đã nộp.
-    final rejection = summarizeRejection(reasons);
+    final rejected = approval == ApprovalStatus.rejected;
+    final reasons = rejected ? ((onboarding['rejectionReasons'] as List?) ?? const []).cast<String>() : const <String>[];
+    final items = rejected ? ((onboarding['rejectedItems'] as List?) ?? const []).cast<Map<String, dynamic>>() : const <Map<String, dynamic>>[];
+    // Chỉ mục Admin chọn từ chối mới bị đánh dấu phải làm lại; các mục còn lại giữ nguyên ảnh đã nộp.
+    final rejection = items.isNotEmpty ? summarizeRejectedItems(items) : summarizeRejection(reasons);
     final kinds = DocumentKind.values;
     final documents = {
       for (var i = 0; i < kinds.length; i++)
@@ -161,7 +163,8 @@ class BackendDriverRepository implements DriverProfileRepository, VehicleTypeCat
       online: status['isOnline'] == true && approval == ApprovalStatus.approved,
       submittedAt: _date(onboarding['submittedAt']),
       reviewedAt: _date(onboarding['reviewedAt']),
-      rejectionReasons: reasons,
+      rejectionReasons: items.isNotEmpty ? [?rejection.vehicleInfo, ...rejection.others] : reasons,
+      vehicleRejected: rejection.vehicleInfo != null,
     );
   }
 
@@ -183,17 +186,39 @@ class BackendDriverRepository implements DriverProfileRepository, VehicleTypeCat
     final urls = [
       for (final kind in DocumentKind.values) application.documents[kind]?.remoteReference ?? '',
     ];
-    if (urls.any((u) => !u.startsWith('http'))) {
-      throw const ApplicationFailure('Một số ảnh chưa tải lên thành công. Vui lòng thử tải lại.');
+    final plate = (fields['plate'] ?? '').trim().toUpperCase();
+    final payload = num.parse((fields['payload'] ?? '0').replaceAll(',', '.'));
+    const notUploaded = ApplicationFailure('Một số ảnh chưa tải lên thành công. Vui lòng thử tải lại.');
+    if (application.status == ApprovalStatus.rejected) {
+      // Nộp lại chỉ phần bị từ chối; BE giữ nguyên các ảnh đã đạt.
+      final resubmitted = [
+        for (final kind in DocumentKind.values)
+          if (application.documents[kind]?.rejectionReason != null) application.documents[kind]!.remoteReference ?? '',
+      ];
+      if (resubmitted.any((u) => !u.startsWith('http'))) throw notUploaded;
+      await _call(
+        () => api.resubmitOnboarding(
+          items: [
+            for (final kind in DocumentKind.values)
+              if (application.documents[kind]?.rejectionReason != null)
+                {'key': itemKeyOf(kind), 'url': application.documents[kind]!.remoteReference!},
+          ],
+          vehicle: application.vehicleRejected
+              ? {'vehicleTypeId': typeId, 'licensePlate': plate, 'maxLoadWeightKg': payload}
+              : null,
+        ),
+      );
+    } else {
+      if (urls.any((u) => !u.startsWith('http'))) throw notUploaded;
+      await _call(
+        () => api.submitOnboarding(
+          vehicleTypeId: typeId,
+          licensePlate: plate,
+          maxLoadWeightKg: payload,
+          documentUrls: urls,
+        ),
+      );
     }
-    await _call(
-      () => api.submitOnboarding(
-        vehicleTypeId: typeId,
-        licensePlate: (fields['plate'] ?? '').trim().toUpperCase(),
-        maxLoadWeightKg: num.parse((fields['payload'] ?? '0').replaceAll(',', '.')),
-        documentUrls: urls,
-      ),
-    );
     final latest = await refresh();
     return ApplicationReceipt(latest.version, latest.submittedAt ?? DateTime.now());
   }
