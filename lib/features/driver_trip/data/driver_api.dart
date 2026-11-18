@@ -66,9 +66,16 @@ class DriverApi {
   /// Q12: xoá (vô hiệu hoá) tài khoản tài xế → 204; BE chặn khi còn đơn chạy, rút tiền chờ hoặc ví khác 0.
   Future<void> deleteAccount() => _api.delete('/driver/account');
 
-  Future<void> sendLocation(double latitude, double longitude) => _api.post(
+  /// B19–B21: `accuracy` (mét), `isMocked` và `recordedAt` (giờ đo của máy, gửi bù khi mất mạng) đều tùy chọn ở BE.
+  Future<void> sendLocation(double latitude, double longitude, {double? accuracy, bool isMocked = false, DateTime? recordedAt}) => _api.post(
     '/driver/location',
-    {'latitude': latitude, 'longitude': longitude},
+    {
+      'latitude': latitude,
+      'longitude': longitude,
+      'accuracy': ?accuracy,
+      'isMocked': isMocked,
+      'recordedAt': ?recordedAt?.toUtc().toIso8601String(),
+    },
   );
 
   /// Đường lái xe thật từ [from] tới [to] (BE gọi MapVina). `null` khi BE không có hình đường.

@@ -4,6 +4,9 @@
     <!-- Tài xế gửi vị trí GPS lên BE (POST api/driver/location) để ghép đơn. -->
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
+    <!-- Online: geolocator chạy foreground service loại location để giữ GPS khi app ra nền (B1). Không xin ACCESS_BACKGROUND_LOCATION. -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_LOCATION" />
     <application
         android:label="ModMove"
         android:name="${applicationName}"

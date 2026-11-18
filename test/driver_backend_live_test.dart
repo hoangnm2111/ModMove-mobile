@@ -16,8 +16,11 @@ import 'package:modmove_mobile/features/onboarding/data/repositories/backend_dri
 const _live = String.fromEnvironment('LIVE_API');
 
 class _Hcm implements DriverLocationSource {
+  GpsSample get _sample => GpsSample(const GeoPoint(10.7769, 106.7009), at: DateTime.now());
   @override
-  Future<GeoPoint?> current() async => const GeoPoint(10.7769, 106.7009);
+  Future<GpsSample?> current() async => _sample;
+  @override
+  Stream<GpsSample> watch() => Stream.value(_sample);
 }
 
 Future<ApiClient> _login(String email) async {

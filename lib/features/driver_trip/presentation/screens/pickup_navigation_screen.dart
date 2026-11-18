@@ -18,7 +18,7 @@ class PickupNavigationScreen extends StatelessWidget {
     return Scaffold(
       appBar: AppHeader(
         'Đến điểm lấy hàng',
-        onHelp: () => showTripSimulation(context),
+        onHelp: tripSimulationAction(context),
       ),
       body: LayoutBuilder(
         builder: (context, size) => SingleChildScrollView(

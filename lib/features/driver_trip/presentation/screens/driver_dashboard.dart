@@ -40,7 +40,7 @@ class _DriverDashboardState extends State<DriverDashboard> {
         listener: (_, _) => _showOffer(),
         child: DriverHomeScreen(
           onActiveTrip: () => Navigator.pushNamed(context, '/active-trip'),
-          onSimulation: () => showTripSimulation(context),
+          onSimulation: tripSimulationAction(context),
           onJob: (job) {
             final bloc = context.read<JobOfferBloc>();
             if (bloc.state.offer?.job.id == job.id) {

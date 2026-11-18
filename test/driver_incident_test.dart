@@ -19,8 +19,11 @@ import 'package:modmove_mobile/features/driver_trip/presentation/widgets/trip_co
 import 'driver_backend_test.dart' show FakeBackend;
 
 class _Here implements DriverLocationSource {
+  GpsSample get _sample => GpsSample(const GeoPoint(10.7769, 106.7009), at: DateTime.now());
   @override
-  Future<GeoPoint?> current() async => const GeoPoint(10.7769, 106.7009);
+  Future<GpsSample?> current() async => _sample;
+  @override
+  Stream<GpsSample> watch() => Stream.value(_sample);
 }
 
 class _NoPhotos implements CargoPhotoRepository {
