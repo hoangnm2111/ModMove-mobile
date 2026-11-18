@@ -8,11 +8,13 @@ App tài xế dùng bản đồ thật của MapVina qua package `mapvina_gl` v�
 Lấy key ở [account.mapvina.com](https://account.mapvina.com). Không commit key vào repo.
 
 ```powershell
-flutter run --dart-define=MAPVINA_KEY=<key của nhóm> --dart-define=DRIVER_FAKE_LAT=10.7769 --dart-define=DRIVER_FAKE_LNG=106.7009
+flutter run --dart-define=MAPVINA_KEY=<key của nhóm>
 ```
 
 - Không truyền `MAPVINA_KEY` thì app dùng `public_key` (hạn mức thấp, chỉ để thử).
-- Emulator mặc định ở Mỹ, ngoài vùng dữ liệu nên bản đồ trắng: luôn đặt `DRIVER_FAKE_LAT/LNG` ở TP.HCM.
+- Emulator mặc định ở Mỹ, ngoài vùng dữ liệu nên bản đồ trắng và ngoài bán kính ghép đơn: đặt vị trí ở TP.HCM bằng
+  Extended Controls → Location (chọn điểm rồi Set location, hoặc Routes → Play route để xe chạy theo tuyến).
+  App không còn toạ độ cố định `DRIVER_FAKE_LAT/LNG`.
 - Build release cũng truyền `--dart-define=MAPVINA_KEY=...`.
 
 ## Đường tới điểm lấy hàng

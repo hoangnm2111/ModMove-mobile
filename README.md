@@ -73,6 +73,17 @@ Read [the pickup walkthrough](docs/driver-pickup-mock.md) for demo scenarios,
 architecture and tests. The trip API, GPS, routing and
 uploads are mocked; the session resets on app restart. Screenshots stay ignored.
 
+## Driver GPS (backend thật)
+
+- Online: foreground service của `geolocator` giữ GPS khi app ra nền; có thông báo thường trực
+  "ModMove đang chia sẻ vị trí khi bạn Online". Offline thì tắt thông báo và dừng gửi.
+  Manifest khai báo `FOREGROUND_SERVICE`, `FOREGROUND_SERVICE_LOCATION`, `POST_NOTIFICATIONS`;
+  không xin `ACCESS_BACKGROUND_LOCATION`.
+- **B18: chỉ phát hành APK.** Muốn lên Google Play phải khai báo loại foreground service `location`
+  và nộp video minh họa trong Play Console.
+- Máy ảo: đặt vị trí bằng Extended Controls → Location. Không có `DRIVER_FAKE_LAT/LNG` hay menu mô phỏng GPS;
+  `USE_MOCK_DRIVER` vẫn dùng được (không gọi backend). Chi tiết: [docs/driver-pickup-mock.md](docs/driver-pickup-mock.md).
+
 ## Driver profile mock API
 
 Driver onboarding now supports a complete interactive demo: register, upload

@@ -23,7 +23,7 @@ class PickupApprovalScreen extends StatelessWidget {
     return Scaffold(
       appBar: AppHeader(
         'Xác nhận hàng',
-        onHelp: () => showTripSimulation(context),
+        onHelp: tripSimulationAction(context),
       ),
       body: ListView(
         padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),

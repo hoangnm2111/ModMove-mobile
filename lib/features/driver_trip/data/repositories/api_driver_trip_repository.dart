@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:collection';
 
 import '../../../../core/config/app_config.dart';
 import '../../../../core/network/api_exception.dart';
@@ -44,9 +45,8 @@ class ApiDriverTripRepository implements DriverTripRepository, TripSimulator {
   final _dropoffNotified = <String>{};
 
   DriverAccess _access;
-  bool _signedIn = false, _online = false, _gps = true, _foreground = true;
-  bool _closed = false, _gpsOff = false;
-  GeoPoint? _override;
+  bool _signedIn = false, _gps = true, _foreground = true, _closed = false;
+  bool __online = false;
   Future<void>? _running;
   int _deposit = 0, _earnings = 0, _pings = 0, _required = 200000, _missing = 0;
   ShiftSummary _shift = const ShiftSummary();
@@ -58,6 +58,18 @@ class ApiDriverTripRepository implements DriverTripRepository, TripSimulator {
   String? _notice, _vehicleName;
   Timer? _timer;
   DateTime? _shiftAt;
+
+  /// Luồng GPS đang nghe và hàng đợi gửi (cũ trước). Hàng đợi chỉ nằm trong bộ nhớ: tắt app là mất.
+  StreamSubscription<GpsSample>? _watch;
+  final _queue = Queue<GpsSample>();
+  static const _maxQueued = 120, _maxAge = Duration(minutes: 10);
+
+  /// Online ⇔ đang nghe GPS (và có thông báo của foreground service); mọi chỗ đổi trạng thái đều qua setter này.
+  bool get _online => __online;
+  set _online(bool value) {
+    __online = value;
+    _syncWatch();
+  }
 
   @override
   DateTime get now => _clock();
@@ -111,8 +123,6 @@ class ApiDriverTripRepository implements DriverTripRepository, TripSimulator {
     _fix = null;
     _offer = null;
     _trip = null;
-    _override =
-        null; // chuyến kết thúc: bỏ vị trí giả lập, quay về GPS thật (hoặc DRIVER_FAKE_LAT/LNG)
     _outcome = null;
     _jobs = const [];
     _deposit = _earnings = _pings = _missing = 0;
@@ -130,21 +140,54 @@ class ApiDriverTripRepository implements DriverTripRepository, TripSimulator {
 
   void _startTimer() {
     _timer?.cancel();
-    if (!_signedIn || !_foreground || _closed) return;
+    if (!_signedIn || _closed || !(_foreground || _online)) return;
     _timer = Timer.periodic(pollInterval, (_) => unawaited(_sync()));
   }
 
+  /// Online thì vẫn đồng bộ khi ra nền (foreground service giữ tiến trình); Offline ra nền thì dừng hẳn.
   @override
   void setForeground(bool foreground) {
     _foreground = foreground;
     if (foreground) {
       _startTimer();
       if (_signedIn) unawaited(_sync());
-    } else {
-      // Không có quyền định vị nền: tạm dừng gửi GPS khi app ra nền.
+    } else if (!_online) {
       _timer?.cancel();
       _timer = null;
     }
+  }
+
+  void _syncWatch() {
+    if (_signedIn && __online && !_closed) {
+      // Lỗi luồng (tắt GPS, mất quyền): mỗi vòng đồng bộ thử nghe lại.
+      _watch ??= _location.watch().listen(_onSample, onError: (_) => _onWatchError());
+      return;
+    }
+    _watch?.cancel();
+    _watch = null;
+    _queue.clear();
+    if (!_foreground) {
+      _timer?.cancel();
+      _timer = null;
+    }
+  }
+
+  void _onSample(GpsSample sample) {
+    _gps = true;
+    _fix = GpsFix(sample.point, sample.at);
+    _queue.addLast(sample);
+    while (_queue.length > _maxQueued) {
+      _queue.removeFirst();
+    }
+    _publish();
+  }
+
+  void _onWatchError() {
+    _watch?.cancel();
+    _watch = null;
+    _gps = false;
+    _fix = null;
+    _publish();
   }
 
   @override
@@ -162,6 +205,7 @@ class ApiDriverTripRepository implements DriverTripRepository, TripSimulator {
   Future<void> close() async {
     _closed = true;
     _timer?.cancel();
+    _syncWatch();
     await _updates.close();
   }
 
@@ -188,7 +232,14 @@ class ApiDriverTripRepository implements DriverTripRepository, TripSimulator {
       final status = await api.status();
       _applyStatus(status);
 
-      if (_online && _gps) await _pushLocation();
+      if (_online) {
+        try {
+          await _pushLocation();
+        } catch (error) {
+          // Gửi GPS lỗi (mạng, 5xx) không làm hỏng cả vòng: điểm còn trong hàng đợi, vòng sau gửi bù.
+          if (error is ApiException && error.code == 'ACCOUNT_INACTIVE') rethrow;
+        }
+      }
       await _loadTrip(
         _trip?.job.id ?? (status['activeOrderId'] as num?)?.toInt().toString(),
       );
@@ -212,32 +263,53 @@ class ApiDriverTripRepository implements DriverTripRepository, TripSimulator {
   }
 
   void _applyStatus(Map<String, dynamic> j) {
-    _online = j['isOnline'] == true;
     _deposit = _money(j['depositBalance']);
     _earnings = _money(j['earningsBalance']);
     _access = DriverAccess(
       approved: j['approvalStatus'] == 'Approved',
       active: true,
     );
-    if (!_access.eligible) _online = false;
+    _online = j['isOnline'] == true && _access.eligible;
   }
 
+  /// Gửi hàng đợi theo thứ tự cũ trước. Lỗi mạng/5xx: dừng và giữ lại (ném lên để vòng sau gửi bù);
+  /// 400/422: bỏ điểm đó, không thử lại. 422 MOCK_LOCATION (B20): tắt Online.
   Future<void> _pushLocation() async {
-    if (_gpsOff) {
-      _gps = false;
-      _fix = null;
-      return;
+    final cutoff = now.subtract(_maxAge);
+    _queue.removeWhere((s) => s.at.isBefore(cutoff));
+    while (_queue.isNotEmpty) {
+      final sample = _queue.first;
+      try {
+        await api.sendLocation(
+          sample.point.latitude,
+          sample.point.longitude,
+          accuracy: sample.accuracy,
+          isMocked: sample.isMocked,
+          recordedAt: sample.at,
+        );
+        _pings++;
+      } on ApiException catch (error) {
+        if (error.status != 400 && error.status != 422) rethrow;
+        if (error.code == 'MOCK_LOCATION') await _blockMockLocation();
+      }
+      if (_queue.isNotEmpty && identical(_queue.first, sample)) _queue.removeFirst();
     }
-    final point = _override ?? await _location.current();
-    if (point == null) {
-      _gps = false;
-      _fix = null;
-      return;
-    }
-    _gps = true;
-    await api.sendLocation(point.latitude, point.longitude);
-    _fix = GpsFix(point, now);
-    _pings++;
+  }
+
+  Future<void> _blockMockLocation() async {
+    _notice = 'Tắt ứng dụng giả lập vị trí để nhận đơn';
+    _offer = null;
+    _jobs = const [];
+    _online = false;
+    try {
+      // BE vẫn ghi Online: báo Offline để vòng sau không bật lại (đang có chuyến thì BE từ chối, bỏ qua).
+      final gateway = availabilityGateway;
+      if (gateway != null) {
+        await gateway(false);
+      } else {
+        await api.setOnline(false);
+      }
+    } catch (_) {}
   }
 
   Future<void> _loadJobs() async {
@@ -272,8 +344,6 @@ class ApiDriverTripRepository implements DriverTripRepository, TripSimulator {
       if (outcome != null) {
         _outcome = outcome;
         _trip = null;
-        _override =
-            null; // chuyến kết thúc: bỏ vị trí giả lập, quay về GPS thật (hoặc DRIVER_FAKE_LAT/LNG)
         _notice = outcome.title;
         return;
       }
@@ -287,14 +357,10 @@ class ApiDriverTripRepository implements DriverTripRepository, TripSimulator {
         _notice = 'Chuyến #${previous.job.label} đã bị hủy.';
       } else {
         _trip = null;
-        _override =
-            null; // chuyến kết thúc: bỏ vị trí giả lập, quay về GPS thật (hoặc DRIVER_FAKE_LAT/LNG)
         _notice = 'Chuyến #${previous.job.label} đã kết thúc.';
       }
     } catch (_) {
       _trip = null;
-      _override =
-          null; // chuyến kết thúc: bỏ vị trí giả lập, quay về GPS thật (hoặc DRIVER_FAKE_LAT/LNG)
     }
   }
 
@@ -462,13 +528,13 @@ class ApiDriverTripRepository implements DriverTripRepository, TripSimulator {
       );
     }
     if (online) {
-      final point = _gpsOff ? null : (_override ?? await _location.current());
-      if (point == null) {
+      final sample = await _location.current();
+      if (sample == null) {
         _gps = false;
         _publish();
         throw const TripFailure('Bật quyền vị trí trước khi nhận đơn.');
       }
-      _gps = true;
+      _onSample(sample);
     }
     await _call(() async {
       final gateway = availabilityGateway;
@@ -709,8 +775,6 @@ class ApiDriverTripRepository implements DriverTripRepository, TripSimulator {
     final url = await _call(() => api.upload(proof.name, proof.bytes));
     await _call(() => api.deliver(trip.job.id, url));
     _trip = null;
-    _override =
-        null; // chuyến kết thúc: bỏ vị trí giả lập, quay về GPS thật (hoặc DRIVER_FAKE_LAT/LNG)
     _dropoffNotified.remove(trip.job.id);
     _shiftAt = null;
     _notice = 'Đã giao hàng thành công chuyến #${trip.job.label}.';
@@ -718,51 +782,15 @@ class ApiDriverTripRepository implements DriverTripRepository, TripSimulator {
     unawaited(_sync());
   }
 
-  /* ------------------------------------------------------------ giả lập vị trí (máy ảo) */
+  /* ------------------------------------------------------------ không có mô phỏng GPS (B20) */
 
-  /// Máy ảo không di chuyển được: các kịch bản này đặt vị trí GPS gửi lên BE
-  /// (POST api/driver/location). Mọi nghiệp vụ khác vẫn là thật.
+  /// BE thật không có kịch bản mô phỏng; máy ảo test bằng Extended Controls → Location.
   @override
-  Set<TripSimulation> get supported => {
-    TripSimulation.nearPickup,
-    TripSimulation.advanceRoute,
-    TripSimulation.nearDropoff,
-    TripSimulation.gpsLost,
-    TripSimulation.gpsRestored,
-  };
+  Set<TripSimulation> get supported => const {};
 
   @override
   Future<void> simulate(TripSimulation action) async {
-    switch (action) {
-      case TripSimulation.nearPickup:
-        _override = _requireTrip().job.pickupPoint;
-      case TripSimulation.nearDropoff:
-        _override = _requireTrip().job.dropoffPoint;
-      case TripSimulation.advanceRoute:
-        final trip = _requireTrip();
-        final target = trip.stage == TripStage.inTransit
-            ? trip.job.dropoffPoint
-            : trip.job.pickupPoint;
-        final from =
-            _override ?? _fix?.point ?? await _location.current() ?? target;
-        final distance = from.distanceTo(target);
-        final fraction = distance <= 300 ? 1.0 : 300 / distance;
-        _override = GeoPoint(
-          from.latitude + (target.latitude - from.latitude) * fraction,
-          from.longitude + (target.longitude - from.longitude) * fraction,
-        );
-      case TripSimulation.gpsLost:
-        _gpsOff = true;
-        _gps = false;
-        _fix = null;
-      case TripSimulation.gpsRestored:
-        _gpsOff = false;
-        _gps = true;
-      default:
-        throw const TripFailure('Kịch bản này chỉ có ở bản mô phỏng.');
-    }
-    if (_online && !_gpsOff) await _call(_pushLocation);
-    _publish();
+    throw const TripFailure('Kịch bản này chỉ có ở bản mô phỏng.');
   }
 
   /* ------------------------------------------------------------ ánh xạ JSON → model */

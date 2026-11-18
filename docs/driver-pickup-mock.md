@@ -141,3 +141,15 @@ Tests mới còn kiểm tra hồ sơ đã duyệt sau restart, camera commands/g
 và thao tác native trên bản đồ với key thật chưa được xác minh vì chưa có key.
 Luồng hai ảnh, retry, khách từ chối/duyệt và responsive được kiểm tra tự động.
 Kiểm tra Android trước đó đã xác minh camera → quay về app → upload mock (`1/2`).
+
+## GPS khi chạy backend thật
+
+Phần trên là bản mock (`USE_MOCK_DRIVER=true`, không gọi backend). Với backend thật:
+
+- Không còn menu mô phỏng GPS và tọa độ cố định `DRIVER_FAKE_LAT/LNG`. Test trên máy ảo bằng
+  Extended Controls → Location: đặt một điểm, hoặc Routes → Play route để xe chạy theo tuyến.
+- Online: app nghe luồng GPS mỗi 5 giây (không dùng `distanceFilter`, xe đứng yên vẫn có điểm mới)
+  và gửi lên `POST api/driver/location` kèm `accuracy`, `isMocked`, `recordedAt`.
+- Mất mạng: điểm được giữ trong bộ nhớ (tối đa 120 điểm, bỏ điểm cũ hơn 10 phút) và gửi bù theo thứ tự
+  khi có mạng. Tắt app thì mất hàng đợi.
+- Backend trả 422 `MOCK_LOCATION` thì app tắt Online và báo "Tắt ứng dụng giả lập vị trí để nhận đơn".
