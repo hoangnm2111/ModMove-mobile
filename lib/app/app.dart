@@ -222,13 +222,16 @@ class ModMoveApp extends StatelessWidget {
           ),
           BlocProvider(create: (c) => driverController ?? _createDriver(c)),
         ],
-        child: RepositoryProvider<RealtimeBridge>(
-          create: (c) => RealtimeBridge(
-            realtimeSource ?? defaultRealtimeSource(AppConfig.apiBaseUrl),
-            c.read<NotificationCubit>(),
-            c.read<ApiClient>().sessions,
+        child: RepositoryProvider<RealtimeSource>(
+          create: (_) => realtimeSource ?? defaultRealtimeSource(AppConfig.apiBaseUrl),
+          child: RepositoryProvider<RealtimeBridge>(
+            create: (c) => RealtimeBridge(
+              c.read<RealtimeSource>(),
+              c.read<NotificationCubit>(),
+              c.read<ApiClient>().sessions,
+            ),
+            child: RealtimeHost(child: _app(context)),
           ),
-          child: RealtimeHost(child: _app(context)),
         ),
       ),
     );
