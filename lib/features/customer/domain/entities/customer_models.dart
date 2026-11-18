@@ -284,6 +284,9 @@ class OrderTracking {
   final String? etaTarget; // Pickup | Handover | Dropoff
   final int? etaMinutes;
 
+  /// Vị trí tài xế mới từ `LocationUpdated`; điểm lấy/giao và ETA giữ nguyên.
+  OrderTracking withDriver(GeoPoint driver, DateTime? at) => OrderTracking(orderStatus, pickup, dropoff, driver, at ?? driverAt, false, etaTarget, etaMinutes);
+
   factory OrderTracking.fromJson(Map<String, dynamic> j) {
     final d = j['driver'] as Map<String, dynamic>?;
     final eta = j['eta'] as Map<String, dynamic>?;

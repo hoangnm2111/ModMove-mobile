@@ -17,10 +17,20 @@ import 'order_detail_cubit.dart';
 import '../../../../core/widgets/phone_button.dart';
 import '../../../../core/network/api_exception.dart';
 import '../../../../core/notifications/notification_cubit.dart';
+import '../../../../core/notifications/realtime_source.dart';
 import '../../../../core/widgets/notice_banner.dart';
 import 'order_sheets.dart';
 
 /// Chi tiết đơn của khách. [openPayment] = true khi vừa đặt đơn PayOS (mở thanh toán ngay).
+/// Nguồn thời gian thực của app; `null` khi màn dựng riêng (test) không có.
+RealtimeSource? _realtimeOf(BuildContext context) {
+  try {
+    return context.read<RealtimeSource>();
+  } on ProviderNotFoundException {
+    return null;
+  }
+}
+
 class OrderDetailScreen extends StatelessWidget {
   const OrderDetailScreen({
     super.key,
@@ -34,8 +44,11 @@ class OrderDetailScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => BlocProvider(
-    create: (_) =>
-        OrderDetailCubit(context.read<CustomerApi>(), orderId)..load(),
+    create: (_) => OrderDetailCubit(
+      context.read<CustomerApi>(),
+      orderId,
+      locations: _realtimeOf(context)?.locations,
+    )..load(),
     child: _DetailView(openPayment: openPayment, onReorder: onReorder),
   );
 }
@@ -55,6 +68,7 @@ class _DetailViewState extends State<_DetailView> with WidgetsBindingObserver {
   bool _paymentOpened = false;
   StreamSubscription<AppNotice>? _pushed;
   late final int _orderId;
+  RealtimeSource? _realtime;
 
   /// Lúc tài xế báo "đã đến điểm giao" (null nếu chưa); chỉ có ý nghĩa khi đơn còn đang giao.
   DateTime? _dropoffArrivedAt;
@@ -66,6 +80,8 @@ class _DetailViewState extends State<_DetailView> with WidgetsBindingObserver {
     final cubit = context.read<OrderDetailCubit>();
     _orderId = cubit.orderId;
     openOrderId.value = _orderId;
+    _realtime = _realtimeOf(context);
+    unawaited(_realtime?.joinOrder(_orderId) ?? Future<void>.value());
     // Có thông báo mới của đúng đơn này (SignalR) → tải lại ngay, không đợi chu kỳ.
     NotificationCubit? notices;
     try {
@@ -109,6 +125,7 @@ class _DetailViewState extends State<_DetailView> with WidgetsBindingObserver {
     _refresh?.cancel();
     _trackRefresh?.cancel();
     _pushed?.cancel();
+    _realtime?.leaveOrder(_orderId);
     if (openOrderId.value == _orderId) openOrderId.value = null;
     super.dispose();
   }

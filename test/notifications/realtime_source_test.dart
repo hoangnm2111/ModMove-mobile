@@ -16,6 +16,14 @@ class FakeRealtimeSource implements RealtimeSource {
   @override
   Stream<Map<String, Object?>> get notifications => _controller.stream;
 
+  @override
+  Stream<Map<String, Object?>> get locations => const Stream.empty();
+  final joined = <int>[];
+  @override
+  Future<void> joinOrder(int orderId) async => joined.add(orderId);
+  @override
+  void leaveOrder(int orderId) => joined.remove(orderId);
+
   Future<String?> Function()? _token;
 
   /// Giả lập SignalR kết nối lại: gọi token() lần nữa như `accessTokenFactory`.
