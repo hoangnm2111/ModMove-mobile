@@ -555,18 +555,40 @@ void main() {
     });
 
     test('mất mạng 3 vòng rồi có lại: gửi bù 4 điểm đúng thứ tự (MB-4)', () async {
-      final lab = await _Lab.start(clock: clock);
+      final lab = await _Lab.start(clock: () => t0.add(const Duration(minutes: 5)));
       lab.location = (_) => throw http.ClientException('mất mạng');
       for (var i = 1; i <= 3; i++) {
-        lab.gps.emit(at(i), at: t0.add(Duration(seconds: i * 5)));
+        lab.gps.emit(at(i), at: t0.add(Duration(minutes: i)));
         await lab.repo.refresh();
       }
       expect(lab.delivered, isEmpty);
       lab.location = null;
-      lab.gps.emit(at(4), at: t0.add(const Duration(seconds: 20)));
+      lab.gps.emit(at(4), at: t0.add(const Duration(minutes: 4)));
       await lab.repo.refresh();
       expect([for (final d in lab.delivered) d['latitude']], [for (var i = 1; i <= 4; i++) at(i).latitude]);
-      expect(lab.delivered.first['recordedAt'], '2026-11-18T03:00:05.000Z');
+      expect(lab.delivered.first['recordedAt'], '2026-11-18T03:01:00.000Z');
+    });
+
+    test('gửi bù dày chỉ giữ 1 điểm mỗi phút + điểm mới nhất (B21)', () async {
+      final lab = await _Lab.start(clock: () => t0.add(const Duration(minutes: 4)));
+      for (var i = 0; i <= 37; i++) {
+        lab.gps.emit(at(i), at: t0.add(Duration(seconds: i * 5)));
+      }
+      await lab.repo.refresh();
+      expect([for (final d in lab.delivered) d['latitude']], [at(0).latitude, at(12).latitude, at(24).latitude, at(36).latitude, at(37).latitude]);
+    });
+
+    test('điểm đến trong lúc đang gửi chờ vòng sau: vòng đồng bộ vẫn tải chuyến và đơn', () async {
+      final lab = await _Lab.start();
+      lab.location = (r) async {
+        if (lab.calls < 50) lab.gps.emit(at(lab.calls), at: DateTime.now()); // mạng chậm: mỗi lần gửi lại có điểm mới
+        return http.Response('', 204);
+      };
+      lab.gps.emit(at(0), at: DateTime.now());
+      lab.backend.requests.clear();
+      await lab.repo.refresh();
+      expect(lab.calls, 1);
+      expect(lab.backend.requests, containsAll(['get /driver/trips/active', 'get /driver/matching/orders']));
     });
 
     test('điểm cũ hơn 10 phút bị bỏ, không gửi bù (MB-4)', () async {
@@ -590,21 +612,36 @@ void main() {
       }
       lab.location = null;
       await lab.repo.refresh();
-      expect(lab.delivered, hasLength(120));
-      expect(lab.delivered.first['latitude'], at(6).latitude);
+      // 120 điểm mới nhất (at(6)…at(125)), cùng một lúc nên gửi bù chỉ còn điểm cũ nhất và mới nhất.
+      expect([for (final d in lab.delivered) d['latitude']], [at(6).latitude, at(125).latitude]);
     });
 
-    test('BE trả 400 thì bỏ điểm đó, không thử lại (MB-4)', () async {
+    test('BE trả 400: gửi lại 1 lần không kèm recordedAt, vẫn lỗi thì bỏ điểm (MB-4)', () async {
       final lab = await _Lab.start();
       lab.location = (_) async => _problem(400, 'VALIDATION');
       lab.gps.emit(at(1), at: DateTime.now());
       await lab.repo.refresh();
-      expect(lab.calls, 1);
+      expect(lab.calls, 2);
+      await lab.repo.refresh();
+      expect(lab.calls, 2); // không thử lại ở vòng sau
       lab.location = null;
       lab.gps.emit(at(2), at: DateTime.now());
       await lab.repo.refresh();
-      expect(lab.calls, 2);
       expect([for (final d in lab.delivered) d['latitude']], [at(2).latitude]);
+    });
+
+    test('đồng hồ máy chạy nhanh (BE từ chối recordedAt): điểm mới nhất vẫn tới BE theo giờ server', () async {
+      final lab = await _Lab.start();
+      lab.location = (r) async {
+        final body = (jsonDecode(r.body) as Map).cast<String, Object?>();
+        if (body.containsKey('recordedAt')) return _problem(400, 'VALIDATION');
+        lab.delivered.add(body);
+        return http.Response('', 204);
+      };
+      lab.gps.emit(at(1), at: DateTime.now().add(const Duration(minutes: 1)));
+      await lab.repo.refresh();
+      expect(lab.delivered.single['latitude'], at(1).latitude);
+      expect(lab.delivered.single.containsKey('recordedAt'), isFalse);
     });
 
     test('422 MOCK_LOCATION tắt Online và báo tắt ứng dụng giả lập (MB-5)', () async {

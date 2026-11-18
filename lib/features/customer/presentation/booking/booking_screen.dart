@@ -421,11 +421,7 @@ class _VehicleCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final v = vehicle;
-    final image = v.maxLoadWeightKg <= 600
-        ? 'pickup'
-        : v.maxLoadWeightKg <= 1200
-        ? 'van'
-        : 'truck-orange';
+    final image = v.image;
     return Opacity(
       opacity: fits ? 1 : 0.5,
       child: AppCard(

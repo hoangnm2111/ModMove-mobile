@@ -4,7 +4,7 @@ import 'package:flutter/material.dart';
 import '../../../../core/widgets/brand_logo.dart';
 import 'package:modmove_mobile/core/theme/app_theme.dart';
 import 'package:modmove_mobile/core/widgets/app_widgets.dart';
-import '../models/vehicle_option.dart';
+import '../models/fare_display.dart';
 
 class HomeScreen extends StatelessWidget {
   const HomeScreen({
@@ -18,16 +18,15 @@ class HomeScreen extends StatelessWidget {
   /// "Giao hàng ngay": đăng nhập khách rồi đặt xe. Không truyền → mở bảng giá như cũ.
   final VoidCallback? onDeliver;
 
-  void _fare(
-    BuildContext context, [
-    VehicleOption vehicle = VehicleOption.truck,
-  ]) => Navigator.pushNamed(context, '/pricing', arguments: vehicle);
+  void _fare(BuildContext context, [int? vehicleId]) =>
+      Navigator.pushNamed(context, '/pricing', arguments: vehicleId);
 
   @override
   Widget build(BuildContext context) {
-    final truckFare = context.watch<HomeController>().fareFor(
-      VehicleOption.truck.type,
-    );
+    final fares = context.watch<HomeController>().state;
+    final cheapest = (fares == null || fares.isEmpty)
+        ? null
+        : fares.reduce((a, b) => b.baseFare < a.baseFare ? b : a);
     return Scaffold(
       bottomNavigationBar: AppBottomNav(
         selected: 0,
@@ -148,39 +147,41 @@ class HomeScreen extends StatelessWidget {
             const SizedBox(height: 21),
             const SectionTitle('Chọn xe phù hợp'),
             const SizedBox(height: 10),
-            Row(
-              children: [
-                for (final vehicle in VehicleOption.values) ...[
-                  if (vehicle != VehicleOption.pickup) const SizedBox(width: 8),
-                  Expanded(
-                    child: AppCard(
-                      padding: const EdgeInsets.fromLTRB(8, 9, 8, 10),
-                      onTap: () => _fare(context, vehicle),
-                      child: Column(
-                        children: [
-                          VehicleImage(vehicle.asset, height: 64),
-                          const SizedBox(height: 5),
-                          Row(
+            if (fares == null)
+              const Center(child: CircularProgressIndicator())
+            else if (fares.isEmpty)
+              FaresUnavailable(onRetry: context.read<HomeController>().load)
+            else
+              SingleChildScrollView(
+                scrollDirection: Axis.horizontal,
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    for (final fare in fares) ...[
+                      if (fare != fares.first) const SizedBox(width: 8),
+                      SizedBox(
+                        width: 120,
+                        child: AppCard(
+                          padding: const EdgeInsets.fromLTRB(8, 9, 8, 10),
+                          onTap: () => _fare(context, fare.id),
+                          child: Column(
                             children: [
-                              Expanded(
-                                child: Text(
-                                  vehicle.label,
-                                  style: appText(
-                                    size: 15,
-                                    weight: FontWeight.w700,
-                                  ),
-                                ),
+                              VehicleImage(fare.image, height: 64),
+                              const SizedBox(height: 5),
+                              Text(
+                                fare.name,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: appText(size: 13, weight: FontWeight.w700),
                               ),
-                              const AppIcon('chevron-right', size: 13),
                             ],
                           ),
-                        ],
+                        ),
                       ),
-                    ),
-                  ),
-                ],
-              ],
-            ),
+                    ],
+                  ],
+                ),
+              ),
             const SizedBox(height: 13),
             AppCard(
               padding: const EdgeInsets.fromLTRB(13, 12, 13, 0),
@@ -202,7 +203,7 @@ class HomeScreen extends StatelessWidget {
                           borderRadius: BorderRadius.circular(7),
                         ),
                         child: Text(
-                          'Giá minh họa',
+                          'Giá hiện hành',
                           style: appText(
                             size: 10,
                             weight: FontWeight.w600,
@@ -215,34 +216,40 @@ class HomeScreen extends StatelessWidget {
                     ],
                   ),
                   const SizedBox(height: 15),
-                  Row(
-                    children: [
-                      Container(
-                        width: 45,
-                        height: 38,
-                        decoration: BoxDecoration(
-                          color: AppColors.pale,
-                          borderRadius: BorderRadius.circular(8),
+                  if (cheapest != null)
+                    Row(
+                      children: [
+                        Container(
+                          width: 45,
+                          height: 38,
+                          decoration: BoxDecoration(
+                            color: AppColors.pale,
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: Padding(
+                            padding: const EdgeInsets.all(5),
+                            child: VehicleImage(cheapest.image, height: 28),
+                          ),
                         ),
-                        child: const Padding(
-                          padding: EdgeInsets.all(5),
-                          child: VehicleImage('truck-orange', height: 28),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Text(
+                            cheapest.name,
+                            overflow: TextOverflow.ellipsis,
+                            style: appText(size: 14),
+                          ),
                         ),
-                      ),
-                      const SizedBox(width: 12),
-                      Text('Xe tải 1 tấn', style: appText(size: 14)),
-                      const Spacer(),
-                      Text('Từ ', style: appText(size: 14)),
-                      Text(
-                        truckFare.baseFareLabel,
-                        style: appText(
-                          size: 16,
-                          weight: FontWeight.w700,
-                          color: AppColors.orange,
+                        Text('Từ ', style: appText(size: 14)),
+                        Text(
+                          cheapest.baseFareLabel,
+                          style: appText(
+                            size: 16,
+                            weight: FontWeight.w700,
+                            color: AppColors.orange,
+                          ),
                         ),
-                      ),
-                    ],
-                  ),
+                      ],
+                    ),
                   const SizedBox(height: 6),
                   const Divider(height: 16),
                   Padding(
