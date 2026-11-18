@@ -207,7 +207,7 @@ void main() {
   );
 
   test(
-    'duplicate identity and missing uploaded reference are rejected by API',
+    'duplicate plate and missing uploaded reference are rejected by API',
     () async {
       final draft = DriverApplicationDto.toJson(api.cachedApplication);
       final plate = (draft['fields'] as Map)['plate'];

@@ -31,12 +31,9 @@ import '../features/driver_trip/presentation/screens/job_details_screen.dart';
 import '../features/driver_trip/presentation/screens/active_trip_screen.dart';
 import '../core/theme/app_theme.dart';
 import '../core/widgets/app_widgets.dart';
-import '../features/home/data/repositories/demo_fare_repository.dart';
-import '../features/home/domain/usecases/get_public_fares.dart';
 import '../features/home/presentation/controllers/home_controller.dart';
 import '../features/home/presentation/screens/home_screen.dart';
 import '../features/home/presentation/screens/pricing_screen.dart';
-import '../features/home/presentation/models/vehicle_option.dart';
 import '../features/driver_account/driver_incidents_screen.dart';
 import '../features/driver_account/driver_ratings_screen.dart';
 import '../features/driver_account/driver_trips_screen.dart';
@@ -217,18 +214,21 @@ class ModMoveApp extends StatelessWidget {
             },
           ),
           BlocProvider(
-            create: (_) =>
-                HomeController(const GetPublicFares(DemoFareRepository())),
+            create: (c) => HomeController(c.read<CustomerApi>()),
           ),
           BlocProvider(create: (c) => driverController ?? _createDriver(c)),
         ],
-        child: RepositoryProvider<RealtimeBridge>(
-          create: (c) => RealtimeBridge(
-            realtimeSource ?? defaultRealtimeSource(AppConfig.apiBaseUrl),
-            c.read<NotificationCubit>(),
-            c.read<ApiClient>().sessions,
+        child: RepositoryProvider<RealtimeSource>(
+          create: (_) => realtimeSource ?? defaultRealtimeSource(AppConfig.apiBaseUrl),
+          child: RepositoryProvider<RealtimeBridge>(
+            create: (c) => RealtimeBridge(
+              c.read<RealtimeSource>(),
+              c.read<NotificationCubit>(),
+              c.read<ApiClient>().sessions,
+              token: c.read<ApiClient>().freshToken,
+            ),
+            child: RealtimeHost(child: _app(context)),
           ),
-          child: RealtimeHost(child: _app(context)),
         ),
       ),
     );
@@ -395,9 +395,7 @@ class ModMoveApp extends StatelessWidget {
                 return MaterialPageRoute<void>(
                   settings: settings,
                   builder: (_) => PricingScreen(
-                    initialVehicle:
-                        settings.arguments as VehicleOption? ??
-                        VehicleOption.truck,
+                    initialVehicleId: settings.arguments as int?,
                   ),
                 );
               }

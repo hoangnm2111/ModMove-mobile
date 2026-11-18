@@ -64,6 +64,13 @@ class VehicleType {
     minimumFare: _d(j['minimumFare']),
   );
 
+  /// Ảnh minh họa theo tải trọng (assets/images/vehicle-*.png), dùng chung cho đặt xe và bảng giá.
+  String get image => maxLoadWeightKg <= 600
+      ? 'pickup'
+      : maxLoadWeightKg <= 1200
+      ? 'van'
+      : 'truck-orange';
+
   /// GB-10: tổng KL ≤ tải trọng; món lớn nhất lọt thùng khi xoay (so 3 cạnh đã sắp xếp).
   bool canCarry(double weightKg, int l, int w, int h) {
     if (weightKg > maxLoadWeightKg) return false;
@@ -283,6 +290,9 @@ class OrderTracking {
   final bool driverStale;
   final String? etaTarget; // Pickup | Handover | Dropoff
   final int? etaMinutes;
+
+  /// Vị trí tài xế mới từ `LocationUpdated`; điểm lấy/giao và ETA giữ nguyên.
+  OrderTracking withDriver(GeoPoint driver, DateTime? at) => OrderTracking(orderStatus, pickup, dropoff, driver, at ?? driverAt, false, etaTarget, etaMinutes);
 
   factory OrderTracking.fromJson(Map<String, dynamic> j) {
     final d = j['driver'] as Map<String, dynamic>?;

@@ -91,7 +91,7 @@ class _DeliveryScreenState extends State<DeliveryScreen> {
       child: Scaffold(
         appBar: AppHeader(
           'Đang giao hàng',
-          onHelp: () => showTripSimulation(context),
+          onHelp: tripSimulationAction(context),
         ),
         body: SingleChildScrollView(
           padding: const EdgeInsets.all(16),

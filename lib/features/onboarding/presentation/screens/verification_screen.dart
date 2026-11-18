@@ -331,7 +331,6 @@ class _VerificationScreenState extends State<VerificationScreen> {
       'JPG hoặc PNG · Tối đa 5 MB/ảnh',
       style: appText(size: 12, color: AppColors.muted),
     ),
-    const SizedBox(height: 10),
     const SizedBox(height: 16),
     const SectionTitle('Giấy phép lái xe', size: 16),
     const SizedBox(height: 6),

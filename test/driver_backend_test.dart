@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:typed_data';
 
@@ -93,8 +94,6 @@ class FakeBackend {
           'fullName': 'Tài xế Thay thế',
           'phoneNumber': '0900000005',
           'hasProfile': true,
-          'citizenIdNumber': '079090000002',
-          'driverLicenseNumber': '790000000002',
           'vehicle': {
             'vehicleTypeName': 'Xe van 500kg',
             'licensePlate': '51C-222.22',
@@ -116,8 +115,6 @@ class FakeBackend {
           'vehicleTypeName': 'Xe van 500kg',
           'licensePlate': '51C-222.22',
           'maxLoadWeightKg': 500.0,
-          'citizenIdNumber': '079090000002',
-          'driverLicenseNumber': '790000000002',
           'documentUrls': [for (var i = 1; i <= 5; i++) 'https://res.cloudinary.com/demo/image/upload/$i.jpg'],
           'rejectionReasons': null,
           'rejectedItems': profileApproval == 'Rejected'
@@ -298,8 +295,66 @@ final _png = Uint8List.fromList([137, 80, 78, 71, 13, 10, 26, 10, 0, 0]);
 class _FixedLocation implements DriverLocationSource {
   const _FixedLocation([this.point = const GeoPoint(10.7769, 106.7009)]);
   final GeoPoint point;
+  GpsSample get _sample => GpsSample(point, at: DateTime.now());
   @override
-  Future<GeoPoint?> current() async => point;
+  Future<GpsSample?> current() async => _sample;
+  @override
+  Stream<GpsSample> watch() => Stream.value(_sample);
+}
+
+/// Nguồn GPS có điều khiển: `emit` phát một điểm như `Geolocator.getPositionStream`.
+class _Gps implements DriverLocationSource {
+  final _stream = StreamController<GpsSample>.broadcast(sync: true);
+  bool get watching => _stream.hasListener;
+  void emit(GeoPoint point, {required DateTime at, double? accuracy, bool mocked = false}) =>
+      _stream.add(GpsSample(point, accuracy: accuracy, isMocked: mocked, at: at));
+  @override
+  Future<GpsSample?> current() async => GpsSample(const GeoPoint(10.7769, 106.7009), at: DateTime.now());
+  @override
+  Stream<GpsSample> watch() => _stream.stream;
+}
+
+http.Response _problem(int status, String code) =>
+    http.Response(jsonEncode({'status': status, 'title': 'x', 'code': code}), status, headers: {'content-type': 'application/json'});
+
+/// Tài xế Online trên BE giả, nguồn GPS điều khiển được; `location` ghi đè phản hồi của POST /driver/location.
+class _Lab {
+  _Lab({DateTime Function()? clock}) {
+    final client = MockClient((r) async {
+      if (r.method == 'POST' && r.url.path.endsWith('/driver/location')) {
+        calls++;
+        final reply = location;
+        if (reply != null) return reply(r);
+        delivered.add((jsonDecode(r.body) as Map).cast<String, Object?>());
+      }
+      return backend.handle(r);
+    });
+    final sessions = MemorySessionStore(
+      const Session(accessToken: 'a', refreshToken: 'r', userId: 5, fullName: 'Tài xế', role: 'Driver'),
+    );
+    repo = ApiDriverTripRepository(
+      api: DriverApi(ApiClient(sessions: sessions, client: client, baseUrl: 'http://test/api')),
+      location: gps,
+      access: const DriverAccess(approved: true, active: true),
+      pollInterval: const Duration(hours: 1),
+      clock: clock,
+    );
+  }
+  final backend = FakeBackend();
+  final gps = _Gps();
+  final delivered = <Map<String, Object?>>[];
+  Future<http.Response> Function(http.Request)? location;
+  int calls = 0;
+  late final ApiDriverTripRepository repo;
+
+  /// Đăng nhập + một vòng đồng bộ đầu: BE báo Online nên app bắt đầu nghe GPS.
+  static Future<_Lab> start({DateTime Function()? clock}) async {
+    final lab = _Lab(clock: clock);
+    lab.repo.onSessionChanged(isDriver: true);
+    await lab.repo.refresh();
+    addTearDown(lab.repo.close);
+    return lab;
+  }
 }
 
 ({DriverApi api, FakeBackend backend}) _setup({String profileApproval = 'Approved'}) {
@@ -451,11 +506,8 @@ void main() {
     expect(repository.current.notice, contains('MM20261110007'));
   });
 
-  // Lỗi cũ: kịch bản giả lập "gần điểm lấy" giữ vị trí giả mãi sau khi chuyến kết thúc, nên đơn kế tiếp ở cùng
-  // khu vực hiện "Cách bạn 0,0 km" dù tài xế ở xa.
-  test('kết thúc chuyến thì bỏ vị trí giả lập, quay về vị trí thật', () async {
+  test('thu tiền gửi toạ độ thật của nguồn GPS cho BE kiểm tra bán kính', () async {
     final env = _setup();
-    // Tài xế ở xa điểm lấy hàng (khác 10.7769, 106.7009 của dữ liệu giả).
     const home = GeoPoint(10.9000, 106.8000);
     final repository = ApiDriverTripRepository(
       api: env.api,
@@ -469,21 +521,12 @@ void main() {
     await repository.setOnline(true);
     await repository.openOffer('7');
     await repository.acceptOffer('7');
-    await repository.simulate(TripSimulation.nearPickup);
-    final pickup = repository.current.trip!.job.pickupPoint;
-    expect(repository.current.fix!.point.latitude, pickup.latitude);
-
     env.backend.orderStatus = 'InTransit';
     await repository.refresh();
     await repository.collectCash();
     final collect = env.backend.bodies['post /driver/trips/7/collect-cash'] as Map;
-    expect(collect['latitude'], isA<num>());
-    expect(collect['longitude'], isA<num>());
-    await repository.deliver(CargoPhoto(kind: CargoPhotoKind.overall, name: 'pod.png', bytes: _png));
-    await repository.refresh();
-    // Về vị trí của nguồn GPS (_FixedLocation), không còn dính điểm lấy hàng của chuyến cũ.
-    expect(repository.current.fix!.point.latitude, home.latitude);
-    expect(repository.current.fix!.point.longitude, home.longitude);
+    expect(collect['latitude'], home.latitude);
+    expect(collect['longitude'], home.longitude);
   });
 
   test('đơn bị tài xế khác nhận trước (409) được bỏ khỏi danh sách và báo lỗi tiếng Việt', () async {
@@ -518,38 +561,164 @@ void main() {
     expect(repository.current.jobs, isEmpty);
   });
 
-  test('giả lập GPS trên máy ảo: đến điểm lấy hàng / đi 300 m / mất GPS gửi vị trí lên BE', () async {
-    final env = _setup();
-    final repository = ApiDriverTripRepository(
-      api: env.api,
-      location: _FixedLocation(),
-      access: const DriverAccess(approved: true, active: true),
-      pollInterval: const Duration(hours: 1),
-    );
-    addTearDown(repository.close);
-    repository.onSessionChanged(isDriver: true);
-    await repository.refresh();
-    await repository.openOffer('7');
-    await repository.acceptOffer('7');
-    expect(repository.supported, contains(TripSimulation.nearPickup));
+  group('GPS tài xế', () {
+    const here = GeoPoint(10.7769, 106.7009);
+    final t0 = DateTime.utc(2026, 11, 18, 3);
+    DateTime clock() => t0.add(const Duration(seconds: 30));
+    GeoPoint at(int i) => GeoPoint(10.70 + i * 0.001, 106.70);
 
-    // Đang cách điểm lấy hàng ~100 m rồi đi tiếp: tối đa 300 m mỗi lần.
-    await repository.simulate(TripSimulation.advanceRoute);
-    final pickup = repository.current.trip!.job.pickupPoint;
-    expect(repository.current.fix!.point.distanceTo(pickup), lessThanOrEqualTo(1));
+    test('repository thật không còn mô phỏng GPS', () async {
+      final lab = await _Lab.start();
+      expect(lab.repo.supported, isEmpty);
+      await expectLater(lab.repo.simulate(TripSimulation.nearPickup), throwsA(isA<TripFailure>()));
+    });
 
-    await repository.simulate(TripSimulation.nearDropoff);
-    final dropoff = repository.current.trip!.job.dropoffPoint;
-    final sent = env.backend.bodies['post /driver/location'] as Map;
-    expect(sent['latitude'], dropoff.latitude);
-    expect(sent['longitude'], dropoff.longitude);
+    test('gửi GPS lỗi không làm hỏng vòng đồng bộ: vẫn tải chuyến và đơn (MB-1)', () async {
+      final lab = await _Lab.start();
+      lab.location = (_) async => _problem(500, 'INTERNAL');
+      lab.gps.emit(here, at: DateTime.now());
+      lab.backend.requests.clear();
+      await lab.repo.refresh(); // không ném lỗi
+      expect(lab.backend.requests, containsAll(['get /driver/trips/active', 'get /driver/matching/orders']));
+      lab.location = (_) => throw http.ClientException('mất mạng');
+      lab.gps.emit(here, at: DateTime.now());
+      await lab.repo.refresh();
+    });
 
-    await repository.simulate(TripSimulation.gpsLost);
-    expect(repository.current.gpsEnabled, isFalse);
-    expect(repository.current.fix, isNull);
-    await repository.simulate(TripSimulation.gpsRestored);
-    expect(repository.current.gpsEnabled, isTrue);
-    await expectLater(repository.simulate(TripSimulation.cancelOrder), throwsA(isA<TripFailure>()));
+    test('ACCOUNT_INACTIVE khi gửi GPS vẫn tắt Online như cũ', () async {
+      final lab = await _Lab.start();
+      lab.location = (_) async => _problem(422, 'ACCOUNT_INACTIVE');
+      lab.gps.emit(here, at: DateTime.now());
+      await expectLater(lab.repo.refresh(), throwsA(isA<TripFailure>()));
+      expect(lab.repo.current.online, isFalse);
+      expect(lab.gps.watching, isFalse);
+    });
+
+    test('Online nghe luồng vị trí, điểm cuối thành _fix; Offline thì hủy nghe (MB-2)', () async {
+      final lab = await _Lab.start();
+      expect(lab.gps.watching, isTrue);
+      for (var i = 1; i <= 3; i++) {
+        lab.gps.emit(at(i), at: t0.add(Duration(seconds: i * 5)));
+      }
+      expect(lab.repo.current.fix!.point.latitude, at(3).latitude);
+      expect(lab.repo.current.fix!.at, t0.add(const Duration(seconds: 15)));
+      await lab.repo.setOnline(false);
+      expect(lab.gps.watching, isFalse);
+    });
+
+    test('gửi kèm accuracy, isMocked và recordedAt UTC (MB-4, MB-5)', () async {
+      final lab = await _Lab.start(clock: clock);
+      lab.gps.emit(at(1), at: t0, accuracy: 12.5);
+      await lab.repo.refresh();
+      expect(lab.delivered.single, {
+        'latitude': at(1).latitude,
+        'longitude': at(1).longitude,
+        'accuracy': 12.5,
+        'isMocked': false,
+        'recordedAt': '2026-11-18T03:00:00.000Z',
+      });
+    });
+
+    test('mất mạng 3 vòng rồi có lại: gửi bù 4 điểm đúng thứ tự (MB-4)', () async {
+      final lab = await _Lab.start(clock: () => t0.add(const Duration(minutes: 5)));
+      lab.location = (_) => throw http.ClientException('mất mạng');
+      for (var i = 1; i <= 3; i++) {
+        lab.gps.emit(at(i), at: t0.add(Duration(minutes: i)));
+        await lab.repo.refresh();
+      }
+      expect(lab.delivered, isEmpty);
+      lab.location = null;
+      lab.gps.emit(at(4), at: t0.add(const Duration(minutes: 4)));
+      await lab.repo.refresh();
+      expect([for (final d in lab.delivered) d['latitude']], [for (var i = 1; i <= 4; i++) at(i).latitude]);
+      expect(lab.delivered.first['recordedAt'], '2026-11-18T03:01:00.000Z');
+    });
+
+    test('gửi bù dày chỉ giữ 1 điểm mỗi phút + điểm mới nhất (B21)', () async {
+      final lab = await _Lab.start(clock: () => t0.add(const Duration(minutes: 4)));
+      for (var i = 0; i <= 37; i++) {
+        lab.gps.emit(at(i), at: t0.add(Duration(seconds: i * 5)));
+      }
+      await lab.repo.refresh();
+      expect([for (final d in lab.delivered) d['latitude']], [at(0).latitude, at(12).latitude, at(24).latitude, at(36).latitude, at(37).latitude]);
+    });
+
+    test('điểm đến trong lúc đang gửi chờ vòng sau: vòng đồng bộ vẫn tải chuyến và đơn', () async {
+      final lab = await _Lab.start();
+      lab.location = (r) async {
+        if (lab.calls < 50) lab.gps.emit(at(lab.calls), at: DateTime.now()); // mạng chậm: mỗi lần gửi lại có điểm mới
+        return http.Response('', 204);
+      };
+      lab.gps.emit(at(0), at: DateTime.now());
+      lab.backend.requests.clear();
+      await lab.repo.refresh();
+      expect(lab.calls, 1);
+      expect(lab.backend.requests, containsAll(['get /driver/trips/active', 'get /driver/matching/orders']));
+    });
+
+    test('điểm cũ hơn 10 phút bị bỏ, không gửi bù (MB-4)', () async {
+      var now = t0;
+      final lab = await _Lab.start(clock: () => now);
+      lab.location = (_) => throw http.ClientException('mất mạng');
+      lab.gps.emit(at(1), at: now);
+      await lab.repo.refresh();
+      now = t0.add(const Duration(minutes: 11));
+      lab.location = null;
+      lab.gps.emit(at(2), at: now);
+      await lab.repo.refresh();
+      expect([for (final d in lab.delivered) d['latitude']], [at(2).latitude]);
+    });
+
+    test('hàng đợi giữ tối đa 120 điểm mới nhất (MB-4)', () async {
+      final lab = await _Lab.start(clock: () => t0);
+      lab.location = (_) => throw http.ClientException('mất mạng');
+      for (var i = 1; i <= 125; i++) {
+        lab.gps.emit(at(i), at: t0);
+      }
+      lab.location = null;
+      await lab.repo.refresh();
+      // 120 điểm mới nhất (at(6)…at(125)), cùng một lúc nên gửi bù chỉ còn điểm cũ nhất và mới nhất.
+      expect([for (final d in lab.delivered) d['latitude']], [at(6).latitude, at(125).latitude]);
+    });
+
+    test('BE trả 400: gửi lại 1 lần không kèm recordedAt, vẫn lỗi thì bỏ điểm (MB-4)', () async {
+      final lab = await _Lab.start();
+      lab.location = (_) async => _problem(400, 'VALIDATION');
+      lab.gps.emit(at(1), at: DateTime.now());
+      await lab.repo.refresh();
+      expect(lab.calls, 2);
+      await lab.repo.refresh();
+      expect(lab.calls, 2); // không thử lại ở vòng sau
+      lab.location = null;
+      lab.gps.emit(at(2), at: DateTime.now());
+      await lab.repo.refresh();
+      expect([for (final d in lab.delivered) d['latitude']], [at(2).latitude]);
+    });
+
+    test('đồng hồ máy chạy nhanh (BE từ chối recordedAt): điểm mới nhất vẫn tới BE theo giờ server', () async {
+      final lab = await _Lab.start();
+      lab.location = (r) async {
+        final body = (jsonDecode(r.body) as Map).cast<String, Object?>();
+        if (body.containsKey('recordedAt')) return _problem(400, 'VALIDATION');
+        lab.delivered.add(body);
+        return http.Response('', 204);
+      };
+      lab.gps.emit(at(1), at: DateTime.now().add(const Duration(minutes: 1)));
+      await lab.repo.refresh();
+      expect(lab.delivered.single['latitude'], at(1).latitude);
+      expect(lab.delivered.single.containsKey('recordedAt'), isFalse);
+    });
+
+    test('422 MOCK_LOCATION tắt Online và báo tắt ứng dụng giả lập (MB-5)', () async {
+      final lab = await _Lab.start();
+      lab.location = (_) async => _problem(422, 'MOCK_LOCATION');
+      lab.gps.emit(here, at: DateTime.now(), mocked: true);
+      await lab.repo.refresh();
+      expect(lab.repo.current.online, isFalse);
+      expect(lab.repo.current.notice, 'Tắt ứng dụng giả lập vị trí để nhận đơn');
+      expect(lab.backend.online, isFalse);
+      expect(lab.gps.watching, isFalse);
+    });
   });
 
   test('nộp hồ sơ gửi đúng 7 ảnh theo thứ tự BE (D2): GPLX, đăng ký, đăng kiểm, ảnh xe, CCCD trước, CCCD sau', () async {
@@ -557,7 +726,7 @@ void main() {
     final docs = {for (final kind in DocumentKind.values) kind: VerificationDocument(remoteReference: 'https://res.cloudinary.com/demo/${kind.name}.jpg')};
     final draft = DriverApplication(
       status: ApprovalStatus.draft,
-      fields: const {'vehicleTypeId': '1', 'citizenId': '079090000002', 'license': '790000000002', 'plate': '51c-222.22', 'payload': '500'},
+      fields: const {'vehicleTypeId': '1', 'plate': '51c-222.22', 'payload': '500'},
       documents: docs,
     );
     await BackendDriverRepository(api: env.api, cached: draft).submit(draft);
@@ -566,6 +735,9 @@ void main() {
       for (final name in ['licenseFront', 'licenseBack', 'registration', 'inspection', 'vehicle', 'citizenIdFront', 'citizenIdBack']) 'https://res.cloudinary.com/demo/$name.jpg',
     ]);
     expect(body['licensePlate'], '51C-222.22');
+    // Admin đọc số CCCD/GPLX trên ảnh: app không nhập và không gửi (2026-11-18).
+    expect(body.containsKey('citizenIdNumber'), isFalse);
+    expect(body.containsKey('driverLicenseNumber'), isFalse);
   });
 
   test('thiếu ảnh CCCD thì không gửi hồ sơ lên BE', () async {
