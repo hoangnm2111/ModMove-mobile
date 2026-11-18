@@ -207,15 +207,16 @@ void main() {
   );
 
   test(
-    'duplicate identity and missing uploaded reference are rejected by API',
+    'duplicate plate and missing uploaded reference are rejected by API',
     () async {
       final draft = DriverApplicationDto.toJson(api.cachedApplication);
-      (draft['fields'] as Map)['citizenId'] = '999999999999';
+      final plate = (draft['fields'] as Map)['plate'];
+      (draft['fields'] as Map)['plate'] = '99C-999.99';
       await expectLater(
         repository.submit(DriverApplicationDto.fromJson(draft)),
         throwsA(isA<ApplicationFailure>()),
       );
-      (draft['fields'] as Map)['citizenId'] = '001201000123';
+      (draft['fields'] as Map)['plate'] = plate;
       (draft['documents'] as Map)['vehicle']['reference'] =
           'mock://does-not-exist';
       await expectLater(

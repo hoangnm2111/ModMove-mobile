@@ -94,8 +94,6 @@ class FakeBackend {
           'fullName': 'Tài xế Thay thế',
           'phoneNumber': '0900000005',
           'hasProfile': true,
-          'citizenIdNumber': '079090000002',
-          'driverLicenseNumber': '790000000002',
           'vehicle': {
             'vehicleTypeName': 'Xe van 500kg',
             'licensePlate': '51C-222.22',
@@ -117,8 +115,6 @@ class FakeBackend {
           'vehicleTypeName': 'Xe van 500kg',
           'licensePlate': '51C-222.22',
           'maxLoadWeightKg': 500.0,
-          'citizenIdNumber': '079090000002',
-          'driverLicenseNumber': '790000000002',
           'documentUrls': [for (var i = 1; i <= 5; i++) 'https://res.cloudinary.com/demo/image/upload/$i.jpg'],
           'rejectionReasons': null,
         });
@@ -661,7 +657,7 @@ void main() {
     final docs = {for (final kind in DocumentKind.values) kind: VerificationDocument(remoteReference: 'https://res.cloudinary.com/demo/${kind.name}.jpg')};
     final draft = DriverApplication(
       status: ApprovalStatus.draft,
-      fields: const {'vehicleTypeId': '1', 'citizenId': '079090000002', 'license': '790000000002', 'plate': '51c-222.22', 'payload': '500'},
+      fields: const {'vehicleTypeId': '1', 'plate': '51c-222.22', 'payload': '500'},
       documents: docs,
     );
     await BackendDriverRepository(api: env.api, cached: draft).submit(draft);
@@ -670,6 +666,9 @@ void main() {
       for (final name in ['licenseFront', 'licenseBack', 'registration', 'inspection', 'vehicle', 'citizenIdFront', 'citizenIdBack']) 'https://res.cloudinary.com/demo/$name.jpg',
     ]);
     expect(body['licensePlate'], '51C-222.22');
+    // Admin đọc số CCCD/GPLX trên ảnh: app không nhập và không gửi (2026-11-18).
+    expect(body.containsKey('citizenIdNumber'), isFalse);
+    expect(body.containsKey('driverLicenseNumber'), isFalse);
   });
 
   test('thiếu ảnh CCCD thì không gửi hồ sơ lên BE', () async {
