@@ -24,8 +24,6 @@ class BackendDriverRepository implements DriverProfileRepository, VehicleTypeCat
     fields: {
       'fullName': fullName,
       'phone': phone,
-      'citizenId': '',
-      'license': '',
       'vehicleType': '',
       'vehicleTypeId': '',
       'plate': '',
@@ -128,8 +126,6 @@ class BackendDriverRepository implements DriverProfileRepository, VehicleTypeCat
     final fields = {
       'fullName': '${profile['fullName'] ?? ''}',
       'phone': '${profile['phoneNumber'] ?? ''}',
-      'citizenId': pick(onboarding['citizenIdNumber'], profile['citizenIdNumber']),
-      'license': pick(onboarding['driverLicenseNumber'], profile['driverLicenseNumber']),
       'vehicleType': pick(onboarding['vehicleTypeName'], vehicle?['vehicleTypeName']),
       'vehicleTypeId': pick(onboarding['vehicleTypeId'], status['vehicleTypeId']),
       'plate': pick(onboarding['licensePlate'], vehicle?['licensePlate']),
@@ -142,8 +138,6 @@ class BackendDriverRepository implements DriverProfileRepository, VehicleTypeCat
     if (!hasApplication && !hasProfile) {
       final local = _cached.fields;
       for (final key in const [
-        'citizenId',
-        'license',
         'vehicleType',
         'vehicleTypeId',
         'plate',
@@ -195,8 +189,6 @@ class BackendDriverRepository implements DriverProfileRepository, VehicleTypeCat
     await _call(
       () => api.submitOnboarding(
         vehicleTypeId: typeId,
-        citizenIdNumber: (fields['citizenId'] ?? '').trim(),
-        driverLicenseNumber: (fields['license'] ?? '').trim(),
         licensePlate: (fields['plate'] ?? '').trim().toUpperCase(),
         maxLoadWeightKg: num.parse((fields['payload'] ?? '0').replaceAll(',', '.')),
         documentUrls: urls,

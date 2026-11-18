@@ -21,8 +21,7 @@ class SubmitDriverApplication {
     if (!application.canEdit) {
       throw const ApplicationFailure('Hồ sơ đã gửi hoặc đang được xử lý.');
     }
-    if (validation.personal(application.fields).isNotEmpty ||
-        validation.vehicle(application.fields).isNotEmpty) {
+    if (validation.vehicle(application.fields).isNotEmpty) {
       throw const ApplicationFailure('Vui lòng kiểm tra thông tin hồ sơ.');
     }
     if (validation.missingDocuments(application).isNotEmpty) {

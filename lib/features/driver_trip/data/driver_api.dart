@@ -29,10 +29,9 @@ class DriverApi {
       _map(await _api.get('/driver/onboarding/status'));
 
   /// Đúng 7 URL theo thứ tự: GPLX trước, GPLX sau, đăng ký xe, đăng kiểm, ảnh xe, CCCD trước, CCCD sau.
+  /// Không gửi số CCCD/GPLX: Admin đọc số trên ảnh (2026-11-18).
   Future<int> submitOnboarding({
     required int vehicleTypeId,
-    required String citizenIdNumber,
-    required String driverLicenseNumber,
     required String licensePlate,
     required num maxLoadWeightKg,
     required List<String> documentUrls,
@@ -40,8 +39,6 @@ class DriverApi {
     final j = _map(
       await _api.post('/driver/onboarding', {
         'vehicleTypeId': vehicleTypeId,
-        'citizenIdNumber': citizenIdNumber,
-        'driverLicenseNumber': driverLicenseNumber,
         'licensePlate': licensePlate,
         'maxLoadWeightKg': maxLoadWeightKg,
         'documentUrls': documentUrls,
