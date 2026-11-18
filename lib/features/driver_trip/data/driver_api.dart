@@ -1,4 +1,6 @@
 import '../../../core/network/api_client.dart';
+import '../domain/entities/trip_models.dart';
+import 'polyline.dart';
 
 /// Một hàm cho mỗi endpoint `api/driver/*` mà app tài xế dùng.
 /// Path và body lấy từ ModMove-backend/docs/api/README.md (BE là nguồn chuẩn).
@@ -27,6 +29,7 @@ class DriverApi {
       _map(await _api.get('/driver/onboarding/status'));
 
   /// Đúng 7 URL theo thứ tự: GPLX trước, GPLX sau, đăng ký xe, đăng kiểm, ảnh xe, CCCD trước, CCCD sau.
+  /// Không gửi số CCCD/GPLX: Admin đọc số trên ảnh (2026-11-18).
   Future<int> submitOnboarding({
     required int vehicleTypeId,
     required String licensePlate,
@@ -74,10 +77,34 @@ class DriverApi {
   /// Q12: xoá (vô hiệu hoá) tài khoản tài xế → 204; BE chặn khi còn đơn chạy, rút tiền chờ hoặc ví khác 0.
   Future<void> deleteAccount() => _api.delete('/driver/account');
 
-  Future<void> sendLocation(double latitude, double longitude) => _api.post(
+  /// B19–B21: `accuracy` (mét), `isMocked` và `recordedAt` (giờ đo của máy, gửi bù khi mất mạng) đều tùy chọn ở BE.
+  Future<void> sendLocation(double latitude, double longitude, {double? accuracy, bool isMocked = false, DateTime? recordedAt}) => _api.post(
     '/driver/location',
-    {'latitude': latitude, 'longitude': longitude},
+    {
+      'latitude': latitude,
+      'longitude': longitude,
+      'accuracy': ?accuracy,
+      'isMocked': isMocked,
+      'recordedAt': ?recordedAt?.toUtc().toIso8601String(),
+    },
   );
+
+  /// Đường lái xe thật từ [from] tới [to] (BE gọi MapVina). `null` khi BE không có hình đường.
+  Future<List<GeoPoint>?> route(GeoPoint from, GeoPoint to) async {
+    final j = _map(
+      await _api.get(
+        '/driver/route',
+        query: {
+          'fromLatitude': from.latitude,
+          'fromLongitude': from.longitude,
+          'toLatitude': to.latitude,
+          'toLongitude': to.longitude,
+        },
+      ),
+    );
+    final polyline = j['polyline'] as String?;
+    return polyline == null || polyline.isEmpty ? null : decodePolyline(polyline);
+  }
 
   /* ------------------------------------------------------ ghép đơn */
 

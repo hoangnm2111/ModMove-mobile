@@ -94,4 +94,46 @@ void main() {
     );
     await expectLater(api.get('/public/VehicleTypes'), throwsA(isA<ApiException>().having((e) => e.code, 'code', 'NETWORK')));
   });
+
+  for (final (name, refresh) in <(String, Future<http.Response> Function())>[
+    ('mất mạng', () async => throw http.ClientException('down')),
+    ('503', () async => _json({'code': 'SERVER_ERROR'}, 503)),
+    ('429', () async => _json({'code': 'TOO_MANY_REQUESTS'}, 429)),
+  ]) {
+    test('refresh lỗi tạm thời ($name) → giữ phiên, không đăng xuất', () async {
+      final store = MemorySessionStore(_session);
+      var expired = false;
+      final api = ApiClient(
+        sessions: store,
+        baseUrl: 'http://api',
+        client: MockClient((req) => req.url.path.endsWith('/public/Auth/refresh') ? refresh() : Future.value(_json({'code': 'UNAUTHORIZED'}, 401))),
+        onSessionExpired: () => expired = true,
+      );
+      await expectLater(api.get('/customer/Orders'), throwsA(isA<ApiException>()));
+      expect(expired, isFalse);
+      expect(store.current?.refreshToken, 'r1');
+    });
+  }
+
+  String jwt(DateTime exp) => 'h.${base64Url.encode(utf8.encode(jsonEncode({'exp': exp.millisecondsSinceEpoch ~/ 1000}))).replaceAll('=', '')}.s';
+
+  test('freshToken: token còn hạn thì giữ, sắp hết hạn thì refresh trước', () async {
+    final live = jwt(DateTime.now().add(const Duration(minutes: 10)));
+    final store = MemorySessionStore(Session(accessToken: live, refreshToken: 'r1', userId: 3, fullName: 'K', role: 'Customer'));
+    var refreshCalls = 0;
+    final api = ApiClient(
+      sessions: store,
+      baseUrl: 'http://api',
+      client: MockClient((req) async {
+        refreshCalls++;
+        return _json({'accessToken': 'new', 'refreshToken': 'r2'});
+      }),
+    );
+    expect(await api.freshToken(), live);
+    expect(refreshCalls, 0);
+    await store.save(store.current!.withTokens(jwt(DateTime.now().add(const Duration(seconds: 30))), 'r1'));
+    expect(await api.freshToken(), 'new');
+    expect(refreshCalls, 1);
+    expect(store.current?.refreshToken, 'r2');
+  });
 }

@@ -40,7 +40,7 @@ class JobDetailsScreen extends StatelessWidget {
       return Scaffold(
         appBar: AppHeader(
           'Chi tiết đơn',
-          onHelp: () => showTripSimulation(context),
+          onHelp: tripSimulationAction(context),
         ),
         bottomNavigationBar: SafeArea(
           child: Padding(

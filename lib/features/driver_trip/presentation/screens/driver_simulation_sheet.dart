@@ -5,6 +5,13 @@ import '../../../../core/theme/app_theme.dart';
 import '../../domain/entities/trip_models.dart';
 import '../../domain/repositories/driver_trip_repository.dart';
 
+/// Nút mở menu kịch bản: chỉ có khi repository hỗ trợ kịch bản nào đó (bản mô phỏng). BE thật trả null → ẩn nút.
+VoidCallback? tripSimulationAction(BuildContext context) {
+  final repository = context.read<DriverTripRepository>();
+  if (repository is! TripSimulator || (repository as TripSimulator).supported.isEmpty) return null;
+  return () => showTripSimulation(context);
+}
+
 Future<void> showTripSimulation(BuildContext context) async {
   final repository = context.read<DriverTripRepository>();
   if (repository is! TripSimulator) return;

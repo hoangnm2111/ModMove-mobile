@@ -4,7 +4,7 @@
 
 Mở máy ảo trong Android Studio, tại `ModMove-mobile` chạy:
 
-Cấu hình Google Maps một lần theo [hướng dẫn bản đồ Android](google-maps-android.md)
+Bản đồ MapVina cấu hình theo [hướng dẫn bản đồ Android](mapvina-android.md)
 để xem và thao tác trên đường phố thật.
 
 ```powershell
@@ -101,14 +101,11 @@ thu tiền người gửi, tối đa 5 lần gửi và chờ khách duyệt trư
   lại tạo phiên chuyến mới. Hồ sơ onboarding vẫn dùng kho lưu riêng như trước.
 - GPS phát tọa độ mô phỏng mỗi 5 giây khi app ở foreground và tài xế online.
   Ra nền thì dừng stream, trở lại thì lấy fix mới. Chưa có dịch vụ GPS chạy nền.
-- Bản đồ dùng Google Maps SDK, kéo/zoom/xoay trực tiếp. Vùng nhận đơn 5 km có vòng
+- Bản đồ dùng MapVina (`mapvina_gl`), kéo/zoom trực tiếp. Vùng nhận đơn 5 km có vòng
   sóng khi online, cùng bán kính với mock matching; dừng khi offline hoặc có chuyến.
-  Key đọc từ `android/secrets.properties` (Git ignore) hoặc biến `MAPS_API_KEY`.
-  Khi chưa có key, app tự dùng map mô phỏng cũ, có kéo/zoom và vòng sóng minh họa.
-  Khi đã thêm key và bật Billing, rebuild app để tự chuyển sang Google Maps.
-  Xem [cấu hình và test](google-maps-android.md).
-- Tọa độ và đường nét đứt đến điểm lấy vẫn mô phỏng; chưa gọi Directions/Routes API.
-  Nhấn thẻ ETA để mở Google Maps ngoài app và tìm đường thật.
+  Key truyền bằng `--dart-define=MAPVINA_KEY=...`. Xem [cấu hình](mapvina-android.md).
+- Đường đến điểm lấy là đường thật từ backend (`GET api/driver/route`); lỗi thì vẽ đường thẳng.
+  Tọa độ tài xế và điểm lấy vẫn là dữ liệu mô phỏng. Nhấn thẻ ETA để mở Google Maps ngoài app.
 - Nút gọi khách mở dialer, không tự gọi điện. Yêu cầu sự cố chỉ tạo biên nhận mock,
   chưa triển khai toàn bộ UC báo sự cố có ảnh và quy trình điều phối.
 - FE-25/26/28/29 nằm ngoài đợt này. Các số tổng hợp/ví ở Home là dữ liệu mock.
@@ -144,3 +141,15 @@ Tests mới còn kiểm tra hồ sơ đã duyệt sau restart, camera commands/g
 và thao tác native trên bản đồ với key thật chưa được xác minh vì chưa có key.
 Luồng hai ảnh, retry, khách từ chối/duyệt và responsive được kiểm tra tự động.
 Kiểm tra Android trước đó đã xác minh camera → quay về app → upload mock (`1/2`).
+
+## GPS khi chạy backend thật
+
+Phần trên là bản mock (`USE_MOCK_DRIVER=true`, không gọi backend). Với backend thật:
+
+- Không còn menu mô phỏng GPS và tọa độ cố định `DRIVER_FAKE_LAT/LNG`. Test trên máy ảo bằng
+  Extended Controls → Location: đặt một điểm, hoặc Routes → Play route để xe chạy theo tuyến.
+- Online: app nghe luồng GPS mỗi 5 giây (không dùng `distanceFilter`, xe đứng yên vẫn có điểm mới)
+  và gửi lên `POST api/driver/location` kèm `accuracy`, `isMocked`, `recordedAt`.
+- Mất mạng: điểm được giữ trong bộ nhớ (tối đa 120 điểm, bỏ điểm cũ hơn 10 phút) và gửi bù theo thứ tự
+  khi có mạng. Tắt app thì mất hàng đợi.
+- Backend trả 422 `MOCK_LOCATION` thì app tắt Online và báo "Tắt ứng dụng giả lập vị trí để nhận đơn".

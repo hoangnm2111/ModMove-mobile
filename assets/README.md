@@ -16,11 +16,9 @@
 These are separate assets used by native Flutter controls. App screens are not
 flattened images. All displayed vehicle specifications and fares are demo data.
 
-With a configured key, the driver map is a native Google Maps view. Its top-down
-vehicle marker is drawn once in `driver_map_marker.dart` and supplied to the SDK
-as a bitmap; the geographic coverage and animated waves are native SDK circles.
-Without a key, the temporary fallback draws the original illustrative map and
-animated waves using Flutter Canvas; it is explicitly labelled as a mock map.
+The driver map is a native MapVina view. Its top-down vehicle marker is drawn
+once in `driver_map_marker.dart` and supplied to the SDK as an image; the
+geographic coverage and animated waves are native SDK fills.
 
 ## Driver profile sample image
 

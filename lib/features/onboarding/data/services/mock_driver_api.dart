@@ -50,8 +50,6 @@ class MockDriverApi {
         fields: {
           'fullName': 'Nguyễn Minh Anh',
           'phone': '0901234678',
-          'citizenId': complete ? '001201000123' : '',
-          'license': complete ? '790123456789' : '',
           'vehicleType': 'Xe tải 1 tấn',
           'plate': complete ? '29C-123.45' : '',
           'payload': complete ? '1000' : '',

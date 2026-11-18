@@ -1,14 +1,14 @@
 import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
-import 'package:google_maps_flutter/google_maps_flutter.dart';
+import 'dart:typed_data';
 import '../../../../core/theme/app_theme.dart';
 
-/// A crisp top-down vehicle marker, rendered once for the native map.
+/// A crisp top-down vehicle marker, rendered once (144 px) for the native map.
 abstract final class DriverMapMarker {
-  static Future<BitmapDescriptor>? _cached;
-  static Future<BitmapDescriptor> load() => _cached ??= _draw();
+  static Future<Uint8List>? _cached;
+  static Future<Uint8List> load() => _cached ??= _draw();
 
-  static Future<BitmapDescriptor> _draw() async {
+  static Future<Uint8List> _draw() async {
     final recorder = ui.PictureRecorder();
     final canvas = Canvas(recorder)..scale(3);
     final paint = Paint();
@@ -52,10 +52,6 @@ abstract final class DriverMapMarker {
     final bytes = await image.toByteData(format: ui.ImageByteFormat.png);
     picture.dispose();
     image.dispose();
-    return BitmapDescriptor.bytes(
-      bytes!.buffer.asUint8List(),
-      width: 48,
-      height: 48,
-    );
+    return bytes!.buffer.asUint8List();
   }
 }

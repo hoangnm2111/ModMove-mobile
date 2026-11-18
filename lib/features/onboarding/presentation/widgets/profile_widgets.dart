@@ -310,6 +310,3 @@ class ProfileDetailRow extends StatelessWidget {
 String maskPhone(String phone) => phone.length < 5
     ? phone
     : '${phone.substring(0, 2)}•• ••• ${phone.substring(phone.length - 3)}';
-String maskDocument(String value) => value.length < 4
-    ? 'Chưa bổ sung'
-    : '•••• •••• ${value.substring(value.length - 4)}';
