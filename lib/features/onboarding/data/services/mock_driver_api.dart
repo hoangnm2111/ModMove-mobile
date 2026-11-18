@@ -268,9 +268,12 @@ class MockDriverApi {
     if (validation.vehicle(application.fields).isNotEmpty) {
       throw const _ApiFailure(422, 'Vui lòng kiểm tra thông tin hồ sơ.');
     }
-    // Deterministic duplicate data case available for a classroom demo.
+    // Deterministic duplicate data cases available for a classroom demo.
     if (application.fields['plate']?.toUpperCase() == '99C-999.99') {
-      throw const _ApiFailure(409, 'Biển số đã có trong dữ liệu mô phỏng.');
+      throw const _ApiFailure(
+        409,
+        'Biển số đã có trong dữ liệu mô phỏng.',
+      );
     }
     if (validation.missingDocuments(application).isNotEmpty) {
       throw const _ApiFailure(

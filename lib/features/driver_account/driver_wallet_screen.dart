@@ -459,7 +459,7 @@ class _Withdrawals extends StatelessWidget {
     'Pending': 'Chờ duyệt',
     'Completed': 'Đã chuyển',
     'Rejected': 'Từ chối',
-    'Failed': 'Thất bại',
+    'Failed': 'Sai số tài khoản',
   };
   @override
   Widget build(BuildContext context) {

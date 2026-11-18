@@ -212,8 +212,9 @@ void main() {
       await tester.pumpWidget(ModMoveApp(driverController: driver));
       await tester.pumpAndSettle();
       await click(tester, find.text('Đăng ký tài xế  →'));
-      expect(find.text('Số CCCD'), findsNothing);
-      expect(find.text('Số giấy phép lái xe'), findsNothing);
+      // Giấy tờ cá nhân chỉ chụp ảnh, không có ô nhập số CCCD hay số giấy phép.
+      expect(find.byKey(const ValueKey('field-citizenId')), findsNothing);
+      expect(find.byKey(const ValueKey('field-license')), findsNothing);
       for (final kind in DocumentKind.values.where((k) => k.isPersonal)) {
         await chooseSample(tester, kind, 'Tải ảnh lên');
         expect(driver.documents[kind]!.remoteReference, isNotNull);

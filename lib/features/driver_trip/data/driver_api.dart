@@ -47,6 +47,20 @@ class DriverApi {
     return (j['id'] as num).toInt();
   }
 
+  /// Nộp lại chỉ phần bị từ chối: `items` = [{key, url}], `vehicle` khi mục VehicleInfo bị từ chối.
+  Future<int> resubmitOnboarding({
+    required List<Map<String, String>> items,
+    Map<String, Object?>? vehicle,
+  }) async {
+    final j = _map(
+      await _api.post('/driver/onboarding/resubmit', {
+        if (items.isNotEmpty) 'items': items,
+        'vehicle': ?vehicle,
+      }),
+    );
+    return (j['id'] as num).toInt();
+  }
+
   Future<List<Map<String, dynamic>>> vehicleTypes() async =>
       _list(await _api.get('/public/VehicleTypes'));
 
@@ -123,16 +137,24 @@ class DriverApi {
   Future<void> arriveDropoff(String id) =>
       _api.post('/driver/Trips/$id/arrive-dropoff');
 
-  Future<void> collectCash(String id) =>
-      _api.post('/driver/Trips/$id/collect-cash');
+  /// Thu tiền mặt: BE kiểm tra bước và bán kính 500 m quanh điểm lấy hoặc điểm giao theo toạ độ gửi lên.
+  Future<void> collectCash(String id, double latitude, double longitude) =>
+      _api.post('/driver/Trips/$id/collect-cash', {
+        'latitude': latitude,
+        'longitude': longitude,
+      });
 
   Future<void> deliver(
     String id,
     String deliveryPhotoUrl, {
     bool cashCollected = false,
+    double? latitude,
+    double? longitude,
   }) => _api.post('/driver/Trips/$id/deliver', {
     'deliveryPhotoUrl': deliveryPhotoUrl,
     'cashCollected': cashCollected,
+    'latitude': ?latitude,
+    'longitude': ?longitude,
   });
 
   /* ------------------------------------------------------ ví */

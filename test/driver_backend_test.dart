@@ -117,7 +117,15 @@ class FakeBackend {
           'maxLoadWeightKg': 500.0,
           'documentUrls': [for (var i = 1; i <= 5; i++) 'https://res.cloudinary.com/demo/image/upload/$i.jpg'],
           'rejectionReasons': null,
+          'rejectedItems': profileApproval == 'Rejected'
+              ? [
+                  {'key': 'LicenseFront', 'reason': 'Ảnh mờ'},
+                  {'key': 'VehicleInfo', 'reason': 'Biển số sai'},
+                ]
+              : null,
         });
+      case 'post /driver/onboarding/resubmit':
+        return json({'id': 100}, 201);
       case 'patch /driver/online-status':
         online = (bodies[key] as Map)['isOnline'] == true;
         return http.Response('', 204);
@@ -285,8 +293,9 @@ class FakeBackend {
 final _png = Uint8List.fromList([137, 80, 78, 71, 13, 10, 26, 10, 0, 0]);
 
 class _FixedLocation implements DriverLocationSource {
-  const _FixedLocation();
-  GpsSample get _sample => GpsSample(const GeoPoint(10.7769, 106.7009), at: DateTime.now());
+  const _FixedLocation([this.point = const GeoPoint(10.7769, 106.7009)]);
+  final GeoPoint point;
+  GpsSample get _sample => GpsSample(point, at: DateTime.now());
   @override
   Future<GpsSample?> current() async => _sample;
   @override
@@ -383,6 +392,43 @@ void main() {
     expect(app.canGoOnline, isFalse);
   });
 
+  test('hồ sơ bị từ chối: đọc mục bị từ chối theo khoá của BE và chỉ nộp lại các mục đó', () async {
+    final env = _setup(profileApproval: 'Rejected');
+    final repository = BackendDriverRepository(api: env.api);
+    final app = await repository.refresh();
+    expect(app.documents[DocumentKind.licenseFront]!.rejectionReason, 'Ảnh mờ');
+    expect(app.documents[DocumentKind.licenseBack]!.rejectionReason, isNull);
+    expect(app.vehicleRejected, isTrue);
+
+    final fixed = DriverApplication(
+      status: app.status,
+      fields: {...app.fields, 'vehicleTypeId': '1', 'plate': '51C-333.33', 'payload': '500'},
+      documents: {
+        ...app.documents,
+        DocumentKind.licenseFront: const VerificationDocument(remoteReference: 'https://res.cloudinary.com/demo/new-front.jpg', rejectionReason: 'Ảnh mờ', replaced: true),
+      },
+      vehicleRejected: app.vehicleRejected,
+    );
+    await repository.submit(fixed);
+    expect(env.backend.requests, contains('post /driver/onboarding/resubmit'));
+    expect(env.backend.requests, isNot(contains('post /driver/onboarding')));
+    final body = env.backend.bodies['post /driver/onboarding/resubmit'] as Map;
+    expect(body['items'], [
+      {'key': 'LicenseFront', 'url': 'https://res.cloudinary.com/demo/new-front.jpg'},
+    ]);
+    expect((body['vehicle'] as Map)['licensePlate'], '51C-333.33');
+  });
+
+  test('nộp hồ sơ lần đầu không gửi số CCCD và số giấy phép', () async {
+    final env = _setup();
+    final docs = {for (final kind in DocumentKind.values) kind: VerificationDocument(remoteReference: 'https://res.cloudinary.com/demo/${kind.name}.jpg')};
+    final draft = DriverApplication(status: ApprovalStatus.draft, fields: const {'vehicleTypeId': '1', 'plate': '51c-222.22', 'payload': '500'}, documents: docs);
+    await BackendDriverRepository(api: env.api, cached: draft).submit(draft);
+    final body = env.backend.bodies['post /driver/onboarding'] as Map;
+    expect(body.containsKey('citizenIdNumber'), isFalse);
+    expect(body.containsKey('driverLicenseNumber'), isFalse);
+  });
+
   test('ghép đơn → nhận đơn → đến nơi → gửi ảnh lấy hàng qua đúng endpoint BE', () async {
     final env = _setup();
     final repository = ApiDriverTripRepository(
@@ -458,6 +504,29 @@ void main() {
     expect((env.backend.bodies['post /driver/trips/7/deliver'] as Map)['deliveryPhotoUrl'], contains('pod.jpg'));
     expect(repository.current.trip, isNull);
     expect(repository.current.notice, contains('MM20261110007'));
+  });
+
+  test('thu tiền gửi toạ độ thật của nguồn GPS cho BE kiểm tra bán kính', () async {
+    final env = _setup();
+    const home = GeoPoint(10.9000, 106.8000);
+    final repository = ApiDriverTripRepository(
+      api: env.api,
+      location: const _FixedLocation(home),
+      access: const DriverAccess(approved: true, active: true),
+      pollInterval: const Duration(hours: 1),
+    );
+    addTearDown(repository.close);
+    repository.onSessionChanged(isDriver: true);
+    await repository.refresh();
+    await repository.setOnline(true);
+    await repository.openOffer('7');
+    await repository.acceptOffer('7');
+    env.backend.orderStatus = 'InTransit';
+    await repository.refresh();
+    await repository.collectCash();
+    final collect = env.backend.bodies['post /driver/trips/7/collect-cash'] as Map;
+    expect(collect['latitude'], home.latitude);
+    expect(collect['longitude'], home.longitude);
   });
 
   test('đơn bị tài xế khác nhận trước (409) được bỏ khỏi danh sách và báo lỗi tiếng Việt', () async {

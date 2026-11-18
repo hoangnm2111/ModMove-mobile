@@ -3,7 +3,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:modmove_mobile/app/app.dart';
 
 void main() {
-  testWidgets('blank personal inputs display errors and do not advance', (
+  testWidgets('personal step has photos only and does not advance without them', (
     tester,
   ) async {
     tester.view.physicalSize = const Size(390, 844);
