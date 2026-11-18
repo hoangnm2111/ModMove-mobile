@@ -4,6 +4,14 @@ abstract final class AppConfig {
   /// Emulator Android truy cập máy host qua 10.0.2.2 (không dùng localhost).
   static const apiBaseUrl = String.fromEnvironment('API_BASE_URL', defaultValue: 'http://10.0.2.2:5133/api');
 
+  /// API key MapVina (lấy ở account.mapvina.com). Ví dụ:
+  /// `flutter run --dart-define=MAPVINA_KEY=khoa_cua_ban`
+  /// Mặc định `public_key` chỉ để thử, có hạn mức thấp.
+  static const mapVinaKey = String.fromEnvironment('MAPVINA_KEY', defaultValue: 'public_key');
+
+  /// Style gốc của MapVina (chuẩn MapLibre), giữ nguyên không chỉnh.
+  static const mapVinaStyleUrl = 'https://maps.mapvina.com/styles/v2/streets.json?key=$mapVinaKey';
+
   /// Thời gian chờ mỗi request.
   static const requestTimeout = Duration(seconds: 20);
 

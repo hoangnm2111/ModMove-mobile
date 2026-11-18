@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/widgets/app_widgets.dart';
+import '../../data/driver_api.dart';
 import '../bloc/active_trip_bloc.dart';
 import '../widgets/driver_map.dart';
 import '../widgets/trip_components.dart';
@@ -33,6 +34,8 @@ class PickupNavigationScreen extends StatelessWidget {
                         available: state.session.mapAvailable,
                         position: state.session.fix?.point,
                         destination: trip.job.pickupPoint,
+                        loadRoute: (from, to) =>
+                            context.read<DriverApi>().route(from, to),
                       ),
                     ),
                     Positioned(
