@@ -200,7 +200,6 @@ class DriverController extends Cubit<DriverPresentationState> {
     }
   }
 
-  Map<String, String> personalErrors() => validation.personal(fields);
   Map<String, String> vehicleErrors() => validation.vehicle(fields);
   List<DocumentKind> missingDocuments({bool personalOnly = false}) {
     final missing = validation

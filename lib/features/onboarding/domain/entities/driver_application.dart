@@ -52,6 +52,7 @@ class DriverApplication {
     this.submittedAt,
     this.reviewedAt,
     List<String> rejectionReasons = const [],
+    this.vehicleRejected = false,
   }) : fields = Map.unmodifiable(fields),
        documents = Map.unmodifiable(documents),
        rejectionReasons = List.unmodifiable(rejectionReasons);
@@ -65,6 +66,9 @@ class DriverApplication {
 
   /// Lý do Admin từ chối, nguyên văn (mỗi dòng một mục).
   final List<String> rejectionReasons;
+
+  /// Admin từ chối mục thông tin xe: nộp lại phải gửi kèm loại xe, biển số, tải trọng.
+  final bool vehicleRejected;
   bool get canEdit =>
       status == ApprovalStatus.draft || status == ApprovalStatus.rejected;
   bool get canGoOnline => status == ApprovalStatus.approved && accountActive;

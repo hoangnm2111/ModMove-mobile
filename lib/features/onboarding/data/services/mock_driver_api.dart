@@ -267,17 +267,14 @@ class MockDriverApi {
     final candidate = _editableCandidate(body);
     final application = DriverApplicationDto.fromJson(candidate);
     const validation = ValidateDriverApplication();
-    if (validation.personal(application.fields).isNotEmpty ||
-        validation.vehicle(application.fields).isNotEmpty) {
+    if (validation.vehicle(application.fields).isNotEmpty) {
       throw const _ApiFailure(422, 'Vui lòng kiểm tra thông tin hồ sơ.');
     }
     // Deterministic duplicate data cases available for a classroom demo.
-    if (application.fields['citizenId'] == '999999999999' ||
-        application.fields['license'] == '999999999999' ||
-        application.fields['plate']?.toUpperCase() == '99C-999.99') {
+    if (application.fields['plate']?.toUpperCase() == '99C-999.99') {
       throw const _ApiFailure(
         409,
-        'CCCD, GPLX hoặc biển số đã có trong dữ liệu mô phỏng.',
+        'Biển số đã có trong dữ liệu mô phỏng.',
       );
     }
     if (validation.missingDocuments(application).isNotEmpty) {

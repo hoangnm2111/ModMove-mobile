@@ -3,7 +3,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:modmove_mobile/app/app.dart';
 
 void main() {
-  testWidgets('blank personal inputs display errors and do not advance', (
+  testWidgets('personal step has photos only and does not advance without them', (
     tester,
   ) async {
     tester.view.physicalSize = const Size(390, 844);
@@ -13,8 +13,8 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(find.text('Tiếp tục'));
     await tester.pumpAndSettle();
-    expect(find.text('CCCD cần 9 đến 12 chữ số.'), findsOneWidget);
-    expect(find.text('GPLX cần 8 đến 20 chữ hoặc số.'), findsOneWidget);
+    expect(find.text('Số CCCD'), findsNothing);
+    expect(find.text('Số giấy phép lái xe'), findsNothing);
     expect(find.text('Giấy tờ cá nhân'), findsOneWidget);
   });
   testWidgets(

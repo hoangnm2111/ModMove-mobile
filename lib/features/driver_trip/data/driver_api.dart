@@ -29,8 +29,6 @@ class DriverApi {
   /// Đúng 7 URL theo thứ tự: GPLX trước, GPLX sau, đăng ký xe, đăng kiểm, ảnh xe, CCCD trước, CCCD sau.
   Future<int> submitOnboarding({
     required int vehicleTypeId,
-    required String citizenIdNumber,
-    required String driverLicenseNumber,
     required String licensePlate,
     required num maxLoadWeightKg,
     required List<String> documentUrls,
@@ -38,11 +36,23 @@ class DriverApi {
     final j = _map(
       await _api.post('/driver/onboarding', {
         'vehicleTypeId': vehicleTypeId,
-        'citizenIdNumber': citizenIdNumber,
-        'driverLicenseNumber': driverLicenseNumber,
         'licensePlate': licensePlate,
         'maxLoadWeightKg': maxLoadWeightKg,
         'documentUrls': documentUrls,
+      }),
+    );
+    return (j['id'] as num).toInt();
+  }
+
+  /// Nộp lại chỉ phần bị từ chối: `items` = [{key, url}], `vehicle` khi mục VehicleInfo bị từ chối.
+  Future<int> resubmitOnboarding({
+    required List<Map<String, String>> items,
+    Map<String, Object?>? vehicle,
+  }) async {
+    final j = _map(
+      await _api.post('/driver/onboarding/resubmit', {
+        if (items.isNotEmpty) 'items': items,
+        'vehicle': ?vehicle,
       }),
     );
     return (j['id'] as num).toInt();
@@ -100,16 +110,24 @@ class DriverApi {
   Future<void> arriveDropoff(String id) =>
       _api.post('/driver/Trips/$id/arrive-dropoff');
 
-  Future<void> collectCash(String id) =>
-      _api.post('/driver/Trips/$id/collect-cash');
+  /// Thu tiền mặt: BE kiểm tra bước và bán kính 500 m quanh điểm lấy hoặc điểm giao theo toạ độ gửi lên.
+  Future<void> collectCash(String id, double latitude, double longitude) =>
+      _api.post('/driver/Trips/$id/collect-cash', {
+        'latitude': latitude,
+        'longitude': longitude,
+      });
 
   Future<void> deliver(
     String id,
     String deliveryPhotoUrl, {
     bool cashCollected = false,
+    double? latitude,
+    double? longitude,
   }) => _api.post('/driver/Trips/$id/deliver', {
     'deliveryPhotoUrl': deliveryPhotoUrl,
     'cashCollected': cashCollected,
+    'latitude': ?latitude,
+    'longitude': ?longitude,
   });
 
   /* ------------------------------------------------------ ví */
