@@ -12,10 +12,11 @@ Cross-platform mobile application built with **Flutter (Android)** supporting tw
 ## 🛠️ Technology Stack
 - **Framework:** Flutter 3.x / Dart (Target: Android SDK 34+)
 - **State Management:** BLoC / Cubit
-- **Real-Time GPS Streaming:** WebSocket / SignalR client (5-10s ping interval)
-- **Mapping & Routing:** Google Maps Flutter SDK + Directions API polyline
+- **Driver GPS:** REST `POST api/driver/location` every 5 s (foreground service while Online)
+- **Realtime:** SignalR `/hubs/tracking` for notifications and live driver position (`LocationUpdated`)
+- **Mapping & Routing:** MapVina GL (`mapvina_gl`); driving route from the backend (`GET api/driver/route`)
 - **Push Notifications:** Firebase Cloud Messaging (FCM)
-- **Media Upload:** Cloudinary SDK (Direct authenticated cargo & POD uploads)
+- **Media Upload:** through the backend (`api/customer/uploads`, `api/driver/uploads`), stored on Cloudinary
 
 ---
 
@@ -61,17 +62,15 @@ profile; its **Đơn hàng** tab opens the active trip. Pending/rejected profile
 cannot go online. The separate `--dart-define=SCREEN=driver-home` shortcut seeds
 an approved demo driver and skips onboarding; it is only for isolated trip tests.
 
-Configure the Android key once using [Google Maps setup and sequential UI tests](docs/google-maps-android.md).
-Maps use the native Google Maps SDK, with pan/pinch/rotate, zoom/recenter controls
-and an animated 5 km dispatch area while searching. `android/secrets.properties`
-stays ignored. No extra `GOOGLE_MAPS_ENABLED` flag is needed.
-Until a key is configured, the app automatically uses the labelled original mock
-map with pan/zoom and animated search waves. Run `flutter run` now to test the
-full driver flow; after key/Billing setup, rebuild to switch to Google Maps.
+Maps use MapVina GL with pan/pinch/rotate, zoom/recenter controls and an animated
+5 km dispatch area while searching. Pass the key with
+`flutter run --dart-define=MAPVINA_KEY=<key>` (default `public_key` has a low quota);
+see [MapVina setup](docs/mapvina-android.md).
 
-Read [the pickup walkthrough](docs/driver-pickup-mock.md) for demo scenarios,
-architecture and tests. The trip API, GPS, routing and
-uploads are mocked; the session resets on app restart. Screenshots stay ignored.
+By default the driver flow calls the real backend (`api/driver/*`). Only
+`--dart-define=USE_MOCK_DRIVER=true` or the `SCREEN=...` shortcuts use the
+in-app mock; read [the pickup walkthrough](docs/driver-pickup-mock.md) for those
+demo scenarios. Screenshots stay ignored.
 
 ## Driver GPS (backend thật)
 

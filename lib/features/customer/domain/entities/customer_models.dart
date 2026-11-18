@@ -64,6 +64,13 @@ class VehicleType {
     minimumFare: _d(j['minimumFare']),
   );
 
+  /// Ảnh minh họa theo tải trọng (assets/images/vehicle-*.png), dùng chung cho đặt xe và bảng giá.
+  String get image => maxLoadWeightKg <= 600
+      ? 'pickup'
+      : maxLoadWeightKg <= 1200
+      ? 'van'
+      : 'truck-orange';
+
   /// GB-10: tổng KL ≤ tải trọng; món lớn nhất lọt thùng khi xoay (so 3 cạnh đã sắp xếp).
   bool canCarry(double weightKg, int l, int w, int h) {
     if (weightKg > maxLoadWeightKg) return false;

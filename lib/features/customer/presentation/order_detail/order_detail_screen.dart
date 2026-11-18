@@ -113,8 +113,9 @@ class _DetailViewState extends State<_DetailView> with WidgetsBindingObserver {
           );
       if (open || ++_ticks % 2 == 0) cubit.load(withTracking: false);
     });
+    // Chỉ để làm mới ETA: vị trí xe đã đến ngay qua LocationUpdated. Mỗi lần tốn 1 lượt MapVina (200/ngày).
     _trackRefresh = Timer.periodic(
-      const Duration(seconds: 60),
+      const Duration(minutes: 3),
       (_) => cubit.loadTracking(),
     );
   }

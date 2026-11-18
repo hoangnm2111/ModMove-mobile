@@ -64,6 +64,10 @@ class ApiDriverTripRepository implements DriverTripRepository, TripSimulator {
   final _queue = Queue<GpsSample>();
   static const _maxQueued = 120, _maxAge = Duration(minutes: 10);
 
+  /// BE ghi log GPS tối đa 1 điểm mỗi 60 giây mỗi đơn và điểm cũ không đổi vị trí cuối (B21):
+  /// gửi bù dày hơn chỉ tốn request.
+  static const _logGap = Duration(seconds: 60);
+
   /// Online ⇔ đang nghe GPS (và có thông báo của foreground service); mọi chỗ đổi trạng thái đều qua setter này.
   bool get _online => __online;
   set _online(bool value) {
@@ -273,11 +277,14 @@ class ApiDriverTripRepository implements DriverTripRepository, TripSimulator {
   }
 
   /// Gửi hàng đợi theo thứ tự cũ trước. Lỗi mạng/5xx: dừng và giữ lại (ném lên để vòng sau gửi bù);
-  /// 400/422: bỏ điểm đó, không thử lại. 422 MOCK_LOCATION (B20): tắt Online.
+  /// 400/422: bỏ điểm đó. 422 MOCK_LOCATION (B20): tắt Online.
   Future<void> _pushLocation() async {
     final cutoff = now.subtract(_maxAge);
     _queue.removeWhere((s) => s.at.isBefore(cutoff));
-    while (_queue.isNotEmpty) {
+    _thinBacklog();
+    // Chỉ gửi các điểm có sẵn lúc bắt đầu: điểm đến trong lúc gửi chờ vòng sau, để mạng chậm
+    // không giữ vòng đồng bộ mãi ở đây (không tải được chuyến và đơn).
+    for (var left = _queue.length; left > 0 && _queue.isNotEmpty; left--) {
       final sample = _queue.first;
       try {
         await api.sendLocation(
@@ -290,9 +297,38 @@ class ApiDriverTripRepository implements DriverTripRepository, TripSimulator {
         _pings++;
       } on ApiException catch (error) {
         if (error.code == 'ACCOUNT_INACTIVE' || (error.status != 400 && error.status != 422)) rethrow;
-        if (error.code == 'MOCK_LOCATION') await _blockMockLocation();
+        if (error.code == 'MOCK_LOCATION') {
+          await _blockMockLocation();
+        } else if (error.status == 400 && identical(sample, _queue.last)) {
+          await _sendWithServerTime(sample);
+        }
       }
       if (_queue.isNotEmpty && identical(_queue.first, sample)) _queue.removeFirst();
+    }
+  }
+
+  /// Sau khi mất mạng: giữ 1 điểm mỗi [_logGap] và điểm mới nhất, theo thứ tự cũ trước.
+  void _thinBacklog() {
+    if (_queue.length < 3) return;
+    final newest = _queue.last;
+    final kept = <GpsSample>[];
+    for (final sample in _queue) {
+      if (kept.isEmpty || identical(sample, newest) || !sample.at.isBefore(kept.last.at.add(_logGap))) kept.add(sample);
+    }
+    _queue
+      ..clear()
+      ..addAll(kept);
+  }
+
+  /// BE trả 400 khi `recordedAt` lệch giờ server (đồng hồ máy chạy nhanh quá 30 giây): gửi lại điểm mới nhất
+  /// không kèm `recordedAt` để BE dùng giờ của nó, nếu không tài xế bị coi là mất GPS mà không biết vì sao.
+  Future<void> _sendWithServerTime(GpsSample sample) async {
+    try {
+      await api.sendLocation(sample.point.latitude, sample.point.longitude, accuracy: sample.accuracy, isMocked: sample.isMocked);
+      _pings++;
+    } on ApiException catch (error) {
+      if (error.code == 'ACCOUNT_INACTIVE') rethrow;
+      // Lỗi khác: bỏ điểm này, điểm tiếp theo đến sau 5 giây.
     }
   }
 

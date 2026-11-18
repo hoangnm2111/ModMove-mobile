@@ -3,20 +3,36 @@ import '../controllers/home_controller.dart';
 import 'package:flutter/material.dart';
 import 'package:modmove_mobile/core/theme/app_theme.dart';
 import 'package:modmove_mobile/core/widgets/app_widgets.dart';
-import '../models/vehicle_option.dart';
+import '../models/fare_display.dart';
 
 class PricingScreen extends StatefulWidget {
-  const PricingScreen({super.key, this.initialVehicle = VehicleOption.truck});
-  final VehicleOption initialVehicle;
+  const PricingScreen({super.key, this.initialVehicleId});
+
+  /// `id` loại xe của BE; không có hoặc không còn thì chọn loại đầu tiên.
+  final int? initialVehicleId;
   @override
   State<PricingScreen> createState() => _PricingScreenState();
 }
 
 class _PricingScreenState extends State<PricingScreen> {
-  late VehicleOption selected = widget.initialVehicle;
+  late int? selectedId = widget.initialVehicleId;
   @override
   Widget build(BuildContext context) {
-    final fare = context.watch<HomeController>().fareFor(selected.type);
+    final fares = context.watch<HomeController>().state;
+    if (fares == null || fares.isEmpty) {
+      return Scaffold(
+        appBar: const AppHeader('Bảng giá dịch vụ'),
+        body: ListView(
+          padding: const EdgeInsets.all(14),
+          children: [
+            fares == null
+                ? const Center(child: CircularProgressIndicator())
+                : FaresUnavailable(onRetry: context.read<HomeController>().load),
+          ],
+        ),
+      );
+    }
+    final fare = fares.firstWhere((f) => f.id == selectedId, orElse: () => fares.first);
     return Scaffold(
       appBar: const AppHeader('Bảng giá dịch vụ'),
       bottomNavigationBar: DecoratedBox(
@@ -32,7 +48,7 @@ class _PricingScreenState extends State<PricingScreen> {
               trailing: true,
               onPressed: () => showInfoSheet(
                 context,
-                'Giao hàng với ${selected.title}',
+                'Giao hàng với ${fare.name}',
                 'Xe có tải trọng tối đa ${fare.capacity}, thùng xe ${fare.dimensions}. Cước được xác định theo điểm lấy, điểm giao và dịch vụ bốc xếp.',
               ),
             ),
@@ -44,52 +60,42 @@ class _PricingScreenState extends State<PricingScreen> {
         children: [
           const SectionTitle('Chọn xe cho nhu cầu của bạn', size: 17),
           const SizedBox(height: 14),
-          Row(
-            children: [
-              for (final vehicle in VehicleOption.values) ...[
-                if (vehicle != VehicleOption.pickup) const SizedBox(width: 8),
-                Expanded(
-                  child: AppCard(
-                    onTap: () => setState(() => selected = vehicle),
-                    color: vehicle == selected ? AppColors.peach : Colors.white,
-                    borderColor: vehicle == selected
-                        ? AppColors.orange
-                        : AppColors.line,
+          SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: Row(
+              children: [
+                for (final vehicle in fares) ...[
+                  if (vehicle != fares.first) const SizedBox(width: 8),
+                  AppCard(
+                    onTap: () => setState(() => selectedId = vehicle.id),
+                    color: vehicle.id == fare.id ? AppColors.peach : Colors.white,
+                    borderColor: vehicle.id == fare.id ? AppColors.orange : AppColors.line,
                     padding: const EdgeInsets.symmetric(
-                      horizontal: 8,
+                      horizontal: 12,
                       vertical: 16,
                     ),
                     child: Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
                       children: [
                         AppIcon(
                           vehicle.icon,
                           size: 28,
-                          color: vehicle == selected
-                              ? AppColors.orange
-                              : AppColors.secondary,
+                          color: vehicle.id == fare.id ? AppColors.orange : AppColors.secondary,
                         ),
                         const SizedBox(width: 8),
-                        Flexible(
-                          child: Text(
-                            vehicle.label,
-                            style: appText(
-                              size: 12,
-                              weight: vehicle == selected
-                                  ? FontWeight.w600
-                                  : FontWeight.w400,
-                              color: vehicle == selected
-                                  ? AppColors.orange
-                                  : AppColors.ink,
-                            ),
+                        Text(
+                          vehicle.name,
+                          style: appText(
+                            size: 12,
+                            weight: vehicle.id == fare.id ? FontWeight.w600 : FontWeight.w400,
+                            color: vehicle.id == fare.id ? AppColors.orange : AppColors.ink,
                           ),
                         ),
                       ],
                     ),
                   ),
-                ),
+                ],
               ],
-            ],
+            ),
           ),
           const SizedBox(height: 14),
           AppCard(
@@ -98,7 +104,7 @@ class _PricingScreenState extends State<PricingScreen> {
               children: [
                 Expanded(
                   flex: 4,
-                  child: VehicleImage(selected.asset, height: 82),
+                  child: VehicleImage(fare.image, height: 82),
                 ),
                 const SizedBox(width: 15),
                 Expanded(
@@ -106,7 +112,7 @@ class _PricingScreenState extends State<PricingScreen> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      SectionTitle(selected.title, size: 17),
+                      SectionTitle(fare.name, size: 17),
                       const SizedBox(height: 10),
                       Text(
                         'Tải trọng tối đa: ${fare.capacity}',
@@ -133,7 +139,7 @@ class _PricingScreenState extends State<PricingScreen> {
                   color: AppColors.peach,
                   padding: const EdgeInsets.symmetric(vertical: 12),
                   child: Text(
-                    'GIÁ MINH HỌA',
+                    'BẢNG GIÁ HIỆN HÀNH',
                     textAlign: TextAlign.center,
                     style: appText(
                       size: 17,

@@ -82,6 +82,10 @@ class SignalRRealtimeSource implements RealtimeSource {
   HubConnection? _connection;
   late final _rooms = OrderRooms(_invokeRoom);
 
+  /// Hàm lấy token của lần [start] gần nhất; `null` sau [stop] nên không tự nối lại nữa.
+  Future<String?> Function()? _token;
+  Timer? _retry;
+
   @override
   Stream<Map<String, Object?>> get notifications => _controller.stream;
 
@@ -107,6 +111,7 @@ class SignalRRealtimeSource implements RealtimeSource {
 
   @override
   Future<void> start(Future<String?> Function() token) async {
+    _token = token;
     if (_connection != null) return;
     final connection = HubConnectionBuilder().withUrl(hubUrl(apiBaseUrl), options: HttpConnectionOptions(accessTokenFactory: () async => await token() ?? '')).withAutomaticReconnect().build();
     connection.on('NotificationReceived', (args) {
@@ -118,17 +123,32 @@ class SignalRRealtimeSource implements RealtimeSource {
       if (payload is Map) _locations.add(payload.cast<String, Object?>());
     });
     connection.onreconnected(({connectionId}) => unawaited(_rooms.rejoin()));
+    // BE đóng kết nối khi access token hết hạn (15 phút); hết lượt tự nối lại thì dựng kết nối mới.
+    connection.onclose(({error}) => _retryLater(connection));
     _connection = connection;
     try {
       await connection.start();
       await _rooms.rejoin();
     } catch (error) {
       debugPrint('SignalR chưa kết nối được: $error');
+      _retryLater(connection);
     }
+  }
+
+  /// Bỏ kết nối hỏng và thử lại sau 5 giây, nếu chưa [stop] (còn đăng nhập).
+  void _retryLater(HubConnection failed) {
+    if (!identical(_connection, failed)) return;
+    _connection = null;
+    _retry?.cancel();
+    final token = _token;
+    if (token != null) _retry = Timer(const Duration(seconds: 5), () => unawaited(start(token)));
   }
 
   @override
   Future<void> stop() async {
+    _token = null;
+    _retry?.cancel();
+    _retry = null;
     final connection = _connection;
     _connection = null;
     _rooms.clear();
@@ -143,17 +163,19 @@ class SignalRRealtimeSource implements RealtimeSource {
 
 /// Nối nguồn thời gian thực với [NotificationCubit]: payload → [noticeFor] → banner và hộp thông báo.
 class RealtimeBridge {
-  RealtimeBridge(this._source, this._cubit, this._sessions);
+  /// [token]: thường là `ApiClient.freshToken` (refresh trước khi hết hạn); không truyền thì đọc thẳng [SessionStore].
+  RealtimeBridge(this._source, this._cubit, this._sessions, {this._token});
   final RealtimeSource _source;
   final NotificationCubit _cubit;
   final SessionStore _sessions;
+  final Future<String?> Function()? _token;
   StreamSubscription<Map<String, Object?>>? _subscription;
 
   Future<void> start() async {
     if (_subscription != null) return;
     _subscription = _source.notifications.listen(_onPayload, onError: (_) {});
-    // Đọc token mới nhất ở mỗi lần kết nối (ApiClient đã tự refresh khi 401 nên SessionStore luôn mới).
-    await _source.start(() async => _sessions.current?.accessToken);
+    // Đọc token ở MỖI lần kết nối (kể cả nối lại), refresh trước nếu sắp hết hạn.
+    await _source.start(_token ?? () async => _sessions.current?.accessToken);
   }
 
   /// Đăng xuất / hết phiên: ngắt kết nối, bỏ nghe và xoá hộp thông báo.
