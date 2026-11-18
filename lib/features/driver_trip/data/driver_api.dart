@@ -1,4 +1,6 @@
 import '../../../core/network/api_client.dart';
+import '../domain/entities/trip_models.dart';
+import 'polyline.dart';
 
 /// Một hàm cho mỗi endpoint `api/driver/*` mà app tài xế dùng.
 /// Path và body lấy từ ModMove-backend/docs/api/README.md (BE là nguồn chuẩn).
@@ -68,6 +70,23 @@ class DriverApi {
     '/driver/location',
     {'latitude': latitude, 'longitude': longitude},
   );
+
+  /// Đường lái xe thật từ [from] tới [to] (BE gọi MapVina). `null` khi BE không có hình đường.
+  Future<List<GeoPoint>?> route(GeoPoint from, GeoPoint to) async {
+    final j = _map(
+      await _api.get(
+        '/driver/route',
+        query: {
+          'fromLatitude': from.latitude,
+          'fromLongitude': from.longitude,
+          'toLatitude': to.latitude,
+          'toLongitude': to.longitude,
+        },
+      ),
+    );
+    final polyline = j['polyline'] as String?;
+    return polyline == null || polyline.isEmpty ? null : decodePolyline(polyline);
+  }
 
   /* ------------------------------------------------------ ghép đơn */
 

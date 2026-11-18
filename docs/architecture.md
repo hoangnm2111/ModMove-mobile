@@ -41,16 +41,14 @@ and timer lifetimes. Profile and trip availability use the same DriverHomeBloc;
 the profile API remains the persistence gateway. See the
 [pickup walkthrough](driver-pickup-mock.md) for boundaries and mock scenarios.
 
-`DriverMap` renders the native Google Maps SDK. Matching and coverage share the
-pure-Dart `DriverMatchingPolicy.searchRadiusMeters`. Online/GPS/trip state comes
-from `DriverHomeBloc`; the widget's animation controller handles only visual
-timing and respects lifecycle, ticker visibility and reduced motion. Android key
-presence is read through `core/platform/maps_configuration.dart`; the key itself
-remains in native manifest metadata. Without a configured key, `MockDriverMap`
-temporarily renders the original illustrative streets, route and vehicle with
-pan/zoom and the same lifecycle-aware pulse. It is labelled as a simulation.
-Rebuilding after key/Billing setup automatically selects Google Maps again.
-See [Google Maps setup](google-maps-android.md).
+`DriverMap` renders the native MapVina map (`mapvina_gl`, MapVina's own style).
+Matching and coverage share the pure-Dart `DriverMatchingPolicy.searchRadiusMeters`.
+Online/GPS/trip state comes from `DriverHomeBloc`; the widget's animation
+controller handles only visual timing and respects lifecycle, ticker visibility
+and reduced motion. The road to the pickup point comes from the backend
+(`GET api/driver/route`, passed in as `loadRoute`); if it fails the widget draws
+a straight line. The key is `MAPVINA_KEY` (`--dart-define`, see `AppConfig`).
+See [MapVina setup](mapvina-android.md).
 
 Public fares use a demo repository. Driver profiles use `ApiDriverRepository`,
 which maps domain entities to JSON and sends HTTP requests through an injected
