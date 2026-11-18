@@ -627,7 +627,8 @@ class ApiDriverTripRepository implements DriverTripRepository, TripSimulator {
         );
       }
       try {
-        await api.collectCash(trip.job.id);
+        final here = await _requirePoint();
+        await api.collectCash(trip.job.id, here.latitude, here.longitude);
       } catch (error) {
         // Lần gửi trước đã ghi nhận thu tiền nhưng gửi ảnh lỗi: BE báo đã thu rồi thì gửi ảnh tiếp.
         if (error is! ApiException || error.code != 'ORDER_ALREADY_PAID') {
@@ -684,13 +685,23 @@ class ApiDriverTripRepository implements DriverTripRepository, TripSimulator {
     _publish();
   }
 
+  /// Vị trí hiện tại để BE kiểm tra bán kính khi thu tiền.
+  Future<GeoPoint> _requirePoint() async {
+    final point = _override ?? await _location.current();
+    if (point == null) {
+      throw const TripFailure('Chưa xác định được vị trí. Bật GPS rồi thử lại.');
+    }
+    return point;
+  }
+
   @override
   Future<void> collectCash() async {
     final trip = _requireTrip();
     if (!trip.job.cash) {
       throw const TripFailure('Đơn này đã thanh toán online.');
     }
-    await _call(() => api.collectCash(trip.job.id));
+    final here = await _requirePoint();
+    await _call(() => api.collectCash(trip.job.id, here.latitude, here.longitude));
     await _reloadTrip();
   }
 

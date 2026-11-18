@@ -168,16 +168,7 @@ class _DriverProfileScreenState extends State<DriverProfileScreen> {
           const SizedBox(height: 8),
           const Divider(height: 1),
           ProfileDetailRow('Họ tên', driver.fields['fullName']!),
-          ProfileDetailRow('', maskPhone(driver.fields['phone']!)),
-          ProfileDetailRow(
-            'Số CCCD',
-            maskDocument(driver.fields['citizenId']!),
-          ),
-          ProfileDetailRow(
-            'Số GPLX',
-            maskDocument(driver.fields['license']!),
-            divider: false,
-          ),
+          ProfileDetailRow('', maskPhone(driver.fields['phone']!), divider: false),
         ],
       ),
     ),

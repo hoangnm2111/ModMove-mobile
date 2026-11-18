@@ -312,9 +312,7 @@ class _VerificationScreenState extends State<VerificationScreen> {
         keyboardType: keyboard,
         style: appText(size: 14),
         onChanged: (value) => driver.setField(key, value),
-        validator: (_) => key == 'citizenId' || key == 'license'
-            ? driver.personalErrors()[key]
-            : driver.vehicleErrors()[key],
+        validator: (_) => driver.vehicleErrors()[key],
         decoration: InputDecoration(
           hintText: hint,
           contentPadding: const EdgeInsets.symmetric(
@@ -334,21 +332,6 @@ class _VerificationScreenState extends State<VerificationScreen> {
       style: appText(size: 12, color: AppColors.muted),
     ),
     const SizedBox(height: 10),
-    _field(
-      driver,
-      'citizenId',
-      'Số CCCD',
-      hint: 'Nhập số CCCD',
-      keyboard: TextInputType.number,
-    ),
-    const SizedBox(height: 10),
-    _field(
-      driver,
-      'license',
-      'Số giấy phép lái xe',
-      hint: 'Nhập số GPLX',
-      keyboard: TextInputType.number,
-    ),
     const SizedBox(height: 16),
     const SectionTitle('Giấy phép lái xe', size: 16),
     const SizedBox(height: 6),
