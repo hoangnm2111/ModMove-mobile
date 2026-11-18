@@ -289,7 +289,7 @@ class ApiDriverTripRepository implements DriverTripRepository, TripSimulator {
         );
         _pings++;
       } on ApiException catch (error) {
-        if (error.status != 400 && error.status != 422) rethrow;
+        if (error.code == 'ACCOUNT_INACTIVE' || (error.status != 400 && error.status != 422)) rethrow;
         if (error.code == 'MOCK_LOCATION') await _blockMockLocation();
       }
       if (_queue.isNotEmpty && identical(_queue.first, sample)) _queue.removeFirst();

@@ -522,7 +522,7 @@ void main() {
 
     test('ACCOUNT_INACTIVE khi gửi GPS vẫn tắt Online như cũ', () async {
       final lab = await _Lab.start();
-      lab.location = (_) async => _problem(403, 'ACCOUNT_INACTIVE');
+      lab.location = (_) async => _problem(422, 'ACCOUNT_INACTIVE');
       lab.gps.emit(here, at: DateTime.now());
       await expectLater(lab.repo.refresh(), throwsA(isA<TripFailure>()));
       expect(lab.repo.current.online, isFalse);
