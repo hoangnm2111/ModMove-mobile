@@ -89,10 +89,5 @@ const errorMessages = <String, String>{
   'WITHDRAWAL_EXCEEDS_BALANCE': 'Số tiền rút vượt số dư được phép rút.',
   'TOP_UP_BELOW_MISSING_DEPOSIT': 'Số tiền nạp phải đủ phần tiền cọc còn thiếu.',
   'APPLICATION_NOT_EDITABLE': 'Hồ sơ đang chờ duyệt hoặc đã được duyệt nên không nộp lại được.',
-  'RESUBMIT_MISSING_REJECTED_ITEMS': 'Vui lòng tải lên đủ các giấy tờ đã bị từ chối trước khi gửi lại.',
-  'COLLECT_CASH_WRONG_LOCATION': 'Chỉ thu được tiền mặt khi bạn đang ở gần điểm lấy hàng hoặc điểm giao hàng (trong vòng 500 m).',
-  'FILE_TOO_LARGE': 'Ảnh phải trong giới hạn cho phép: tối đa 5MB.',
-  'UNSUPPORTED_FILE_TYPE': 'Ảnh phải trong giới hạn cho phép: chỉ chấp nhận JPG hoặc PNG.',
-  'UPLOAD_FAILED': 'Không thể hoàn tất thao tác. Vui lòng thử lại.',
   'SERVER_ERROR': 'Lỗi máy chủ. Vui lòng thử lại sau.',
 };
