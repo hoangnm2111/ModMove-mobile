@@ -19,6 +19,8 @@ String transactionLabel(String type) => switch (type) {
   'TripEarning' => 'Thu nhập chuyến',
   'CommissionDeduction' => 'Phí nền tảng',
   'WithdrawEarnings' => 'Rút thu nhập',
+  'Withdrawal' => 'Rút tiền',
+  'DepositRefill' => 'Bổ sung ký quỹ từ thu nhập',
   'CommissionDebtPaid' => 'Trả nợ phí nền tảng',
   _ => type,
 };

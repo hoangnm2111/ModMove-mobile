@@ -77,6 +77,23 @@ class WalletCubit extends Cubit<WalletState> {
 
   Future<void> refresh() => _run(_reload);
   Future<void> topUp(int amount) => _run(() async {
+    emit(state.copyWith(clearPayment: true, paymentConfirmed: false));
+    final balance = await repository.balance();
+    if (isClosed) return;
+    emit(state.copyWith(balance: balance));
+    if (!balance.active) {
+      throw const WalletFailure('Ví đang bị khóa. Liên hệ hỗ trợ.');
+    }
+    final missing = balance.minimumDeposit > balance.deposit
+        ? balance.minimumDeposit - balance.deposit
+        : 0;
+    if (amount <= 0 || amount < missing) {
+      throw WalletFailure(
+        missing > 0
+            ? 'Cần nạp ít nhất $missing đ để bù đủ ký quỹ.'
+            : 'Số tiền nạp phải lớn hơn 0đ.',
+      );
+    }
     // Do not leave an earlier QR visible if creating its replacement fails.
     emit(state.copyWith(clearPayment: true, paymentConfirmed: false));
     final payment = await repository.topUp(amount);

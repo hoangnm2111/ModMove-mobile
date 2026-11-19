@@ -103,7 +103,7 @@ class _WalletScreenState extends State<WalletScreen>
                       child: _balance(
                         'Ký quỹ',
                         balance?.deposit,
-                        'Không thể rút',
+                        'Rút theo hạn mức khả dụng',
                       ),
                     ),
                   ],
@@ -115,8 +115,8 @@ class _WalletScreenState extends State<WalletScreen>
                   !balance.active
                       ? 'Ví đang bị khóa'
                       : balance.canReceiveCash
-                      ? 'Đủ ký quỹ tối thiểu để nhận đơn tiền mặt'
-                      : 'Cần bổ sung ký quỹ để nhận đơn tiền mặt',
+                      ? 'Đủ ký quỹ tối thiểu để nhận đơn'
+                      : 'Cần bổ sung ký quỹ để nhận đơn',
                   detail:
                       'Ký quỹ tối thiểu ${formatVnd(balance.minimumDeposit)}. Hệ thống kiểm tra thêm hoa hồng của từng đơn.',
                   icon: balance.canReceiveCash ? 'check' : 'warning',
@@ -148,7 +148,7 @@ class _WalletScreenState extends State<WalletScreen>
                     Expanded(
                       child: _action(
                         'withdraw',
-                        'Rút thu nhập',
+                        'Rút tiền',
                         () => openWalletPage(context, const WithdrawalScreen()),
                         hint: balance == null
                             ? 'Đang tải hạn mức'
@@ -168,7 +168,7 @@ class _WalletScreenState extends State<WalletScreen>
               ),
               const SizedBox(height: 10),
               Text(
-                'Chỉ rút từ ví thu nhập. Ký quỹ dùng để nhận đơn và trừ hoa hồng đơn tiền mặt.',
+                'Khi không có chuyến đang chạy, có thể rút cả thu nhập và ký quỹ theo hạn mức hệ thống. Khi đang chạy chuyến, chỉ rút phần thu nhập. Rút ký quỹ có thể làm bạn chưa đủ điều kiện nhận đơn mới.',
                 style: appText(size: 11, color: AppColors.secondary),
               ),
               if (state.error != null) ...[

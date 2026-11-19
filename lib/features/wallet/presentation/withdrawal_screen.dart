@@ -33,7 +33,7 @@ class _WithdrawalScreenState extends State<WithdrawalScreen> {
       final block = _withdrawalBlock(state);
       return Scaffold(
         appBar: AppHeader(
-          'Rút thu nhập',
+          'Rút tiền',
           actions: [
             IconButton(
               tooltip: 'Tải lại trạng thái rút tiền',
@@ -64,7 +64,7 @@ class _WithdrawalScreenState extends State<WithdrawalScreen> {
                     ),
                     const SizedBox(height: 6),
                     Text(
-                      'Chỉ rút thu nhập sau khi trừ nợ hoa hồng. Không rút được ký quỹ.',
+                      'Khi không có chuyến đang chạy, có thể rút cả thu nhập và ký quỹ. Khi đang chạy chuyến, chỉ rút thu nhập theo hạn mức khả dụng.',
                       style: appText(size: 12, color: AppColors.secondary),
                     ),
                   ],
@@ -131,7 +131,7 @@ class _WithdrawalScreenState extends State<WithdrawalScreen> {
                     ? 'Rút từ 1đ. Số tiền phải là số nguyên VND.'
                     : balance.withdrawable > 0
                     ? 'Rút từ 1đ đến ${formatVnd(balance.withdrawable)}.'
-                    : 'Rút từ 1đ. Hiện chưa có thu nhập có thể rút.',
+                    : 'Rút từ 1đ. Hiện chưa có số dư khả dụng để rút.',
                 style: appText(
                   size: 12,
                   weight: FontWeight.w600,
@@ -224,7 +224,7 @@ class _WithdrawalScreenState extends State<WithdrawalScreen> {
                             shape: RoundedRectangleBorder(
                               borderRadius: BorderRadius.circular(16),
                             ),
-                            title: const Text('Xác nhận rút thu nhập'),
+                            title: const Text('Xác nhận rút tiền'),
                             content: Text(
                               'Rút ${formatVnd(amount)} về ${balance.bank!.name} ${balance.bank!.masked}?'
                               '${balance.debt > 0 ? '\n\nTrả nợ hoa hồng: ${formatVnd(balance.debt)}. Tổng trừ từ ví thu nhập: ${formatVnd(amount + balance.debt)}.' : ''}'
@@ -321,7 +321,7 @@ class _WithdrawalScreenState extends State<WithdrawalScreen> {
     return (
       title: 'Chưa đủ số dư để rút',
       detail:
-          'Chỉ rút thu nhập khả dụng sau khi trừ nợ hoa hồng. Hoàn tất đơn PayOS để ghi nhận thu nhập; nạp ký quỹ không làm tăng số có thể rút.',
+          'Hệ thống tính hạn mức từ số dư, nợ hoa hồng, yêu cầu đang chờ và chuyến đang chạy. Khi đang chạy chuyến, ký quỹ chưa thể rút.',
     );
   }
   return null;

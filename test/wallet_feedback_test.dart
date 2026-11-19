@@ -103,14 +103,14 @@ void main() {
           scale: 1.3,
         );
         await tester.scrollUntilVisible(
-          find.text('Rút thu nhập'),
+          find.text('Rút tiền'),
           200,
           scrollable: find.byType(Scrollable).first,
         );
         expect(find.text(rule.label), findsOneWidget);
-        expect(find.text('Không thể rút'), findsOneWidget);
+        expect(find.text('Rút theo hạn mức khả dụng'), findsOneWidget);
         expect(tester.takeException(), isNull);
-        await tester.tap(find.text('Rút thu nhập'));
+        await tester.tap(find.text('Rút tiền'));
         await tester.pumpAndSettle();
         await tester.scrollUntilVisible(
           find.byKey(const Key('request-withdrawal')),

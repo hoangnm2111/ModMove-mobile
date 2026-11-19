@@ -24,6 +24,10 @@ class _DepositScreenState extends State<DepositScreen>
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
+    final balance = context.read<WalletCubit>().state.balance;
+    if (balance != null && balance.deposit < balance.minimumDeposit) {
+      _amount.text = '${balance.minimumDeposit - balance.deposit}';
+    }
     _poll = Timer.periodic(const Duration(seconds: 5), (_) {
       if (!mounted ||
           !_foreground ||
@@ -66,7 +70,15 @@ class _DepositScreenState extends State<DepositScreen>
             Wrap(
               spacing: 8,
               children: [
-                for (final amount in [50000, 100000, 200000, 500000])
+                for (final amount in {
+                  if (state.balance != null &&
+                      state.balance!.deposit < state.balance!.minimumDeposit)
+                    state.balance!.minimumDeposit - state.balance!.deposit,
+                  50000,
+                  100000,
+                  200000,
+                  500000,
+                })
                   ActionChip(
                     label: Text(formatVnd(amount)),
                     onPressed: state.busy
@@ -84,9 +96,13 @@ class _DepositScreenState extends State<DepositScreen>
                 FilteringTextInputFormatter.digitsOnly,
                 LengthLimitingTextInputFormatter(12),
               ],
-              decoration: const InputDecoration(
+              decoration: InputDecoration(
                 labelText: 'Số tiền (VND)',
-                helperText: 'Nạp tối thiểu 50.000đ',
+                helperText: state.balance == null
+                    ? 'Số tiền phải lớn hơn 0đ; hệ thống kiểm tra phần ký quỹ còn thiếu.'
+                    : state.balance!.deposit < state.balance!.minimumDeposit
+                    ? 'Cần bổ sung ít nhất ${formatVnd(state.balance!.minimumDeposit - state.balance!.deposit)}'
+                    : 'Đã đủ ký quỹ. Có thể nạp thêm từ 1đ.',
               ),
             ),
             const SizedBox(height: 16),

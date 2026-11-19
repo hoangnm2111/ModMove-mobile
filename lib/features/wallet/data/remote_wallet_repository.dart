@@ -38,8 +38,8 @@ class RemoteWalletRepository implements DriverWalletRepository {
   });
   @override
   Future<DepositPayment> topUp(int amount) => _guard(() async {
-    if (amount < 50000) {
-      throw const WalletFailure('Số tiền nạp tối thiểu là 50.000đ.');
+    if (amount <= 0) {
+      throw const WalletFailure('Số tiền nạp phải lớn hơn 0đ.');
     }
     Map data;
     try {

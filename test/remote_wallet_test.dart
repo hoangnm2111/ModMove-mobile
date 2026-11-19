@@ -10,12 +10,58 @@ import 'support/remote_fixtures.dart';
 
 void main() {
   test(
+    'top-up accepts 1 VND when funded, and requires the full current deposit deficit',
+    () async {
+      var deposit = 200000;
+      final amounts = <int>[];
+      final api = ApiClient(
+        store: MemorySessionStore(),
+        client: MockClient((r) async {
+          if (r.url.path == '/api/driver/wallet') {
+            return jsonResponse(walletFixture(deposit: deposit));
+          }
+          final amount = (jsonDecode(r.body) as Map)['amount'] as int;
+          amounts.add(amount);
+          return jsonResponse({
+            'transactionId': 1,
+            'amount': amount,
+            'checkoutUrl': 'https://pay.payos.vn/test',
+            'expiresAt': DateTime.now()
+                .add(const Duration(minutes: 10))
+                .toIso8601String(),
+            'qrCode': 'test',
+          });
+        }),
+      );
+      addTearDown(api.close);
+      await api.saveSession(tokens());
+      final c = WalletCubit(RemoteWalletRepository(api));
+      addTearDown(c.close);
+      await c.topUp(1);
+      expect(c.state.payment?.amount, 1);
+      deposit = -10000;
+      await c.topUp(200000);
+      expect(c.state.payment, isNull);
+      expect(c.state.error, contains('210000'));
+      expect(amounts, [1]);
+      await c.topUp(210000);
+      expect(amounts, [1, 210000]);
+      expect(
+        c.state.balance!.deposit,
+        -10000,
+      ); // A QR never credits the wallet.
+    },
+  );
+  test(
     'PayOS service error keeps its support reference and removes the older QR',
     () async {
       var unavailable = false;
       final api = ApiClient(
         store: MemorySessionStore(),
         client: MockClient((request) async {
+          if (request.url.path == '/api/driver/wallet') {
+            return jsonResponse(walletFixture());
+          }
           expect(request.url.path, '/api/driver/wallet/topup');
           if (unavailable) {
             return jsonResponse({
@@ -107,9 +153,9 @@ void main() {
       final cubit = WalletCubit(RemoteWalletRepository(api));
       addTearDown(cubit.close);
       await cubit.refresh();
-      await cubit.topUp(49000);
+      await cubit.topUp(0);
       expect(posts, 0);
-      expect(cubit.state.error, contains('50.000'));
+      expect(cubit.state.error, contains('lớn hơn 0'));
       await cubit.topUp(50000);
       expect(cubit.state.balance!.deposit, 250000);
       deposit = 300000;
