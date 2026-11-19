@@ -5,7 +5,9 @@ Backend quyết định quyền truy cập, trạng thái chuyến và kết qu�
 
 ## Mở và kiểm thử tuần tự
 
-1. Chạy backend tại `http://localhost:5133`, rồi chạy Android Emulator:
+1. Chạy `flutter run` trên Android Emulator hoặc điện thoại có Internet. App mặc định
+   kết nối `https://modmove-103-178-235-191.sslip.io`; dùng tài khoản tài xế trên VPS.
+   Nếu cần kiểm thử backend local trên emulator, chạy
    `flutter run --dart-define=API_BASE_URL=http://10.0.2.2:5133`.
 2. Đăng nhập tài xế đã duyệt và có chuyến Accepted/Arrived/PickedUp/InTransit.
    Mở chuyến → **Báo sự cố**. Cũng có thể vào **Tài khoản → Sự cố của tôi**

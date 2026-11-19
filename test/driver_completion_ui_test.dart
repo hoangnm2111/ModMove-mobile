@@ -306,7 +306,13 @@ class UiPhotos implements CargoPhotoRepository {
 class UiTrips implements DriverTripRepository, DriverDeliveryRepository {
   int uploads = 0, deliveries = 0;
   @override
-  DriverSession get current => DriverSession(trip: _trip('InTransit'));
+  DriverSession get current => DriverSession(
+    trip: _trip('InTransit'),
+    gpsEnabled: true,
+    fix: GpsFix(_trip('InTransit').job.dropoffPoint, fixtureTime),
+  );
+  @override
+  Stream<DriverSession> get changes => const Stream.empty();
   @override
   Future<UploadedEvidence> upload(
     CargoPhoto photo,

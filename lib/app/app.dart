@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'driver_trip_scope.dart';
+import '../core/domain/draft_store.dart';
 import '../features/incidents/domain/driver_incident_repository.dart';
 import '../features/incidents/presentation/incident_list_screen.dart';
 import '../features/incidents/presentation/incident_detail_screen.dart';
@@ -47,6 +48,8 @@ class ModMoveApp extends StatelessWidget {
     this.incidentRepository,
     this.navigatorKey,
     this.notificationSettingsBuilder,
+    this.drafts,
+    this.accountSecurityBuilder,
   });
   final String screen;
   final DriverController? driverController;
@@ -59,6 +62,8 @@ class ModMoveApp extends StatelessWidget {
   final DriverIncidentRepository? incidentRepository;
   final GlobalKey<NavigatorState>? navigatorKey;
   final WidgetBuilder? notificationSettingsBuilder;
+  final DraftStore? drafts;
+  final WidgetBuilder? accountSecurityBuilder;
 
   DriverController _createDriver() {
     final fixture = DemoDriverRepository(
@@ -111,6 +116,7 @@ class ModMoveApp extends StatelessWidget {
         repository: tripRepository,
         cargoPhotos: cargoPhotos,
         incidents: incidentRepository,
+        drafts: drafts,
         child: MaterialApp(
           navigatorKey: navigatorKey,
           title: 'ModMove',
@@ -141,6 +147,13 @@ class ModMoveApp extends StatelessWidget {
                 : _home(context),
           ),
           onGenerateRoute: (settings) {
+            if (settings.name == '/account-security' &&
+                accountSecurityBuilder != null) {
+              return MaterialPageRoute<void>(
+                settings: settings,
+                builder: accountSecurityBuilder!,
+              );
+            }
             if (settings.name == '/notifications' &&
                 notificationSettingsBuilder != null) {
               return MaterialPageRoute<void>(
@@ -283,6 +296,9 @@ class ModMoveApp extends StatelessWidget {
         );
 
   Widget _profile(BuildContext context) => DriverProfileScreen(
+    onSecurity: accountSecurityBuilder == null
+        ? null
+        : () => Navigator.pushNamed(context, '/account-security'),
     onNotifications: notificationSettingsBuilder == null
         ? null
         : () => Navigator.pushNamed(context, '/notifications'),

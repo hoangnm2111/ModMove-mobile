@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../../../core/domain/draft_store.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import '../../../../core/formatting/vietnam_time.dart';
@@ -22,9 +23,18 @@ class DeliveryScreen extends StatelessWidget {
       context.read<DriverTripRepository>(),
       context.read<DriverDeliveryRepository>(),
       context.read<CargoPhotoRepository>(),
+      drafts: _draftStore(context),
     ),
     child: _DeliveryBody(tripState),
   );
+}
+
+DraftStore? _draftStore(BuildContext context) {
+  try {
+    return context.read<DraftStore?>();
+  } catch (_) {
+    return null;
+  }
 }
 
 class _DeliveryBody extends StatelessWidget {
@@ -51,6 +61,7 @@ class _DeliveryBody extends StatelessWidget {
               busy: state.busy,
               onPressed:
                   state.uploaded != null &&
+                      tripState.canDeliver &&
                       (!needsCash || state.cash) &&
                       !state.busy
                   ? cubit.submit
@@ -62,6 +73,14 @@ class _DeliveryBody extends StatelessWidget {
           padding: const EdgeInsets.fromLTRB(16, 0, 16, 20),
           children: [
             const PickupStepper(3),
+            if (!tripState.canDeliver)
+              Notice(
+                trip.onHold
+                    ? 'Chuyến tạm dừng. Chờ điều phối xử lý sự cố bạn đã báo.'
+                    : 'Cần GPS cập nhật trong 30 giây và cách điểm giao không quá 500 m để xác nhận giao hàng.',
+                icon: 'warning',
+                peach: true,
+              ),
             const Notice(
               'Khách đã xác nhận hàng. Chuyến đã bắt đầu giao.',
               icon: 'check',
@@ -143,7 +162,9 @@ class _DeliveryBody extends StatelessWidget {
                     )
                   else
                     TextButton(
-                      onPressed: state.busy ? null : cubit.arrive,
+                      onPressed: state.busy || trip.onHold
+                          ? null
+                          : cubit.arrive,
                       child: const Text('Thông báo đã đến điểm giao'),
                     ),
                 ],

@@ -1,4 +1,5 @@
 import 'dart:async';
+import '../core/domain/draft_store.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../features/incidents/domain/driver_incident_repository.dart';
@@ -22,11 +23,13 @@ class DriverTripScope extends StatefulWidget {
     this.repository,
     this.cargoPhotos,
     this.incidents,
+    this.drafts,
   });
   final Widget child;
   final DriverTripRepository? repository;
   final CargoPhotoRepository? cargoPhotos;
   final DriverIncidentRepository? incidents;
+  final DraftStore? drafts;
   @override
   State<DriverTripScope> createState() => _DriverTripScopeState();
 }
@@ -100,6 +103,7 @@ class _DriverTripScopeState extends State<DriverTripScope>
   @override
   Widget build(BuildContext context) => MultiRepositoryProvider(
     providers: [
+      RepositoryProvider<DraftStore?>.value(value: widget.drafts),
       if (widget.incidents != null)
         RepositoryProvider<DriverIncidentRepository>.value(
           value: widget.incidents!,
@@ -126,6 +130,7 @@ class _DriverTripScopeState extends State<DriverTripScope>
           create: (_) => EvidenceCubit(
             DriverTripActions(_repository),
             widget.cargoPhotos ?? DeviceCargoPhotoRepository(),
+            drafts: widget.drafts,
           ),
         ),
         BlocProvider.value(value: _homeBloc),
