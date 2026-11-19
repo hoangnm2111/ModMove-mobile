@@ -13,7 +13,7 @@ Cross-platform mobile application built with **Flutter (Android)** supporting tw
 - **Framework:** Flutter 3.x / Dart (Target: Android SDK 34+)
 - **State Management:** BLoC / Cubit
 - **Real-Time GPS Streaming:** WebSocket / SignalR client (5-10s ping interval)
-- **Mapping & Routing:** Google Maps Flutter SDK + Directions API polyline
+- **Mapping & Routing:** MapVina raster tiles, search/reverse and Directions v2; Flutter Map renderer
 - **Push Notifications:** Firebase Cloud Messaging (FCM)
 - **Media Upload:** Cloudinary SDK (Direct authenticated cargo & POD uploads)
 
@@ -36,7 +36,9 @@ payment, order tracking, pickup review, receipt confirmation, ratings, incidents
 Registration lets the user choose Customer or Driver. See the [Customer API walkthrough](docs/customer-api.md)
 for all 18 tasks, backend rules and the live verification limits (MapVina, Cloudinary and Google Maps configuration).
 
-The app defaults to the real local backend at `http://10.0.2.2:5133` on Android Emulator. Start the backend, then run `flutter run` from this repository. See [backend API setup and sequential driver testing](docs/backend-api.md) for all 11 Driver tasks and the remaining Cloudinary/PayOS verification.
+The app defaults to the deployed backend at `https://modmove-103-178-235-191.sslip.io` for both Customer and Driver. Run `flutter run` from this repository on an emulator or a physical Android device with internet access. REST requests, uploads, FCM token registration and SignalR tracking use the same API base URL. See [backend API setup and sequential driver testing](docs/backend-api.md) for all 11 Driver tasks and the remaining Cloudinary/PayOS verification.
+
+To use a local backend on Android Emulator instead, run `flutter run --dart-define=API_BASE_URL=http://10.0.2.2:5133`. The base URL must not include `/api`. Stop and relaunch the app after changing this build-time setting. Sessions and driver drafts are stored separately for each server; sign in with an account registered on the VPS when using the default URL. Local demo accounts are not automatically transferred to the VPS.
 
 The UI fixture commands below describe the earlier demo. Add `--dart-define=USE_MOCK_API=true` when reviewing those mock screens; `SCREEN` does not bypass authentication in real API mode.
 
@@ -73,18 +75,18 @@ Pickup photos require customer approval; Delivered remains distinct from the
 Completed settlement. The separate `SCREEN=driver-home` shortcut only seeds a
 demo driver when `USE_MOCK_API=true`.
 
-Configure the Android key once using [Google Maps setup and sequential UI tests](docs/google-maps-android.md).
-Maps use the native Google Maps SDK, with pan/pinch/rotate, zoom/recenter controls
-and an animated 5 km dispatch area while searching. `android/secrets.properties`
-stays ignored. No extra `GOOGLE_MAPS_ENABLED` flag is needed.
-Until a key is configured, the app automatically uses the labelled original mock
-map with pan/zoom and animated search waves. Run `flutter run` now to test the
-driver UI; after key/Billing setup, rebuild to switch to Google Maps.
+Configure `MAPVINA_API_KEY` using [MapVina setup and verification](docs/mapvina.md).
+Customer and Driver maps use MapVina data with pan/pinch, zoom/recenter controls
+and an animated 5 km driver dispatch area. `android/secrets.properties` stays
+ignored. Rebuild the APK after changing the key. Live mode never substitutes a
+mock map for missing configuration; manual addresses remain available.
 
 Read [the real API walkthrough](docs/backend-api.md) for sequential testing.
 Cloudinary/PayOS credentials were unavailable during local verification, so
 real uploads/payments and a full new trip through settlement remain to be tested.
-Routing opens Google Maps externally; GPS currently runs in the foreground.
+Routing opens the in-app MapVina route and step list. Android uses a location foreground service
+while online/on a trip to keep GPS updates running when switching apps. Real-device
+background/lock-screen and force-stop recovery checks are still required.
 The older [pickup walkthrough](docs/driver-pickup-mock.md) applies only to the
 explicit mock mode. Screenshots stay ignored.
 

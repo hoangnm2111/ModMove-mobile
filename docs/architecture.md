@@ -92,16 +92,19 @@ currently selected period.
 
 ## Maps and location
 
-`DriverMap` uses native Google Maps when an Android Maps key is configured.
-Without it, the requested temporary `MockDriverMap` displays an explicitly
-labelled illustrated map, pan/zoom and animated coverage waves. Rendering uses
-the shared search radius; animation respects lifecycle and reduced motion.
-See [Google Maps setup](google-maps-android.md).
+`MapVinaMap` renders MapVina Streets Raster v2 with `flutter_map`; the same
+component serves customer tracking, address selection and driver maps.
+`MapVinaClient` calls Search, Reverse Geocoding and Directions v2 through a
+dedicated HTTP client without app session tokens. `MapVinaCustomerPlaces`
+maps provider responses to pure domain entities and uses Geolocator for GPS.
+Rendering uses the shared dispatch radius; animation respects lifecycle and
+reduced motion. Mock maps are limited to demo mode. See [MapVina setup](mapvina.md).
 
 Location sent to the API always comes from the device in real mode, including
-when the map is illustrative. SignalR sends location about every 5 seconds while
-foreground, with REST fallback. Turn-by-turn routing opens Google Maps externally.
-Background location and an in-app Directions route are not implemented here.
+when map tiles are unavailable. SignalR sends location about every 5 seconds,
+with REST fallback and an Android foreground location service. Routing opens
+an in-app MapVina road polyline and instruction list; explicit refresh recalculates
+from the latest GPS fix. This is not voice guidance or automatic rerouting.
 
 ## Push notifications
 

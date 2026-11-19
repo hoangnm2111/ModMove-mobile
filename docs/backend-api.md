@@ -1,24 +1,50 @@
 # Driver mobile: API thật và test tuần tự
 
+## Bản sửa luồng local — 19/11/2026
+
+- Xác nhận giao hàng cần ảnh POD đã upload, xác nhận thu tiền nếu cần, GPS không quá 30 giây và cách điểm giao tối đa 500 m. Kiểm tra cả nút UI và repository; backend vẫn theo GB-52 tin kiểm tra GPS của app.
+- Android chạy dịch vụ vị trí foreground khi online/đang giao, gửi GPS khoảng 5 giây ngay cả khi mở Google Maps hoặc khóa màn hình. Dừng dịch vụ khi offline và không còn chuyến, hoặc đăng xuất. Không cam kết tiếp tục sau force-stop/OS hủy tiến trình; cần kiểm tra thiết bị thật, quyền vị trí và giới hạn pin của hãng máy.
+- Bản nháp ảnh lấy hàng/POD lưu ở thư mục riêng của app, tách theo server, tài khoản, đơn, lần phân công và lần gửi ảnh. Khôi phục chỉ khi trạng thái server phù hợp; ảnh bị từ chối phải chụp lại. Dọn khi kết thúc/đổi chuyến và dọn bản nháp cũ sau bảy ngày. Không lưu mật khẩu/token trong file bản nháp này.
+- Sự cố `Open`/`InProgress` do chính tài xế báo sẽ khóa thao tác tiếp tục chuyến, đồng thời có đường mở lịch sử xử lý. Sự cố của khách/tài xế trước không khóa nhầm chuyến.
+- Ví nạp từ 1đ khi đủ cọc; nếu thiếu cọc phải nạp đủ phần thiếu theo server. Rút tiền dùng `maxWithdrawableAmount`: khi rảnh có thể rút thu nhập + cọc, khi đang chạy chỉ phần thu nhập. Có nhãn `Withdrawal` và `DepositRefill`.
+- Hồ sơ → **Bảo mật và tài khoản** gọi `POST /api/account/Password` và `DELETE /api/driver/Account`. Đổi mật khẩu thành công đăng xuất; xóa tài khoản hiển thị lý do từ chối nếu còn đơn, yêu cầu rút hoặc số dư/nợ ví.
+- Thông báo đơn mới làm mới danh sách trước khi mở một đơn chưa có trong cache. `INCIDENT_IN_PROGRESS` mở đúng chi tiết sự cố.
+
+Các thay đổi này chưa được push hoặc triển khai. Phần tọa độ booking, chống đặt trùng và khóa một chuyến/tài xế cần backend + migration đi kèm. Kiểm tra trên điện thoại thật: chuyển sang Maps khi online, khóa màn hình 2 phút, quay lại app, khôi phục sau khi đóng tiến trình, và chạy một đơn Cash lẫn PayOS qua đủ hai tài khoản.
+
 Cập nhật 10/11/2026, đối chiếu backend local commit `2cbed81`.
 Ứng dụng mặc định gọi API thật; lỗi HTTP không chuyển sang dữ liệu mock.
 Backend là nguồn quyết định trạng thái chuyến, số tiền, hồ sơ và quyền nhận đơn.
 
-## Chạy trên Android Emulator
+## Chạy trên Android Emulator hoặc điện thoại thật
 
-Backend đang chạy ở `http://localhost:5133` trên máy host. Mở máy ảo Android
-Studio, chạy từ thư mục `ModMove-mobile`:
+Từ 17/11/2026, mobile mặc định dùng backend VPS tại
+`https://modmove-103-178-235-191.sslip.io` cho cả Customer và Driver.
+Mở máy ảo Android Studio hoặc kết nối điện thoại có Internet, rồi chạy từ thư mục
+`ModMove-mobile`:
 
 ```powershell
 flutter pub get
 flutter run
 ```
 
-Mobile tự dùng `http://10.0.2.2:5133`, không thêm `/api` vào `API_BASE_URL`.
+REST, upload, đăng ký FCM token và SignalR `/hubs/tracking` dùng chung URL này.
+Không thêm `/api` vào `API_BASE_URL`.
 Nếu có nhiều thiết bị: `flutter devices`, rồi `flutter run -d <device-id>`.
-Điện thoại thật cần URL LAN của máy chạy backend:
+Để chủ động dùng backend local trên Android Emulator:
+`flutter run --dart-define=API_BASE_URL=http://10.0.2.2:5133`.
+Nếu cần dùng backend local trên điện thoại thật, chỉ định URL LAN:
 `flutter run --dart-define=API_BASE_URL=http://<IP-LAN>:5133`.
 Debug cho phép HTTP local; release cần HTTPS.
+
+Dừng rồi chạy lại app khi đổi `API_BASE_URL`; hot reload không đổi cấu hình build.
+Phiên đăng nhập, bản nháp hồ sơ và chuyến đang chạy được tách theo server.
+Đăng nhập bằng tài khoản trên VPS hoặc đăng ký mới; tài khoản seed local không
+tự chuyển lên database VPS.
+
+Kiểm tra kết nối ngày 17/11/2026: VPS trả `Healthy` tại `/health` và HTTP 200 với
+4 loại xe tại `/api/public/VehicleTypes` qua HTTPS. Chưa kiểm thử các thao tác
+cần đăng nhập hoặc giao dịch PayOS trên VPS trong lần đổi URL này.
 
 Không cần thay đổi source backend để chạy mobile. Cấu hình database, SMTP,
 Cloudinary và PayOS thuộc môi trường backend. Thông tin thiết lập backend xem
@@ -62,8 +88,9 @@ thông số xe đăng ký từ hồ sơ, không thay bằng kích thước danh 
    backend Development hiện OTP trong terminal theo cấu hình môi trường.
 2. Chọn 2 ảnh CCCD và 2 ảnh GPLX, nhập số CCCD/GPLX; chọn loại xe, biển số, tải trọng và 3 ảnh
    xe → gửi hồ sơ. Bước upload cần Cloudinary hoạt động.
-3. Hồ sơ chuyển **Chờ duyệt**. Admin duyệt/từ chối trên web hoặc Swagger
-   `http://localhost:5133/swagger`: lấy ID từ
+3. Hồ sơ chuyển **Chờ duyệt**. Admin duyệt/từ chối trên web quản trị hoặc API client
+   kết nối cùng backend với mobile. VPS Production không bật Swagger; Swagger
+   `http://localhost:5133/swagger` chỉ dùng khi kiểm thử backend local. Lấy ID từ
    `GET /api/admin/driver-applications/pending`, gọi
    `POST /api/admin/driver-applications/{id}/approve`.
    Đây là thao tác bằng tài khoản Admin; Driver không tự duyệt.
@@ -138,10 +165,10 @@ tự thao tác tài khoản Admin để đổi trạng thái hồ sơ trên back
 
 1. Mở **Ví**: kiểm tra ví cọc, ví thu nhập, nợ hoa hồng, số có thể rút, trạng
    thái khóa và lịch sử từ server.
-2. **Nạp cọc**: tối thiểu 50.000đ; tạo phiên PayOS, xem QR/mở trang thanh toán.
+2. **Nạp cọc**: từ 1đ khi đủ cọc; nếu thiếu phải nạp đủ phần thiếu. Tạo phiên PayOS, xem QR/mở trang thanh toán.
    Phiên có hạn 10 phút. Quay lại app để kiểm tra; chỉ giao dịch server xác
    nhận thành công mới hiện đã nạp. Mở checkout không tự cộng tiền.
-3. **Rút thu nhập**: lưu ngân hàng, nhập số tiền nguyên dương, xem xác nhận.
+3. **Rút tiền**: lưu ngân hàng, nhập số tiền nguyên dương, xem xác nhận.
    Không áp đặt mức rút tối thiểu. Backend quyết định số có thể rút sau nợ
    hoa hồng; chỉ một yêu cầu chờ xử lý. Admin xử lý chuyển tiền.
 4. Nếu mất mạng lúc gửi yêu cầu rút, tải lại trạng thái trước khi thử lại;
@@ -161,7 +188,7 @@ ngrok còn offline. Xem [kết quả kiểm thử mới](wallet-payos-local-test
 Phần chẩn đoán thiếu key bên dưới ghi nhận tình trạng trước lần cấu hình này.
 
 - Rút tiền nhận **số nguyên VND lớn hơn 0**, tức từ **1đ** đến số có thể rút
-  do server trả về. Mức **50.000đ áp dụng cho nạp cọc**, không áp dụng cho rút.
+  do server trả về. Nạp cọc cũng từ 1đ khi đủ cọc; khi thiếu phải bù đủ phần thiếu theo server.
 - Tại lần kiểm tra này, `driver@modmove.local` có 89.000đ có thể rút nhưng đã
   có yêu cầu rút 100.000đ đang chờ. `hasPendingWithdrawal=true` chặn yêu cầu
   mới dù số tiền nhập hợp lệ. Nhờ Admin xử lý yêu cầu hiện tại qua web hoặc
@@ -183,7 +210,9 @@ Phần chẩn đoán thiếu key bên dưới ghi nhận tình trạng trước 
   Nếu tạo mã mới thất bại, QR cũ được ẩn để tránh thanh toán nhầm phiên/số tiền.
   Lần gọi kiểm tra lỗi không làm thay đổi số dư ví.
 
-### Quy tắc rút thu nhập trên app — đối chiếu 11/11/2026
+### Ghi nhận kiểm thử ví ngày 11/11/2026 — luật cũ
+
+Các công thức và hạn chế dưới đây là ghi nhận lịch sử, đã được thay bằng quy tắc rút cả cọc khi không chạy chuyến ở bản sửa 19/11/2026 đầu tài liệu. Không dùng phần lịch sử này làm hợp đồng hiện hành.
 
 - **Ví → Rút thu nhập** hiển thị `Tối đa …đ` từ trường
   `maxWithdrawableAmount` của `GET /api/driver/wallet`. Với ví Active, BE tính
@@ -227,8 +256,8 @@ Phần chẩn đoán thiếu key bên dưới ghi nhận tình trạng trước 
   Billing, rebuild để dùng Google Maps thật; xem
   [thiết lập Maps](google-maps-android.md). Chưa có Directions API cho mobile;
   chỉ đường từng chặng mở Google Maps bên ngoài.
-- GPS/SignalR hoạt động khi app ở foreground. Chưa có background location
-  service; backend coi GPS quá 5 phút là cũ. Push FCM đã được nối riêng ở
+- GPS/SignalR dùng dịch vụ vị trí foreground Android để tiếp tục khi chuyển app;
+  cần kiểm tra trên thiết bị thật. Backend coi GPS quá 5 phút là cũ. Push FCM đã được nối riêng ở
   [FE-20](firebase-push.md), không thay thế dịch vụ GPS nền.
 
 Muốn xem bản demo cũ: `flutter run --dart-define=USE_MOCK_API=true`.
