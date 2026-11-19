@@ -61,7 +61,7 @@ class ApiClient {
     http.Client? client,
     String baseUrl = const String.fromEnvironment(
       'API_BASE_URL',
-      defaultValue: 'http://10.0.2.2:5133',
+      defaultValue: 'https://modmove-103-178-235-191.sslip.io',
     ),
   }) : _http = client ?? http.Client(),
        baseUrl = baseUrl.replaceAll(RegExp(r'/+$'), '') {
@@ -193,24 +193,46 @@ class ApiClient {
     return request;
   }, authenticated);
 
-  Future<dynamic> upload(String path, String name, Uint8List bytes) => _send(
-    () {
-      final request = http.MultipartRequest('POST', Uri.parse('$baseUrl$path'));
-      request.files.add(
-        http.MultipartFile.fromBytes(
-          'file',
-          bytes,
-          filename: name,
-          contentType: http.MediaType(
-            'image',
-            name.toLowerCase().endsWith('.png') ? 'png' : 'jpeg',
+  Future<dynamic> upload(String path, String name, Uint8List bytes) async {
+    try {
+      return await _send(() {
+        final request = http.MultipartRequest(
+          'POST',
+          Uri.parse('$baseUrl$path'),
+        );
+        request.files.add(
+          http.MultipartFile.fromBytes(
+            'file',
+            bytes,
+            filename: name,
+            contentType: http.MediaType(
+              'image',
+              name.toLowerCase().endsWith('.png') ? 'png' : 'jpeg',
+            ),
           ),
-        ),
+        );
+        return request;
+      }, true);
+    } on ApiFailure catch (e) {
+      final message = switch (e.status) {
+        413 =>
+          'Ảnh vượt giới hạn tải lên của máy chủ. Chọn ảnh nhỏ hơn, tối đa 5 MB.',
+        415 => 'Định dạng ảnh chưa được hỗ trợ. Hãy chọn ảnh JPG hoặc PNG.',
+        400 when e.code == 'VALIDATION' =>
+          'Không đọc được ảnh tải lên. Hãy chọn ảnh JPG hoặc PNG, tối đa 5 MB.',
+        >= 500 =>
+          'Máy chủ chưa tải được ảnh. Vui lòng thử lại sau. '
+              'Mã hỗ trợ: ${e.status}${e.traceId == null ? '' : ' / ${e.traceId}'}.',
+        _ => e.message,
+      };
+      throw ApiFailure(
+        message,
+        status: e.status,
+        code: e.code,
+        traceId: e.traceId,
       );
-      return request;
-    },
-    true,
-  );
+    }
+  }
 
   Future<dynamic> _send(http.BaseRequest Function() build, bool auth) async {
     try {
@@ -276,9 +298,13 @@ class ApiClient {
   }
 
   static String _message(int status, String code) => switch (code) {
-    'OTP_INVALID' => 'Mã OTP không đúng hoặc đã hết hạn. Kiểm tra email hoặc yêu cầu gửi lại mã.',
+    'OTP_INVALID' =>
+      'Mã OTP không đúng hoặc đã hết hạn. Kiểm tra email hoặc yêu cầu gửi lại mã.',
     'EMAIL_NOT_VERIFIED' =>
       'Email chưa xác minh. Hãy xác minh OTP trước khi đăng nhập.',
+    'WRONG_PASSWORD' => 'Mật khẩu hiện tại chưa đúng.',
+    'BOOKING_KEY_REUSED' =>
+      'Yêu cầu này đã thuộc về một đơn khác. Hãy mở danh sách đơn để kiểm tra.',
     'VERIFY_PASSWORD_MISMATCH' =>
       'Mật khẩu không khớp với lần đăng ký. Kiểm tra rồi xác minh lại.',
     'ACCOUNT_INACTIVE' => 'Tài khoản đã bị khóa hoặc ngừng hoạt động.',
@@ -290,6 +316,20 @@ class ApiClient {
     'DRIVER_NOT_APPROVED' => 'Hồ sơ tài xế cần được duyệt trước.',
     'BANK_ACCOUNT_REQUIRED' =>
       'Thêm tài khoản ngân hàng trước khi rút thu nhập.',
+    'TOP_UP_BELOW_MISSING_DEPOSIT' =>
+      'Số tiền nạp chưa bù đủ ký quỹ còn thiếu. Làm mới ví để xem số tiền cần bổ sung.',
+    'DRIVER_HAS_ACTIVE_ORDER' =>
+      'Bạn đang có chuyến. Hoàn tất chuyến trước khi tắt hoạt động.',
+    'ACCOUNT_HAS_OPEN_ORDERS' =>
+      'Bạn còn chuyến chưa hoàn tất. Xử lý chuyến trước khi xóa tài khoản.',
+    'ACCOUNT_HAS_PENDING_WITHDRAWAL' =>
+      'Chờ yêu cầu rút tiền được xử lý trước khi xóa tài khoản.',
+    'ACCOUNT_HAS_WALLET_BALANCE' =>
+      'Rút hết số dư hoặc nạp bù nợ trong ví trước khi xóa tài khoản.',
+    'ACCOUNT_HAS_OPEN_REFUNDS' =>
+      'Chờ xử lý xong khoản hoàn tiền trước khi xóa tài khoản.',
+    'INCIDENT_PENDING' =>
+      'Chuyến tạm dừng. Chờ điều phối xử lý sự cố bạn đã báo.',
     'WITHDRAWAL_ALREADY_PENDING' =>
       'Bạn đã có một yêu cầu rút tiền đang chờ xử lý.',
     'INSUFFICIENT_BALANCE' => 'Số dư khả dụng không đủ để thực hiện giao dịch.',
