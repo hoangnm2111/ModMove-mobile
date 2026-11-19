@@ -18,7 +18,8 @@ List<T> array<T>(dynamic v, T Function(Json) map) =>
 Choice choice(Json j) =>
     Choice(txt(j, 'code'), txt(j, 'name'), txt(j, 'description'));
 
-class RemoteCustomerRepository implements CustomerRepository {
+class RemoteCustomerRepository
+    implements CustomerRepository, CustomerBookingRecovery {
   RemoteCustomerRepository(this.api);
   final ApiClient api;
   static const root = '/api/customer';
@@ -67,6 +68,27 @@ class RemoteCustomerRepository implements CustomerRepository {
   };
   Future<dynamic> get(String path, {bool public = false}) =>
       api.request('GET', path, authenticated: !public);
+  @override
+  Future<CreatedOrder?> findBooking(String requestKey) => guard(() async {
+    try {
+      final j = obj(
+        await get('$root/orders/by-request/${Uri.encodeComponent(requestKey)}'),
+      );
+      if (integer(j, 'orderId') <= 0) {
+        throw const CustomerFailure(
+          'Chưa đọc được kết quả đặt đơn. Hãy thử lại.',
+        );
+      }
+      return CreatedOrder(
+        integer(j, 'orderId'),
+        txt(j, 'orderCode'),
+        numValue(j, 'totalFee'),
+      );
+    } on ApiFailure catch (e) {
+      if (e.status == 404) return null;
+      rethrow;
+    }
+  });
   Future<void> command(String method, String path, [Json? body]) =>
       guard(() async {
         await api.request(method, path, body: body);
@@ -125,6 +147,16 @@ class RemoteCustomerRepository implements CustomerRepository {
     'vehicleTypeId': d.vehicleId,
     'pickupAddress': d.pickup.trim(),
     'dropoffAddress': d.dropoff.trim(),
+    if (d.pickupPoint != null)
+      'pickupPoint': {
+        'latitude': d.pickupPoint!.latitude,
+        'longitude': d.pickupPoint!.longitude,
+      },
+    if (d.dropoffPoint != null)
+      'dropoffPoint': {
+        'latitude': d.dropoffPoint!.latitude,
+        'longitude': d.dropoffPoint!.longitude,
+      },
     'weightKg': d.weight,
     'lengthCm': d.length,
     'widthCm': d.width,
@@ -142,6 +174,22 @@ class RemoteCustomerRepository implements CustomerRepository {
         authenticated: false,
       ),
     );
+    bool matches(GeoPosition? expected, dynamic actual) =>
+        expected == null ||
+        (actual is Map &&
+            actual['latitude'] is num &&
+            actual['longitude'] is num &&
+            ((actual['latitude'] as num).toDouble() - expected.latitude).abs() <
+                .000002 &&
+            ((actual['longitude'] as num).toDouble() - expected.longitude)
+                    .abs() <
+                .000002);
+    if (!matches(d.pickupPoint, j['pickupPoint']) ||
+        !matches(d.dropoffPoint, j['dropoffPoint'])) {
+      throw const CustomerFailure(
+        'Máy chủ chưa xác nhận được vị trí đã chọn. Chưa thể đặt đơn với ghim này; vui lòng thử lại sau.',
+      );
+    }
     return Fare(
       numValue(j, 'distanceKm'),
       integer(j, 'durationMinutes'),
@@ -149,6 +197,7 @@ class RemoteCustomerRepository implements CustomerRepository {
       numValue(j, 'serviceFee'),
       numValue(j, 'discountAmount'),
       numValue(j, 'totalFee'),
+      supportsBookingRecovery: j['supportsBookingRecovery'] == true,
     );
   });
   @override
@@ -177,18 +226,28 @@ class RemoteCustomerRepository implements CustomerRepository {
       'payerRole': d.payment == 'Cash' ? d.payer : null,
       'prohibitedGoodsCommitment': d.committed,
       'expectedTotalFee': f.total,
+      if (f.supportsBookingRecovery && d.requestKey != null)
+        'requestKey': d.requestKey,
     });
     Json j;
     try {
       j = obj(await api.request('POST', '$root/orders', body: body));
     } on ApiFailure catch (e) {
-      if (e.status == 0 || e.status >= 500) {
+      if (e.status == 0 ||
+          e.status >= 500 ||
+          (e.status == 409 && f.supportsBookingRecovery)) {
         throw const CustomerFailure(
           'Chưa xác định được kết quả tạo đơn. Hãy kiểm tra danh sách đơn trước khi gửi lại để tránh đặt trùng.',
           code: 'ORDER_RESULT_UNKNOWN',
         );
       }
       rethrow;
+    }
+    if (integer(j, 'orderId') <= 0 || txt(j, 'orderCode').isEmpty) {
+      throw const CustomerFailure(
+        'Chưa xác định được đơn vừa đặt. Hãy kiểm tra lại.',
+        code: 'ORDER_RESULT_UNKNOWN',
+      );
     }
     return CreatedOrder(
       integer(j, 'orderId'),
@@ -363,6 +422,7 @@ class RemoteCustomerRepository implements CustomerRepository {
       d['isStale'] == true,
       eta['durationMinutes'] as int?,
       txt(eta, 'target'),
+      etaAt: DateTime.now(),
     );
   });
   @override

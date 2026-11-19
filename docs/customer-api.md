@@ -1,16 +1,24 @@
 # Customer mobile — real API integration
 
-The default entry point uses the local backend at `http://10.0.2.2:5133` on Android Emulator. Customer has no mock repository, fallback fare, fake location or simulated payment completion. Login reads the role in the server response and opens either Customer or the existing Driver flow.
+The default entry point uses the deployed backend at `https://modmove-103-178-235-191.sslip.io` on Android Emulator and physical devices. Customer has no mock repository, fallback fare, fake location or simulated payment completion. Login reads the role in the server response and opens either Customer or the existing Driver flow.
 
 ```powershell
 flutter pub get
 flutter run
 ```
 
-For a deployed backend, use `flutter run --dart-define=API_BASE_URL=https://your-api-host`.
+For a local backend on Android Emulator, use `flutter run --dart-define=API_BASE_URL=http://10.0.2.2:5133`.
 The base URL must not include `/api`. Do not add `USE_MOCK_API=true` when testing these features.
+Stop and relaunch after changing `API_BASE_URL`. Sessions are scoped to the server URL;
+sign in with a VPS account, or register a new one, when switching from the local database.
+
+Connection check on 17 November 2026: the deployed `/health` returned `Healthy`, and
+`/api/public/VehicleTypes` returned HTTP 200 with four vehicle types over HTTPS.
+These public checks do not verify authenticated booking, uploads, payments or tracking.
 
 ## Implemented screens and contracts
+
+Local update, 19 November 2026: booking inputs, uploaded cargo URLs and a cargo photo awaiting upload now survive navigation/process restarts in app-private files scoped to the server and account. A pending photo can be retried or discarded; submission waits until it is resolved. Regular drafts and orphaned trip photos expire after seven days; unresolved booking keys remain until reconciled. A restored regular draft needs a new quote. The map picker keeps coordinates; fare estimation must acknowledge them. The current backend does not acknowledge map pins; this remains a contract limitation to report, not an implemented backend fix. All earlier backend edits and migrations have been withdrawn to honor the mobile-only scope. The deployed service has not been changed. Home/order/incident/refund lists now refresh every 15 seconds, on foreground pushes and on resume.
 
 | Ticket | Where to test | Backend API |
 | --- | --- | --- |
@@ -44,11 +52,11 @@ Push-token registration uses the existing account FCM API. Customer notification
 - Cargo quantity must be positive; total weight must be positive and at most 100,000 kg; dimensions are whole centimetres from 1 to 2,000. Vehicle fit allows rotation of the largest item and checks the total weight.
 - Uploads are JPG/PNG, at most 5 MB; the order requires 1–5 returned photo URLs. Failed uploads do not discard existing photos or inputs.
 - Changing any pricing input invalidates the quote. `FARE_CHANGED` requires a new server quote. Repeated submit taps are serialized.
-- An ambiguous create-order failure requires checking the order list before retrying; the backend does not expose an idempotency key for booking.
+- The current backend does not provide booking recovery by request key. The app requires an explicit order-list check after an uncertain result and does not automatically replay the POST. An optional mobile adapter is gated by `supportsBookingRecovery: true`; it must not be treated as an available API or authorization to add backend code. No backend migration accompanies this mobile work.
 - PayOS orders must be paid before driver matching. A deep-link return only triggers an authenticated refresh; it never marks an order Paid. Expired or superseded QR codes are removed. Cash requires Sender/Receiver; PayOS sends no cash payer.
 - Matching lasts up to ten minutes. The countdown is displayed only when a server-derived start timestamp is available. Reaching zero does not cancel locally.
 - Pickup approval is only available for PickedUp with Pending proof and no pending driver incident. A rejection requires a specific reason.
-- Location events update the actual driver coordinates. GPS older than five minutes is labelled stale. Tracking requests that calculate routing/ETA are made on opening, reconnection or manual refresh, not for every GPS event. No invented ETA or road polyline is displayed.
+- Location events update driver coordinates and preserve a recent ETA. Tracking/ETA retries every ten seconds while the order remains active, including after the first request fails; concurrent reads are coalesced. ETA expires after one minute without a fresh route response. GPS older than five minutes is labelled stale. No routing request is sent for each GPS event, and no road polyline is invented.
 - Customer incidents can be reported during Arrived, PickedUp or InTransit. Incident refunds require a paid PayOS order.
 - Complaints are allowed only while Delivered, within 24 hours, before completion. Confirming receipt completes the trip; the app explains the consequence before confirmation. The server also rejects confirmation while a complaint is open.
 - Ratings are once per completed trip within 24 hours, immutable after submission.

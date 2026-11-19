@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../core/network/api_client.dart';
+import '../core/platform/file_draft_store.dart';
 import '../core/theme/customer_theme.dart';
 import '../features/customer/domain/customer_models.dart';
 import '../features/customer/domain/customer_repository.dart';
@@ -30,6 +31,10 @@ class CustomerApp extends StatefulWidget {
 class _CustomerAppState extends State<CustomerApp> {
   final navigator = GlobalKey<NavigatorState>();
   late final CustomerRepository repo = RemoteCustomerRepository(widget.api);
+  late final drafts = FileDraftStore(
+    widget.api.baseUrl,
+    widget.api.session?.userId ?? 'guest',
+  );
   int? paymentOrder;
   bool opening = false;
   void handlePending() {
@@ -93,6 +98,7 @@ class _CustomerAppState extends State<CustomerApp> {
         screen = BlocProvider(
           create: (_) => BookingCubit(
             repo,
+            drafts: drafts,
             initial: settings.arguments is BookingDraft
                 ? settings.arguments as BookingDraft
                 : null,

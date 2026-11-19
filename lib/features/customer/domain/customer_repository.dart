@@ -1,6 +1,10 @@
 import 'dart:typed_data';
 import 'customer_models.dart';
 
+abstract interface class CustomerBookingRecovery {
+  Future<CreatedOrder?> findBooking(String requestKey);
+}
+
 abstract interface class CustomerRepository {
   Future<BookingCatalog> catalog();
   Future<List<Choice>> choices(String kind);

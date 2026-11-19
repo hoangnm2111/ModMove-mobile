@@ -16,7 +16,6 @@ class CustomerOrderScreen extends StatefulWidget {
 
 class _CustomerOrderScreenState extends State<CustomerOrderScreen>
     with WidgetsBindingObserver {
-  bool trackingRequested = false;
   @override
   void initState() {
     super.initState();
@@ -72,13 +71,7 @@ class _CustomerOrderScreenState extends State<CustomerOrderScreen>
   @override
   Widget build(
     BuildContext context,
-  ) => BlocConsumer<CustomerOrderCubit, OrderState>(
-    listener: (context, s) {
-      if (s.order != null && !trackingRequested && !s.order!.summary.terminal) {
-        trackingRequested = true;
-        context.read<CustomerOrderCubit>().loadTracking();
-      }
-    },
+  ) => BlocBuilder<CustomerOrderCubit, OrderState>(
     builder: (context, s) {
       final cubit = context.read<CustomerOrderCubit>(), o = s.order;
       return Scaffold(
@@ -784,7 +777,9 @@ class _DriverPositionInfo extends StatelessWidget {
         return CustomerNotice(
           stale
               ? 'GPS tài xế đã cũ hoặc mất kết nối. Vị trí hiển thị là lần ghi nhận cuối.'
-              : tracking.minutes != null
+              : tracking.minutes != null &&
+                    now.difference(tracking.etaAt ?? tracking.at!) <=
+                        const Duration(minutes: 1)
               ? 'Dự kiến đến ${switch (tracking.target) {
                   'Pickup' => 'điểm lấy hàng',
                   'Handover' => 'điểm bàn giao giữa hai tài xế',

@@ -1,6 +1,8 @@
 import 'dart:async';
 import 'dart:typed_data';
+import 'dart:math';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import '../../../core/domain/draft_store.dart';
 import '../domain/customer_models.dart';
 import '../domain/customer_repository.dart';
 
@@ -135,24 +137,117 @@ class BookingState {
 }
 
 class BookingCubit extends Cubit<BookingState> {
-  BookingCubit(this.repository, {BookingDraft? initial})
-    : super(BookingState(draft: initial ?? const BookingDraft()));
+  BookingCubit(this.repository, {BookingDraft? initial, this.drafts})
+    : _hasInitial = initial != null,
+      super(BookingState(draft: initial ?? const BookingDraft()));
   final CustomerRepository repository;
+  final DraftStore? drafts;
+  final bool _hasInitial;
+  bool _restored = false;
+  static String _newKey() => List.generate(
+    16,
+    (_) => Random.secure().nextInt(256).toRadixString(16).padLeft(2, '0'),
+  ).join();
+  Future<void> _persist(BookingState s) async {
+    if (drafts == null) return;
+    if (s.created != null) return drafts!.remove('booking');
+    await drafts!.write('booking', {
+      'draft': s.draft.toJson(),
+      'pending': s.needsOrderCheck,
+      if (s.needsOrderCheck && s.fare != null)
+        'fare': {
+          'distance': s.fare!.distance,
+          'minutes': s.fare!.minutes,
+          'distanceFee': s.fare!.distanceFee,
+          'serviceFee': s.fare!.serviceFee,
+          'discount': s.fare!.discount,
+          'total': s.fare!.total,
+          'recovery': s.fare!.supportsBookingRecovery,
+        },
+    });
+  }
+
+  @override
+  void onChange(Change<BookingState> change) {
+    super.onChange(change);
+    if (_restored) {
+      unawaited(_persist(change.nextState).catchError((Object _) {}));
+    }
+  }
+
   int _revision = 0;
   Future<void> initialize() async {
-    if (isClosed || state.busy || state.needsOrderCheck) return;
-    emit(BookingState(draft: state.draft, busy: true));
+    if (isClosed ||
+        state.busy ||
+        (state.needsOrderCheck && state.catalog != null)) {
+      return;
+    }
+    emit(
+      BookingState(
+        draft: state.draft,
+        fare: state.fare,
+        needsOrderCheck: state.needsOrderCheck,
+        busy: true,
+      ),
+    );
     try {
+      if (!_restored) {
+        final saved = await drafts?.read('booking');
+        if (isClosed) return;
+        if (saved != null && (!_hasInitial || saved['pending'] == true)) {
+          final j = saved['fare'] as Map?;
+          emit(
+            BookingState(
+              draft: BookingDraft.fromJson(
+                Map<String, dynamic>.from(saved['draft'] as Map),
+              ),
+              fare: j == null
+                  ? null
+                  : Fare(
+                      (j['distance'] as num).toDouble(),
+                      j['minutes'] as int,
+                      (j['distanceFee'] as num).toDouble(),
+                      (j['serviceFee'] as num).toDouble(),
+                      (j['discount'] as num).toDouble(),
+                      (j['total'] as num).toDouble(),
+                      supportsBookingRecovery: j['recovery'] == true,
+                    ),
+              needsOrderCheck: saved['pending'] == true,
+              busy: true,
+            ),
+          );
+        }
+        _restored = true;
+      }
       final c = await repository.catalog();
       if (!isClosed) {
-        final draft = c.cargoTypes.any((v) => v.code == state.draft.cargoType)
+        final draft =
+            state.needsOrderCheck ||
+                c.cargoTypes.any((v) => v.code == state.draft.cargoType)
             ? state.draft
             : state.draft.copyWith(cargoType: '');
-        emit(BookingState(draft: draft, catalog: c));
+        emit(
+          BookingState(
+            draft: draft,
+            catalog: c,
+            fare: state.fare,
+            needsOrderCheck: state.needsOrderCheck,
+            error: state.needsOrderCheck
+                ? 'Có yêu cầu đặt đơn chưa xác định kết quả. Kiểm tra trước khi tạo đơn khác.'
+                : null,
+          ),
+        );
       }
     } catch (e) {
       if (!isClosed) {
-        emit(BookingState(draft: state.draft, error: customerError(e)));
+        emit(
+          BookingState(
+            draft: state.draft,
+            fare: state.fare,
+            needsOrderCheck: state.needsOrderCheck,
+            error: customerError(e),
+          ),
+        );
       }
     }
   }
@@ -169,6 +264,8 @@ class BookingCubit extends Cubit<BookingState> {
     final priceChanged =
         old.pickup != draft.pickup ||
         old.dropoff != draft.dropoff ||
+        old.pickupPoint != draft.pickupPoint ||
+        old.dropoffPoint != draft.dropoffPoint ||
         old.weight != draft.weight ||
         old.length != draft.length ||
         old.width != draft.width ||
@@ -201,20 +298,31 @@ class BookingCubit extends Cubit<BookingState> {
         state.draft.photos.length >= 5) {
       return;
     }
+    if (bytes.isEmpty ||
+        bytes.length > 5 * 1024 * 1024 ||
+        !RegExp(r'\.(jpg|jpeg|png)$', caseSensitive: false).hasMatch(name)) {
+      return error('Chọn ảnh JPG hoặc PNG hợp lệ, tối đa 5 MB.');
+    }
     emit(
       BookingState(
-        draft: state.draft,
+        draft: state.draft.copyWith(
+          pendingPhoto: PendingCargoPhoto(name, bytes),
+        ),
         catalog: state.catalog,
         fare: state.fare,
         uploading: true,
       ),
     );
     try {
+      await _persist(state);
       final url = await repository.upload(name, bytes);
       if (!isClosed) {
         emit(
           BookingState(
-            draft: state.draft.copyWith(photos: [...state.draft.photos, url]),
+            draft: state.draft.copyWith(
+              photos: [...state.draft.photos, url],
+              clearPendingPhoto: true,
+            ),
             catalog: state.catalog,
             fare: state.fare,
           ),
@@ -224,6 +332,14 @@ class BookingCubit extends Cubit<BookingState> {
       if (!isClosed) error(customerError(e));
     }
   }
+
+  Future<void> retryPhoto() async {
+    final pending = state.draft.pendingPhoto;
+    if (pending != null) await upload(pending.name, pending.bytes);
+  }
+
+  void discardPendingPhoto() =>
+      edit(state.draft.copyWith(clearPendingPhoto: true));
 
   Future<void> estimate() async {
     if (state.busy || state.uploading || state.needsOrderCheck) return;
@@ -253,29 +369,51 @@ class BookingCubit extends Cubit<BookingState> {
     }
   }
 
-  Future<void> submit() async {
+  Future<void> submit({bool retry = false}) async {
     if (state.busy ||
         state.uploading ||
         state.created != null ||
-        state.needsOrderCheck) {
+        (state.needsOrderCheck && !retry)) {
       return;
     }
     final invalid = state.draft.validate(submit: true);
     if (invalid != null) return error(invalid);
     final fare = state.fare;
+    if (retry &&
+        (!state.needsOrderCheck ||
+            fare?.supportsBookingRecovery != true ||
+            state.draft.requestKey == null)) {
+      return;
+    }
     if (fare == null) {
       return error('Vui lòng tính lại giá cước trước khi đặt đơn.');
     }
     emit(
       BookingState(
-        draft: state.draft,
+        draft: state.draft.copyWith(
+          requestKey: state.draft.requestKey ?? _newKey(),
+        ),
         catalog: state.catalog,
         fare: fare,
         busy: true,
+        needsOrderCheck: true,
       ),
     );
+    var sent = false;
     try {
-      final created = await repository.book(state.draft, fare);
+      // Persist BEFORE the request: a process death can then retry the same key.
+      await _persist(state);
+      CreatedOrder? created;
+      if (fare.supportsBookingRecovery &&
+          repository is CustomerBookingRecovery) {
+        created = await (repository as CustomerBookingRecovery).findBooking(
+          state.draft.requestKey!,
+        );
+      }
+      if (created == null) {
+        sent = true;
+        created = await repository.book(state.draft, fare);
+      }
       if (!isClosed) {
         emit(
           BookingState(
@@ -297,7 +435,10 @@ class BookingCubit extends Cubit<BookingState> {
                 : fare,
             error: customerError(e),
             needsOrderCheck:
-                e is CustomerFailure && e.code == 'ORDER_RESULT_UNKNOWN',
+                (retry &&
+                    !(e is CustomerFailure && e.code == 'FARE_CHANGED')) ||
+                (e is CustomerFailure && e.code == 'ORDER_RESULT_UNKNOWN') ||
+                (sent && e is! CustomerFailure),
           ),
         );
       }
@@ -305,6 +446,7 @@ class BookingCubit extends Cubit<BookingState> {
   }
 
   void confirmedNoOrderCreated() {
+    if (state.fare?.supportsBookingRecovery == true) return;
     if (!state.needsOrderCheck) return;
     emit(
       BookingState(
@@ -313,6 +455,13 @@ class BookingCubit extends Cubit<BookingState> {
         fare: state.fare,
       ),
     );
+  }
+
+  Future<void> retryPending() => submit(retry: true);
+  @override
+  Future<void> close() async {
+    if (_restored) await _persist(state).catchError((Object _) {});
+    return super.close();
   }
 }
 
@@ -334,8 +483,14 @@ class OrderState {
 }
 
 class CustomerOrderCubit extends Cubit<OrderState> {
-  CustomerOrderCubit(this.repository, this.id, this.realtime)
-    : super(const OrderState());
+  CustomerOrderCubit(
+    this.repository,
+    this.id,
+    this.realtime, {
+    DateTime Function()? clock,
+  }) : _clock = clock ?? DateTime.now,
+       super(const OrderState());
+  final DateTime Function() _clock;
   final CustomerRepository repository;
   final CustomerRealtime realtime;
   final int id;
@@ -345,6 +500,7 @@ class CustomerOrderCubit extends Cubit<OrderState> {
   bool _trackingAgain = false;
   int _trackingGeneration = 0;
   bool _closing = false;
+  DateTime? _trackingAttemptAt;
   Completer<void>? _refreshDone;
   OrderState update({
     OrderDetail? order,
@@ -385,8 +541,8 @@ class CustomerOrderCubit extends Cubit<OrderState> {
         }
       } else {
         unawaited(refresh());
-        if (event.reconnected && state.tracking != null) {
-          unawaited(loadTracking());
+        if (event.reconnected) {
+          _refreshTrackingIfDue();
         }
       }
     });
@@ -418,7 +574,11 @@ class CustomerOrderCubit extends Cubit<OrderState> {
             (previous.driverPhone != order.driverPhone ||
                 previous.plate != order.plate ||
                 previous.summary.status != order.summary.status);
-        if (trackingChanged) _trackingGeneration++;
+        if (trackingChanged) {
+          _trackingGeneration++;
+          _trackingAttemptAt = null;
+          if (_trackingBusy) _trackingAgain = true;
+        }
         final payment = state.payment;
         final keepQr =
             order.summary.needsPayment &&
@@ -434,9 +594,7 @@ class CustomerOrderCubit extends Cubit<OrderState> {
             trackingError: state.trackingError,
           ),
         );
-        if (trackingChanged && !order.summary.terminal) {
-          unawaited(loadTracking());
-        }
+        if (!order.summary.terminal) _refreshTrackingIfDue();
       }
     } catch (e) {
       if (!isClosed) {
@@ -451,10 +609,11 @@ class CustomerOrderCubit extends Cubit<OrderState> {
   Future<void> loadTracking() async {
     if (isClosed || _closing) return;
     if (_trackingBusy) {
-      _trackingAgain = true;
-      return;
+      return _trackingDone?.future;
     }
     _trackingBusy = true;
+    _trackingDone = Completer<void>();
+    _trackingAttemptAt = _clock();
     final generation = _trackingGeneration;
     final before = state.tracking;
     try {
@@ -483,12 +642,24 @@ class CustomerOrderCubit extends Cubit<OrderState> {
       }
     } finally {
       _trackingBusy = false;
+      _trackingDone?.complete();
       if (_trackingAgain) {
         _trackingAgain = false;
         if (!isClosed && !_closing && state.order?.summary.terminal != true) {
           unawaited(loadTracking());
         }
       }
+    }
+  }
+
+  Completer<void>? _trackingDone;
+
+  void _refreshTrackingIfDue() {
+    if (isClosed || _closing || state.order?.summary.terminal == true) return;
+    if (_trackingAttemptAt == null ||
+        _clock().difference(_trackingAttemptAt!) >=
+            const Duration(seconds: 10)) {
+      unawaited(loadTracking());
     }
   }
 

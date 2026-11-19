@@ -40,6 +40,10 @@ class _CustomerBookingScreenState extends State<CustomerBookingScreen> {
 
   BookingCubit get cubit => context.read<BookingCubit>();
   Future<void> checkCreatedOrder() async {
+    if (cubit.state.fare?.supportsBookingRecovery == true) {
+      await cubit.retryPending();
+      return;
+    }
     await Navigator.pushNamed(context, '/orders');
     if (!mounted) return;
     final checked = await confirmCustomerAction(
@@ -192,8 +196,11 @@ class _CustomerBookingScreenState extends State<CustomerBookingScreen> {
   Widget build(
     BuildContext context,
   ) => BlocConsumer<BookingCubit, BookingState>(
-    listenWhen: (a, b) => a.created != b.created,
+    listenWhen: (a, b) => a.created != b.created || (a.busy && !b.busy),
     listener: (_, s) {
+      _pickup.text = s.draft.pickup;
+      _dropoff.text = s.draft.dropoff;
+      _coupon.text = s.draft.coupon;
       if (s.created != null) widget.onCreated(s.created!.id);
     },
     builder: (context, s) {
@@ -259,7 +266,9 @@ class _CustomerBookingScreenState extends State<CustomerBookingScreen> {
                                 : s.uploading
                                 ? 'Đang tải ảnh…'
                                 : s.needsOrderCheck
-                                ? 'Kiểm tra đơn vừa gửi'
+                                ? (s.fare?.supportsBookingRecovery == true
+                                      ? 'Khôi phục đơn vừa gửi'
+                                      : 'Kiểm tra đơn vừa gửi')
                                 : step == 3
                                 ? 'Xác nhận đặt đơn'
                                 : 'Tiếp tục',
@@ -310,6 +319,49 @@ class _CustomerBookingScreenState extends State<CustomerBookingScreen> {
                           const SizedBox(height: 24),
                           if (s.error != null)
                             CustomerNotice(s.error!, error: true),
+                          if (d.pendingPhoto != null) ...[
+                            CustomerCard(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.stretch,
+                                children: [
+                                  const Text(
+                                    'Ảnh hàng hóa đang chờ tải',
+                                    style: TextStyle(
+                                      fontWeight: FontWeight.w700,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 8),
+                                  ClipRRect(
+                                    borderRadius: BorderRadius.circular(8),
+                                    child: Image.memory(
+                                      d.pendingPhoto!.bytes,
+                                      height: 120,
+                                      fit: BoxFit.cover,
+                                      errorBuilder: (_, _, _) => const Icon(
+                                        Icons.image_outlined,
+                                        size: 48,
+                                      ),
+                                    ),
+                                  ),
+                                  const SizedBox(height: 8),
+                                  const Text(
+                                    'Ảnh được giữ trong bản nháp để bạn có thể thử lại khi có mạng.',
+                                  ),
+                                  OutlinedButton(
+                                    onPressed: locked ? null : cubit.retryPhoto,
+                                    child: const Text('Tải lại ảnh hàng hóa'),
+                                  ),
+                                  TextButton(
+                                    onPressed: locked
+                                        ? null
+                                        : cubit.discardPendingPhoto,
+                                    child: const Text('Bỏ ảnh đang chờ'),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            const SizedBox(height: 16),
+                          ],
                           if (step == 0) ...[
                             sectionTitle('Hàng của bạn đi đâu?'),
                             const Text(
@@ -518,7 +570,8 @@ class _CustomerBookingScreenState extends State<CustomerBookingScreen> {
                                     ),
                                   ),
                                   const SizedBox(height: 10),
-                                  if (d.photos.length < 5)
+                                  if (d.photos.length < 5 &&
+                                      d.pendingPhoto == null)
                                     OutlinedButton.icon(
                                       onPressed: addPhoto,
                                       icon: const Icon(
