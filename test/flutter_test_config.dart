@@ -25,7 +25,7 @@ Future<void> testExecutable(FutureOr<void> Function() testMain) async {
     TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
         .setMockMethodCallHandler(
           const MethodChannel('vn.modmove/maps_configuration'),
-          (_) async => false,
+          (_) async => '',
         );
   });
   tearDown(() {

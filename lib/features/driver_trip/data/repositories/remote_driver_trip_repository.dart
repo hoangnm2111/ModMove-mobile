@@ -13,6 +13,7 @@ import '../services/driver_tracking_connection.dart';
 class RemoteDriverTripRepository
     implements
         DriverTripRepository,
+        DriverLocationRecovery,
         DriverDeliveryRepository,
         TripHistoryRepository {
   RemoteDriverTripRepository(
@@ -37,6 +38,7 @@ class RemoteDriverTripRepository
     shift: const ShiftSummary(available: false),
   );
   DateTime? _summaryAt;
+  DateTime? _sentLocationAt;
   Map<String, dynamic>? _accepted;
   final Map<String, DateTime> _deadlines = {};
   final Set<String> _dismissed = {};
@@ -58,7 +60,9 @@ class RemoteDriverTripRepository
   DriverSession _copy({
     bool? online,
     bool? gpsEnabled,
+    DriverLocationFailure? locationFailure,
     GpsFix? fix,
+    bool clearFix = false,
     JobOffer? offer,
     bool clearOffer = false,
     ActiveTrip? trip,
@@ -72,7 +76,10 @@ class RemoteDriverTripRepository
   }) => DriverSession(
     online: online ?? current.online,
     gpsEnabled: gpsEnabled ?? current.gpsEnabled,
-    fix: fix ?? current.fix,
+    locationFailure: gpsEnabled == true
+        ? null
+        : locationFailure ?? current.locationFailure,
+    fix: clearFix ? null : fix ?? current.fix,
     offer: clearOffer ? null : offer ?? current.offer,
     trip: clearTrip ? null : trip ?? current.trip,
     jobs: jobs ?? current.jobs,
@@ -99,22 +106,103 @@ class RemoteDriverTripRepository
   }
 
   Future<void> _tick() async {
-    if (_closed || !_foreground || _ticking || _mutating) return;
+    if (_closed || _ticking || _mutating) return;
+    if (!_foreground && location is! DriverLocationLifecycle) return;
     _ticking = true;
     try {
-      await refresh();
+      // Location continues independently while Maps is visible or the screen is locked.
+      if (_foreground) {
+        await refresh(); // Refresh order status even when GPS is unavailable.
+      } else if (current.online || current.trip?.ongoing == true) {
+        await _sendLocation();
+      }
+    } on DriverLocationFailure catch (e) {
+      _locationFailed(e);
     } catch (e) {
       _emit(
         _copy(
           jobs: [],
-          gpsEnabled: false,
           clearOffer: true,
-          notice: e.toString(),
+          notice: e is TripFailure
+              ? e.message
+              : e is ApiFailure
+              ? e.message
+              : 'Kết nối gián đoạn. Vui lòng thử lại.',
         ),
       );
     } finally {
       _ticking = false;
     }
+  }
+
+  void _locationFailed(DriverLocationFailure failure) {
+    _sentLocationAt = null;
+    _emit(
+      _copy(
+        gpsEnabled: false,
+        locationFailure: failure,
+        clearFix: true,
+        jobs: [],
+        clearOffer: true,
+      ),
+    );
+  }
+
+  @override
+  Future<void> recoverLocation() => _guard(() async {
+    if (_closed || _mutating) return;
+    _mutating = true;
+    try {
+      await _refreshing;
+      GpsFix fix;
+      try {
+        fix = await location.current();
+      } on DriverLocationFailure catch (e) {
+        _locationFailed(e);
+        if ((e.issue == DriverLocationIssue.permissionBlocked ||
+                e.issue == DriverLocationIssue.serviceDisabled) &&
+            location is DriverLocationSettings) {
+          final settings = location as DriverLocationSettings;
+          final opened = e.issue == DriverLocationIssue.serviceDisabled
+              ? await settings.openLocationSettings()
+              : await settings.openAppSettings();
+          if (!opened) throw TripFailure(e.message);
+          // App lifecycle resume rechecks access after the user leaves settings.
+          return;
+        }
+        if (e.issue != DriverLocationIssue.permissionDenied) rethrow;
+        fix = await location.current(requestPermission: true);
+      }
+      _emit(_copy(fix: fix, gpsEnabled: true));
+      _sentLocationAt = null;
+      await refresh();
+    } on DriverLocationFailure catch (e) {
+      _locationFailed(e);
+    } finally {
+      _mutating = false;
+    }
+  });
+
+  Future<void> _sendLocation() async {
+    if (_closed) return;
+    if (_foreground && location is DriverLocationLifecycle) {
+      await (location as DriverLocationLifecycle).startTracking();
+      if (_closed) {
+        await (location as DriverLocationLifecycle).stopTracking();
+        return;
+      }
+    }
+    if (_sentLocationAt != null &&
+        now.difference(_sentLocationAt!) < const Duration(seconds: 4)) {
+      return;
+    }
+    final fix = await location.current();
+    if (_closed) return;
+    // A tracking connection failure must not be reported as missing GPS access.
+    _emit(_copy(fix: fix, gpsEnabled: true));
+    await tracking.send(fix);
+    _sentLocationAt = now;
+    _emit(_copy(fix: fix, gpsEnabled: true, pings: current.pings + 1));
   }
 
   @override
@@ -176,22 +264,27 @@ class RemoteDriverTripRepository
         earnings: (status['earningsBalance'] as num).round(),
       ),
     );
-    if (_foreground && (current.online || (trip?.ongoing ?? false))) {
+    if (current.online || (trip?.ongoing ?? false)) {
       try {
-        final fix = await location.current();
-        if (!_foreground || _closed) return;
-        await tracking.send(fix);
-        _emit(_copy(fix: fix, gpsEnabled: true, pings: current.pings + 1));
-      } on TripFailure catch (e) {
-        _emit(
-          _copy(
-            gpsEnabled: false,
-            jobs: [],
-            clearOffer: true,
-            notice: e.message,
-          ),
-        );
+        await _sendLocation();
+      } on DriverLocationFailure catch (e) {
+        _locationFailed(e);
         return;
+      }
+    } else {
+      if (location is DriverLocationLifecycle) {
+        await (location as DriverLocationLifecycle).stopTracking();
+      }
+      _sentLocationAt = null;
+      // A failed attempt to go online can send an offline driver to Settings.
+      // Recheck on resume without prompting or switching them online.
+      if (current.locationFailure != null) {
+        try {
+          final fix = await location.current();
+          _emit(_copy(fix: fix, gpsEnabled: true));
+        } on DriverLocationFailure catch (e) {
+          _locationFailed(e);
+        }
       }
     }
     if (!current.online ||
@@ -282,7 +375,14 @@ class RemoteDriverTripRepository
     try {
       if (_refreshing != null) await _refreshing;
       GpsFix? fix;
-      if (online) fix = await location.current(requestPermission: true);
+      if (online) {
+        try {
+          fix = await location.current(requestPermission: true);
+        } on DriverLocationFailure catch (e) {
+          _locationFailed(e);
+          rethrow;
+        }
+      }
       await api.request(
         'PATCH',
         '/api/driver/online-status',
@@ -306,13 +406,16 @@ class RemoteDriverTripRepository
     _foreground = foreground;
     if (foreground) {
       _tick();
-    } else {
+    } else if (location is! DriverLocationLifecycle ||
+        (!current.online && current.trip?.ongoing != true)) {
       unawaited(tracking.pause());
     }
   }
 
   @override
   Future<void> openOffer(String jobId) => _guard(() async {
+    // A push can arrive before the next matching poll populates the cache.
+    if (!current.jobs.any((job) => job.id == jobId)) await refresh();
     final job = current.jobs.where((j) => j.id == jobId).firstOrNull;
     if (job == null) {
       throw const TripFailure('Đơn không còn trong danh sách. Hãy tải lại.');
@@ -496,6 +599,15 @@ class RemoteDriverTripRepository
           'Xác nhận đã thu tiền trước khi hoàn tất giao hàng.',
         );
       }
+      final fix = await location.current(requestPermission: true);
+      if (!fix.freshAt(now) ||
+          fix.point.distanceTo(trip.job.dropoffPoint) > 500) {
+        throw const TripFailure(
+          'Cần GPS cập nhật trong 30 giây và cách điểm giao không quá 500 m.',
+        );
+      }
+      await tracking.send(fix);
+      _emit(_copy(fix: fix, gpsEnabled: true));
       await api.request(
         'POST',
         '/api/driver/trips/${trip.job.id}/deliver',
@@ -519,6 +631,11 @@ class RemoteDriverTripRepository
       final before = await detail(id);
       _emit(_copy(trip: before));
       if (confirmed?.call(before) == true) return;
+      if (before.onHold) {
+        throw const TripFailure(
+          'Chuyến tạm dừng. Chờ điều phối xử lý sự cố bạn đã báo.',
+        );
+      }
       try {
         await action(before);
       } on ApiFailure {
@@ -614,6 +731,9 @@ class RemoteDriverTripRepository
     _closed = true;
     _timer?.cancel();
     await _updates.cancel();
+    if (location is DriverLocationLifecycle) {
+      await (location as DriverLocationLifecycle).stopTracking();
+    }
     await tracking.close();
     await _changes.close();
   }

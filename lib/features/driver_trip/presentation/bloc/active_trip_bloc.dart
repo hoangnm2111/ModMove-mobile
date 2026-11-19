@@ -25,7 +25,14 @@ class ActiveTripState {
       fresh &&
       distance <= 500 &&
       session.trip?.stage == TripStage.accepted &&
+      session.trip?.onHold != true &&
       !busy;
+  bool get canDeliver =>
+      fresh &&
+      !busy &&
+      session.trip?.stage == TripStage.inTransit &&
+      session.trip?.onHold != true &&
+      session.fix!.point.distanceTo(session.trip!.job.dropoffPoint) <= 500;
 }
 
 sealed class ActiveTripEvent {}
@@ -100,7 +107,7 @@ class ActiveTripBloc extends Bloc<ActiveTripEvent, ActiveTripState> {
                 : trip.job.collectionPoint,
           )) {
         throw const TripFailure(
-          'Không mở được Google Maps. Hãy dùng địa chỉ điểm lấy hàng.',
+          'Không mở được ứng dụng bản đồ. Hãy dùng địa chỉ của chuyến.',
         );
       }
       String? receipt;

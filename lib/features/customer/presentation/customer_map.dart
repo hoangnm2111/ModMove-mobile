@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:google_maps_flutter/google_maps_flutter.dart';
+import 'package:flutter_map/flutter_map.dart';
+import 'package:latlong2/latlong.dart';
+import '../../../core/maps/mapvina_map.dart';
 import '../../../core/platform/maps_configuration.dart';
 import '../domain/customer_models.dart';
 import '../domain/customer_places.dart';
@@ -15,133 +17,100 @@ class CustomerTrackingMap extends StatefulWidget {
   State<CustomerTrackingMap> createState() => _CustomerTrackingMapState();
 }
 
-class _CustomerTrackingMapState extends State<CustomerTrackingMap>
-    with SingleTickerProviderStateMixin {
-  late final AnimationController pulse = AnimationController(
-    vsync: this,
-    duration: const Duration(milliseconds: 1800),
-  );
-  bool mapsReady = false;
-  void syncPulse() {
-    final animate =
-        mapsReady &&
-        widget.searching &&
-        !(MediaQuery.maybeOf(context)?.disableAnimations ?? false);
-    if (animate && !pulse.isAnimating) {
-      pulse.repeat();
-    } else if (!animate) {
-      pulse.stop();
-    }
-  }
-
-  @override
-  void initState() {
-    super.initState();
-    configured.then((ready) {
-      if (mounted) {
-        mapsReady = ready;
-        syncPulse();
-      }
-    });
-  }
-
-  @override
-  void didChangeDependencies() {
-    super.didChangeDependencies();
-    syncPulse();
-  }
-
-  @override
-  void didUpdateWidget(covariant CustomerTrackingMap oldWidget) {
-    super.didUpdateWidget(oldWidget);
-    syncPulse();
-  }
-
-  late final Future<bool> configured = MapsConfiguration.isConfigured();
-  GoogleMapController? controller;
+class _CustomerTrackingMapState extends State<CustomerTrackingMap> {
+  final controller = MapController();
+  bool ready = false;
   LatLng point(GeoPosition p) => LatLng(p.latitude, p.longitude);
+  void fit() {
+    if (!ready) return;
+    final t = widget.snapshot;
+    controller.fitCamera(
+      CameraFit.coordinates(
+        coordinates: [
+          point(t.pickup),
+          point(t.dropoff),
+          if (t.driver != null) point(t.driver!),
+        ],
+        padding: const EdgeInsets.all(40),
+        maxZoom: 16,
+      ),
+    );
+  }
+
   @override
   void dispose() {
-    pulse.dispose();
-    controller?.dispose();
+    controller.dispose();
     super.dispose();
   }
 
   @override
-  Widget build(BuildContext context) => FutureBuilder<bool>(
-    future: configured,
-    builder: (context, s) {
-      final t = widget.snapshot;
-      if (s.data != true) {
-        return const CustomerNotice(
-          'Bản đồ Google chưa được cấu hình trên bản cài đặt này. Địa chỉ và trạng thái bên dưới vẫn được cập nhật từ hệ thống.',
-        );
-      }
-      return AnimatedBuilder(
-        animation: pulse,
-        builder: (context, _) => ClipRRect(
-          borderRadius: BorderRadius.circular(18),
-          child: SizedBox(
-            height: widget.searching ? 330 : 310,
-            child: GoogleMap(
-              initialCameraPosition: CameraPosition(
-                target: point(t.driver ?? t.pickup),
-                zoom: 13,
-              ),
-              onMapCreated: (c) => controller = c,
-              myLocationButtonEnabled: false,
-              zoomControlsEnabled: true,
-              circles: widget.searching
-                  ? {
-                      Circle(
-                        circleId: const CircleId('search-area'),
-                        center: point(t.pickup),
-                        radius: 100 + 250 * pulse.value,
-                        fillColor: AppColors.orange.withValues(
-                          alpha: .16 * (1 - pulse.value),
-                        ),
-                        strokeColor: AppColors.orange.withValues(
-                          alpha: .28 * (1 - pulse.value),
-                        ),
-                        strokeWidth: 1,
-                      ),
-                    }
-                  : {},
-              markers: {
-                Marker(
-                  markerId: const MarkerId('pickup'),
-                  position: point(t.pickup),
-                  icon: BitmapDescriptor.defaultMarkerWithHue(
-                    BitmapDescriptor.hueGreen,
-                  ),
-                  infoWindow: const InfoWindow(title: 'Điểm lấy hàng'),
+  Widget build(BuildContext context) {
+    final t = widget.snapshot;
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(18),
+      child: SizedBox(
+        height: widget.searching ? 330 : 310,
+        child: Stack(
+          children: [
+            MapVinaMap(
+              controller: controller,
+              center: point(t.driver ?? t.pickup),
+              zoom: 13,
+              onReady: () {
+                ready = true;
+                fit();
+              },
+              markers: [
+                mapVinaMarker(
+                  'pickup',
+                  point(t.pickup),
+                  Icons.inventory_2_outlined,
+                  Colors.green,
+                  'Điểm lấy hàng',
                 ),
-                Marker(
-                  markerId: const MarkerId('dropoff'),
-                  position: point(t.dropoff),
-                  icon: BitmapDescriptor.defaultMarkerWithHue(
-                    BitmapDescriptor.hueOrange,
-                  ),
-                  infoWindow: const InfoWindow(title: 'Điểm giao hàng'),
+                mapVinaMarker(
+                  'dropoff',
+                  point(t.dropoff),
+                  Icons.place,
+                  AppColors.orange,
+                  'Điểm giao hàng',
                 ),
                 if (t.driver != null)
-                  Marker(
-                    markerId: const MarkerId('driver'),
-                    position: point(t.driver!),
-                    icon: BitmapDescriptor.defaultMarkerWithHue(
-                      BitmapDescriptor.hueOrange,
-                    ),
-                    infoWindow: const InfoWindow(
-                      title: 'Vị trí cuối của tài xế',
-                    ),
+                  mapVinaMarker(
+                    'driver',
+                    point(t.driver!),
+                    Icons.local_shipping,
+                    AppColors.orange,
+                    'Vị trí cuối của tài xế',
                   ),
-              },
+              ],
+              circles: widget.searching
+                  ? [
+                      CircleMarker(
+                        point: point(t.pickup),
+                        radius: 350,
+                        useRadiusInMeter: true,
+                        color: AppColors.orange.withValues(alpha: .12),
+                        borderColor: AppColors.orange.withValues(alpha: .3),
+                        borderStrokeWidth: 1,
+                      ),
+                    ]
+                  : [],
             ),
-          ),
+            Positioned(
+              right: 8,
+              bottom: 32,
+              child: IconButton.filledTonal(
+                onPressed: fit,
+                tooltip: 'Xem toàn bộ hành trình',
+                icon: const Icon(Icons.center_focus_strong),
+              ),
+            ),
+          ],
         ),
-      );
-    },
-  );
+      ),
+    );
+  }
 }
 
 class PlaceState {
@@ -184,8 +153,16 @@ class PlaceCubit extends Cubit<PlaceState> {
     }
   }
 
-  void select(CustomerPlace place) =>
-      emit(PlaceState(results: state.results, selected: place));
+  void clearSelection() {
+    ++_version;
+    emit(const PlaceState());
+  }
+
+  void select(CustomerPlace place) {
+    ++_version;
+    emit(PlaceState(results: state.results, selected: place));
+  }
+
   Future<void> pin(GeoPosition position) async {
     final version = ++_version;
     emit(const PlaceState(busy: true));
@@ -201,62 +178,75 @@ class PlaceCubit extends Cubit<PlaceState> {
 
   Future<void> locate() async {
     if (state.busy) return;
+    final version = ++_version;
     emit(const PlaceState(busy: true));
     try {
       final p = await places.locate();
-      if (!isClosed) await pin(p);
+      if (!isClosed && version == _version) await pin(p);
     } catch (e) {
-      if (!isClosed) emit(PlaceState(error: customerError(e)));
+      if (!isClosed && version == _version) {
+        emit(PlaceState(error: customerError(e)));
+      }
     }
   }
 }
 
 class CustomerPlaceScreen extends StatefulWidget {
-  const CustomerPlaceScreen({super.key, this.title = 'Chọn địa chỉ'});
-  final String title;
+  const CustomerPlaceScreen({
+    super.key,
+    this.title = 'Chọn địa chỉ',
+    this.initialAddress = '',
+  });
+  final String title, initialAddress;
   @override
   State<CustomerPlaceScreen> createState() => _CustomerPlaceScreenState();
 }
 
 class _CustomerPlaceScreenState extends State<CustomerPlaceScreen> {
-  final query = TextEditingController();
+  late final query = TextEditingController(text: widget.initialAddress);
   late final Future<bool> configured = MapsConfiguration.isConfigured();
-  GoogleMapController? controller;
+  final controller = MapController();
+  bool mapReady = false;
   @override
   void dispose() {
     query.dispose();
-    controller?.dispose();
+    controller.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) => BlocConsumer<PlaceCubit, PlaceState>(
     listener: (_, s) {
-      if (s.selected != null) {
-        controller?.animateCamera(
-          CameraUpdate.newLatLngZoom(
-            LatLng(
-              s.selected!.position.latitude,
-              s.selected!.position.longitude,
-            ),
-            16,
-          ),
+      if (s.selected != null && mapReady) {
+        controller.move(
+          LatLng(s.selected!.position.latitude, s.selected!.position.longitude),
+          16,
         );
       }
     },
     builder: (context, s) => Scaffold(
       appBar: AppBar(title: Text(widget.title)),
       body: SafeArea(
-        child: Column(
+        child: ListView(
+          keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
           children: [
             Padding(
               padding: const EdgeInsets.all(18),
               child: TextField(
                 controller: query,
                 textInputAction: TextInputAction.search,
-                onSubmitted: context.read<PlaceCubit>().search,
+                onSubmitted: (value) {
+                  FocusScope.of(context).unfocus();
+                  context.read<PlaceCubit>().search(value);
+                },
+                onChanged: (_) {
+                  context.read<PlaceCubit>().clearSelection();
+                  setState(() {});
+                },
+                maxLength: 500,
                 decoration: InputDecoration(
                   hintText: 'Tìm địa chỉ: số nhà, đường, thành phố',
+                  counterText: '',
                   prefixIcon: const Padding(
                     padding: EdgeInsets.all(14),
                     child: AppIcon('search', color: AppColors.secondary),
@@ -290,47 +280,46 @@ class _CustomerPlaceScreenState extends State<CustomerPlaceScreen> {
                       .toList(),
                 ),
               ),
-            Expanded(
-              child: FutureBuilder<bool>(
-                future: configured,
-                builder: (context, config) {
-                  if (config.data != true) {
-                    return const Center(
-                      child: Padding(
-                        padding: EdgeInsets.all(24),
-                        child: Text(
-                          'Bản đồ Google chưa sẵn sàng. Bạn có thể tìm và chọn địa chỉ ở phía trên.',
-                          textAlign: TextAlign.center,
-                        ),
+            FutureBuilder<bool>(
+              future: configured,
+              builder: (context, config) {
+                if (config.data != true) {
+                  return const Center(
+                    child: Padding(
+                      padding: EdgeInsets.all(24),
+                      child: Text(
+                        'Bạn có thể nhập đầy đủ số nhà, đường, phường/xã và tỉnh/thành phố, rồi chọn “Dùng địa chỉ đã nhập”. Hệ thống sẽ xác định tuyến đường khi tính giá cước.',
+                        textAlign: TextAlign.center,
                       ),
-                    );
-                  }
-                  final p = s.selected?.position;
-                  return GoogleMap(
-                    initialCameraPosition: CameraPosition(
-                      target: p == null
-                          ? const LatLng(10.7769, 106.7009)
-                          : LatLng(p.latitude, p.longitude),
-                      zoom: 13,
                     ),
-                    onMapCreated: (c) => controller = c,
-                    myLocationButtonEnabled: false,
+                  );
+                }
+                final p = s.selected?.position;
+                return SizedBox(
+                  height: 280,
+                  child: MapVinaMap(
+                    controller: controller,
+                    center: p == null
+                        ? const LatLng(10.7769, 106.7009)
+                        : LatLng(p.latitude, p.longitude),
+                    zoom: 13,
+                    onReady: () => mapReady = true,
                     onTap: (p) => context.read<PlaceCubit>().pin(
                       GeoPosition(p.latitude, p.longitude),
                     ),
-                    markers: {
+                    markers: [
                       if (p != null)
-                        Marker(
-                          markerId: const MarkerId('selected'),
-                          position: LatLng(p.latitude, p.longitude),
-                          icon: BitmapDescriptor.defaultMarkerWithHue(
-                            BitmapDescriptor.hueOrange,
-                          ),
+                        mapVinaMarker(
+                          'selected',
+                          LatLng(p.latitude, p.longitude),
+                          Icons.place,
+                          AppColors.orange,
+                          'Địa chỉ đã chọn',
                         ),
-                    },
-                  );
-                },
-              ),
+                    ],
+                  ),
+                );
+              },
             ),
             Padding(
               padding: const EdgeInsets.all(18),
@@ -366,12 +355,29 @@ class _CustomerPlaceScreenState extends State<CustomerPlaceScreen> {
                     label: const Text('Dùng vị trí hiện tại'),
                   ),
                   const SizedBox(height: 8),
-                  FilledButton(
-                    onPressed: s.busy || s.selected == null
-                        ? null
-                        : () => Navigator.pop(context, s.selected!.address),
-                    child: const Text('Chọn địa chỉ này'),
-                  ),
+                  if (s.selected == null)
+                    FilledButton(
+                      onPressed: query.text.trim().length < 5
+                          ? null
+                          : () => Navigator.pop(
+                              context,
+                              BookingAddress(query.text.trim()),
+                            ),
+                      child: const Text('Dùng địa chỉ đã nhập'),
+                    ),
+                  if (s.selected != null)
+                    FilledButton(
+                      onPressed: s.busy || s.selected == null
+                          ? null
+                          : () => Navigator.pop(
+                              context,
+                              BookingAddress(
+                                s.selected!.address,
+                                position: s.selected!.position,
+                              ),
+                            ),
+                      child: const Text('Chọn địa chỉ này'),
+                    ),
                 ],
               ),
             ),

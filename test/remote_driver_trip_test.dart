@@ -11,24 +11,66 @@ import 'package:modmove_mobile/features/driver_trip/domain/entities/trip_models.
 import 'package:modmove_mobile/features/driver_trip/domain/repositories/driver_location_gateway.dart';
 import 'support/remote_fixtures.dart';
 
-class TestLocation implements DriverLocationGateway {
+class TestLocation
+    implements
+        DriverLocationGateway,
+        DriverLocationLifecycle,
+        DriverLocationSettings {
   TestLocation(this.clock);
   final DateTime Function() clock;
   bool denied = false;
+  DriverLocationIssue? problem;
+  bool grantOnRequest = false;
+  int permissionRequests = 0, appSettings = 0, locationSettings = 0;
+  GeoPoint point = const GeoPoint(10.7348, 106.7057);
+  Duration age = Duration.zero;
+  bool started = false;
+  @override
+  Future<void> startTracking() async {
+    started = true;
+  }
+
+  @override
+  Future<void> stopTracking() async {
+    started = false;
+  }
+
   @override
   Future<GpsFix> current({bool requestPermission = false}) async {
-    if (denied) throw const TripFailure('Cần quyền GPS');
-    return GpsFix(const GeoPoint(10.7348, 106.7057), clock());
+    if (requestPermission) {
+      permissionRequests++;
+      if (grantOnRequest) denied = false;
+    }
+    final issue =
+        problem ?? (denied ? DriverLocationIssue.permissionDenied : null);
+    if (issue != null) {
+      throw DriverLocationFailure(issue, 'Vị trí chưa sẵn sàng');
+    }
+    return GpsFix(point, clock().subtract(age));
+  }
+
+  @override
+  Future<bool> openAppSettings() async {
+    appSettings++;
+    return true;
+  }
+
+  @override
+  Future<bool> openLocationSettings() async {
+    locationSettings++;
+    return true;
   }
 }
 
 class TestTracking implements DriverTrackingConnection {
   final controller = StreamController<void>.broadcast();
   int sent = 0, pauses = 0;
+  bool fail = false;
   @override
   Stream<void> get updates => controller.stream;
   @override
   Future<void> send(GpsFix fix) async {
+    if (fail) throw const TripFailure('Kết nối theo dõi gián đoạn');
     sent++;
   }
 
@@ -241,7 +283,7 @@ void main() {
     },
   );
   test(
-    'permission denied prevents online PATCH; background stops GPS sends',
+    'permission denied prevents online PATCH; a foreground location service keeps sending in background',
     () async {
       location.denied = true;
       await expectLater(repo.setOnline(true), throwsA(isA<TripFailure>()));
@@ -249,9 +291,11 @@ void main() {
       location.denied = false;
       final sent = tracking.sent;
       repo.setForeground(false);
+      now = now.add(const Duration(seconds: 6));
       await repo.refresh();
-      expect(tracking.sent, sent);
-      expect(tracking.pauses, 1);
+      expect(tracking.sent, sent + 1);
+      expect(tracking.pauses, 0);
+      expect(location.started, true);
     },
   );
   test(
@@ -263,6 +307,84 @@ void main() {
       expect(repo.current.trip!.job.detailsAvailable, true);
       expect(repo.current.trip!.job.pickup, '12 Nguyễn Văn Linh');
       expect(repo.current.jobs, isEmpty);
+    },
+  );
+  test(
+    'restored online driver can grant location without toggling server availability',
+    () async {
+      location.denied = true;
+      now = now.add(const Duration(seconds: 6));
+      await repo.refresh();
+      await repo.refresh();
+      expect(location.permissionRequests, 0);
+      expect(repo.current.online, true);
+      expect(repo.current.gpsEnabled, false);
+      expect(repo.current.fix, isNull);
+      expect(repo.current.jobs, isEmpty);
+      expect(
+        repo.current.locationFailure?.issue,
+        DriverLocationIssue.permissionDenied,
+      );
+      location.grantOnRequest = true;
+      await repo.recoverLocation();
+      expect(location.permissionRequests, 1);
+      expect(repo.current.gpsEnabled, true);
+      expect(repo.current.locationFailure, isNull);
+      expect(repo.current.jobs, isNotEmpty);
+      expect(patches, 0);
+    },
+  );
+  test(
+    'blocked permission and disabled service open the corresponding settings once',
+    () async {
+      for (final issue in [
+        DriverLocationIssue.permissionBlocked,
+        DriverLocationIssue.serviceDisabled,
+      ]) {
+        location.problem = issue;
+        await repo.recoverLocation();
+        expect(repo.current.locationFailure?.issue, issue);
+        expect(repo.current.gpsEnabled, false);
+      }
+      expect(location.appSettings, 1);
+      expect(location.locationSettings, 1);
+      expect(location.permissionRequests, 0);
+      expect(patches, 0);
+      location.problem = null;
+      final recovered = repo.changes.firstWhere((s) => s.gpsEnabled);
+      repo.setForeground(true);
+      await recovered;
+      expect(repo.current.locationFailure, isNull);
+    },
+  );
+  test(
+    'returning from settings clears the GPS error without going online',
+    () async {
+      online = false;
+      location.denied = true;
+      await expectLater(
+        repo.setOnline(true),
+        throwsA(isA<DriverLocationFailure>()),
+      );
+      location.denied = false;
+      await repo.refresh();
+      expect(repo.current.online, false);
+      expect(repo.current.gpsEnabled, true);
+      expect(repo.current.locationFailure, isNull);
+      expect(patches, 0);
+    },
+  );
+  test(
+    'tracking connection failure does not label available GPS as denied',
+    () async {
+      now = now.add(const Duration(seconds: 6));
+      tracking.fail = true;
+      final failed = repo.changes.firstWhere((s) => s.notice != null);
+      repo.setForeground(true);
+      await failed;
+      expect(repo.current.gpsEnabled, true);
+      expect(repo.current.locationFailure, isNull);
+      expect(repo.current.notice, 'Kết nối theo dõi gián đoạn');
     },
   );
   test(
@@ -320,6 +442,22 @@ void main() {
         bytes: Uint8List.fromList([137, 80, 78, 71, 13, 10, 26, 10]),
       );
       final uploaded = await repo.upload(photo, (_) {});
+      await expectLater(
+        repo.deliver(photoUrl: uploaded.reference, cashCollected: true),
+        throwsA(isA<TripFailure>()),
+      );
+      expect(
+        writes,
+        0,
+      ); // Still at pickup: uploaded POD alone cannot complete a trip.
+      location.point = repo.current.trip!.job.dropoffPoint;
+      location.age = const Duration(seconds: 31);
+      await expectLater(
+        repo.deliver(photoUrl: uploaded.reference, cashCollected: true),
+        throwsA(isA<TripFailure>()),
+      );
+      expect(writes, 0);
+      location.age = Duration.zero;
       loseWriteResponse = true;
       await repo.deliver(photoUrl: uploaded.reference, cashCollected: true);
       expect(repo.current.trip!.stage, TripStage.delivered);

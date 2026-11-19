@@ -26,6 +26,18 @@ class TripFailure implements Exception {
   String toString() => message;
 }
 
+enum DriverLocationIssue {
+  permissionDenied,
+  permissionBlocked,
+  serviceDisabled,
+  unavailable,
+}
+
+class DriverLocationFailure extends TripFailure {
+  const DriverLocationFailure(this.issue, super.message);
+  final DriverLocationIssue issue;
+}
+
 class GeoPoint {
   const GeoPoint(this.latitude, this.longitude);
   final double latitude, longitude;
@@ -143,6 +155,7 @@ class ActiveTrip {
     this.attempts = 0,
     this.reason,
     this.arrivedAt,
+    this.assignedAt,
     this.submittedAt,
     this.cashCollected = false,
     this.note = '',
@@ -158,13 +171,19 @@ class ActiveTrip {
   final int attempts;
   final String? reason;
   final String note;
-  final DateTime? arrivedAt, submittedAt;
+  final DateTime? arrivedAt, submittedAt, assignedAt;
   final bool cashCollected;
   final List<UploadedEvidence> evidence;
   final String? deliveryPhotoUrl;
   final DateTime? deliveredAt, completedAt;
   final List<TripIncident> incidents;
+  bool get onHold => incidents.any(
+    (incident) =>
+        incident.reportedByYou &&
+        ['Open', 'InProgress'].contains(incident.status),
+  );
   bool get editable =>
+      !onHold &&
       (stage == TripStage.arrived ||
           stage == TripStage.pickedUp && review == EvidenceReview.rejected) &&
       attempts < 5;
@@ -193,6 +212,7 @@ class ActiveTrip {
     attempts: attempts ?? this.attempts,
     reason: reason,
     arrivedAt: arrivedAt ?? this.arrivedAt,
+    assignedAt: assignedAt,
     submittedAt: submittedAt ?? this.submittedAt,
     cashCollected: cashCollected ?? this.cashCollected,
     note: note ?? this.note,
@@ -205,9 +225,16 @@ class ActiveTrip {
 }
 
 class TripIncident {
-  const TripIncident(this.id, this.description, this.status, this.resolution);
+  const TripIncident(
+    this.id,
+    this.description,
+    this.status,
+    this.resolution, {
+    this.reportedByYou = false,
+  });
   final String id, description, status;
   final String? resolution;
+  final bool reportedByYou;
 }
 
 class ShiftSummary {
@@ -225,6 +252,7 @@ class DriverSession {
   DriverSession({
     this.online = false,
     this.gpsEnabled = true,
+    this.locationFailure,
     this.mapAvailable = true,
     this.fix,
     this.offer,
@@ -237,6 +265,7 @@ class DriverSession {
     this.notice,
   }) : jobs = List.unmodifiable(jobs);
   final bool online, gpsEnabled, mapAvailable;
+  final DriverLocationFailure? locationFailure;
   final GpsFix? fix;
   final JobOffer? offer;
   final ActiveTrip? trip;

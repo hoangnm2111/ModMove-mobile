@@ -1,4 +1,13 @@
 import '../../../core/domain/account_input.dart';
+import 'dart:convert';
+import 'dart:typed_data';
+
+class PendingCargoPhoto {
+  PendingCargoPhoto(this.name, Uint8List bytes)
+    : bytes = Uint8List.fromList(bytes).asUnmodifiableView();
+  final String name;
+  final Uint8List bytes;
+}
 
 class CustomerFailure implements Exception {
   const CustomerFailure(this.message, {this.code = ''});
@@ -95,6 +104,10 @@ class BookingDraft {
     this.payment = 'PayOS',
     this.payer = 'Sender',
     this.committed = false,
+    this.pickupPoint,
+    this.dropoffPoint,
+    this.requestKey,
+    this.pendingPhoto,
   });
   final String pickup,
       dropoff,
@@ -110,6 +123,9 @@ class BookingDraft {
   final double weight;
   final List<String> photos;
   final bool loading, committed;
+  final GeoPosition? pickupPoint, dropoffPoint;
+  final String? requestKey;
+  final PendingCargoPhoto? pendingPhoto;
   BookingDraft copyWith({
     String? pickup,
     String? dropoff,
@@ -129,6 +145,13 @@ class BookingDraft {
     String? payment,
     String? payer,
     bool? committed,
+    GeoPosition? pickupPoint,
+    GeoPosition? dropoffPoint,
+    bool clearPickupPoint = false,
+    bool clearDropoffPoint = false,
+    String? requestKey,
+    PendingCargoPhoto? pendingPhoto,
+    bool clearPendingPhoto = false,
   }) => BookingDraft(
     pickup: pickup ?? this.pickup,
     dropoff: dropoff ?? this.dropoff,
@@ -148,8 +171,91 @@ class BookingDraft {
     payment: payment ?? this.payment,
     payer: payer ?? this.payer,
     committed: committed ?? this.committed,
+    pickupPoint: clearPickupPoint
+        ? null
+        : pickupPoint ??
+              (pickup == null || pickup == this.pickup
+                  ? this.pickupPoint
+                  : null),
+    dropoffPoint: clearDropoffPoint
+        ? null
+        : dropoffPoint ??
+              (dropoff == null || dropoff == this.dropoff
+                  ? this.dropoffPoint
+                  : null),
+    requestKey: requestKey ?? this.requestKey,
+    pendingPhoto: clearPendingPhoto ? null : pendingPhoto ?? this.pendingPhoto,
   );
+  Map<String, dynamic> toJson() => {
+    'pickup': pickup,
+    'dropoff': dropoff,
+    'receiver': receiver,
+    'phone': phone,
+    'cargoType': cargoType,
+    'quantity': quantity,
+    'weight': weight,
+    'length': length,
+    'width': width,
+    'height': height,
+    'photos': photos,
+    'notes': notes,
+    'vehicleId': vehicleId,
+    'loading': loading,
+    'coupon': coupon,
+    'payment': payment,
+    'payer': payer,
+    'committed': committed,
+    'requestKey': requestKey,
+    if (pendingPhoto != null)
+      'pendingPhoto': {
+        'name': pendingPhoto!.name,
+        'bytes': base64Encode(pendingPhoto!.bytes),
+      },
+    'pickupPoint': pickupPoint == null
+        ? null
+        : [pickupPoint!.latitude, pickupPoint!.longitude],
+    'dropoffPoint': dropoffPoint == null
+        ? null
+        : [dropoffPoint!.latitude, dropoffPoint!.longitude],
+  };
+  factory BookingDraft.fromJson(Map<String, dynamic> j) {
+    GeoPosition? point(dynamic v) => v is List && v.length == 2
+        ? GeoPosition((v[0] as num).toDouble(), (v[1] as num).toDouble())
+        : null;
+    return BookingDraft(
+      pickup: j['pickup'] as String,
+      dropoff: j['dropoff'] as String,
+      receiver: j['receiver'] as String,
+      phone: j['phone'] as String,
+      cargoType: j['cargoType'] as String,
+      quantity: j['quantity'] as int,
+      weight: (j['weight'] as num).toDouble(),
+      length: j['length'] as int,
+      width: j['width'] as int,
+      height: j['height'] as int,
+      photos: List<String>.from(j['photos'] as List),
+      notes: j['notes'] as String,
+      vehicleId: j['vehicleId'] as int?,
+      loading: j['loading'] == true,
+      coupon: j['coupon'] as String,
+      payment: j['payment'] as String,
+      payer: j['payer'] as String,
+      committed: j['committed'] == true,
+      requestKey: j['requestKey'] as String?,
+      pendingPhoto: j['pendingPhoto'] == null
+          ? null
+          : PendingCargoPhoto(
+              (j['pendingPhoto'] as Map)['name'] as String,
+              base64Decode((j['pendingPhoto'] as Map)['bytes'] as String),
+            ),
+      pickupPoint: point(j['pickupPoint']),
+      dropoffPoint: point(j['dropoffPoint']),
+    );
+  }
   String? validate({bool submit = false}) {
+    if (submit && pendingPhoto != null) {
+      return 'Có ảnh hàng hóa chưa tải xong. Hãy tải lại hoặc bỏ ảnh đó trước khi đặt đơn.';
+    }
     if (pickup.trim().isEmpty || dropoff.trim().isEmpty) {
       return 'Nhập đầy đủ địa chỉ lấy và giao hàng.';
     }
@@ -194,10 +300,12 @@ class Fare {
     this.distanceFee,
     this.serviceFee,
     this.discount,
-    this.total,
-  );
+    this.total, {
+    this.supportsBookingRecovery = false,
+  });
   final double distance, distanceFee, serviceFee, discount, total;
   final int minutes;
+  final bool supportsBookingRecovery;
 }
 
 class CreatedOrder {
@@ -355,16 +463,28 @@ class TrackingSnapshot {
     this.at,
     this.stale,
     this.minutes,
-    this.target,
-  );
+    this.target, {
+    this.etaAt,
+  });
   final GeoPosition pickup, dropoff;
   final GeoPosition? driver;
-  final DateTime? at;
+  final DateTime? at, etaAt;
   final bool stale;
   final int? minutes;
   final String target;
   TrackingSnapshot withLocation(GeoPosition position, DateTime time) =>
-      TrackingSnapshot(pickup, dropoff, position, time, false, null, target);
+      TrackingSnapshot(
+        pickup,
+        dropoff,
+        position,
+        time,
+        false,
+        time.difference(etaAt ?? at ?? time) > const Duration(minutes: 1)
+            ? null
+            : minutes,
+        target,
+        etaAt: etaAt ?? at ?? time,
+      );
 }
 
 class Incident {

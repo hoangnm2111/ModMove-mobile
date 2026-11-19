@@ -87,6 +87,7 @@ abstract final class DriverTripDto {
           proof?['rejectionReason'] as String? ??
           data['cancellationReason'] as String?,
       arrivedAt: transition('Arrived'),
+      assignedAt: transition('Accepted') ?? time('acceptedAt'),
       submittedAt: transition('PickedUp'),
       cashCollected: data['paymentStatus'] == 'Paid',
       evidence: [
@@ -107,6 +108,7 @@ abstract final class DriverTripDto {
             '${incident['description']}',
             '${incident['resolutionStatus']}',
             incident['resolutionNote'] as String?,
+            reportedByYou: incident['reportedByYou'] == true,
           ),
       ],
     );

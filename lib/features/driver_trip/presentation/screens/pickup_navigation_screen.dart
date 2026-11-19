@@ -7,6 +7,7 @@ import '../widgets/driver_map.dart';
 import '../widgets/trip_components.dart';
 import '../widgets/trip_contact_actions.dart';
 import 'driver_simulation_sheet.dart';
+import 'mapvina_navigation_screen.dart';
 import '../../domain/repositories/driver_trip_repository.dart';
 
 class PickupNavigationScreen extends StatelessWidget {
@@ -46,9 +47,7 @@ class PickupNavigationScreen extends StatelessWidget {
                         children: [
                           AppCard(
                             shadow: true,
-                            onTap: () => context.read<ActiveTripBloc>().add(
-                              ExternalNavigationOpened(),
-                            ),
+                            onTap: () => openTripNavigation(context),
                             child: Row(
                               children: [
                                 const AppIcon('truck', size: 21),

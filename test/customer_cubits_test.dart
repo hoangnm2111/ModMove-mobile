@@ -327,7 +327,10 @@ void main() {
       );
       await Future<void>.delayed(Duration.zero);
       expect(c.state.tracking!.driver!.latitude, 11);
-      expect(c.state.tracking!.minutes, isNull);
+      expect(
+        c.state.tracking!.minutes,
+        10,
+      ); // GPS updates keep the latest periodic ETA.
       expect(
         t.requests.where((r) => r.url.path.endsWith('/tracking')).length,
         1,

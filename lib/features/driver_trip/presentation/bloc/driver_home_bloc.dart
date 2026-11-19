@@ -2,11 +2,14 @@ import 'dart:async';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:bloc_concurrency/bloc_concurrency.dart';
 import '../../domain/entities/trip_models.dart';
+import '../../domain/repositories/driver_trip_repository.dart';
 import '../../domain/usecases/driver_trip_actions.dart';
 
 sealed class DriverHomeEvent {}
 
 class HomeRefreshed extends DriverHomeEvent {}
+
+class LocationRecoveryRequested extends DriverHomeEvent {}
 
 class AvailabilityChanged extends DriverHomeEvent {
   AvailabilityChanged(this.online, [this.completion]);
@@ -55,13 +58,23 @@ class DriverHomeBloc extends Bloc<DriverHomeEvent, DriverHomeState> {
     try {
       if (event is AvailabilityChanged) await actions.setOnline(event.online);
       if (event is HomeRefreshed) await actions.repository.refresh();
+      if (event is LocationRecoveryRequested) {
+        final repository = actions.repository;
+        if (repository is DriverLocationRecovery) {
+          await (repository as DriverLocationRecovery).recoverLocation();
+        } else {
+          await repository.refresh();
+        }
+      }
       emit(DriverHomeState(actions.repository.current));
       if (event is AvailabilityChanged) event.completion?.complete(true);
     } catch (e) {
       emit(
         DriverHomeState(
           actions.repository.current,
-          error: e is TripFailure
+          error: e is DriverLocationFailure
+              ? null
+              : e is TripFailure
               ? e.message
               : 'Chưa tải được dữ liệu. Thử lại.',
         ),

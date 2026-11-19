@@ -52,23 +52,32 @@ class _CustomerBookingScreenState extends State<CustomerBookingScreen> {
   }
 
   Future<void> chooseAddress(bool pickup) async {
-    final value = await Navigator.push<String>(
+    final value = await Navigator.push<BookingAddress>(
       context,
       MaterialPageRoute(
         builder: (_) => BlocProvider(
           create: (_) => PlaceCubit(context.read<CustomerPlaces>()),
           child: CustomerPlaceScreen(
             title: pickup ? 'Chọn điểm lấy hàng' : 'Chọn điểm giao hàng',
+            initialAddress: pickup ? _pickup.text : _dropoff.text,
           ),
         ),
       ),
     );
     if (value == null || !mounted) return;
-    (pickup ? _pickup : _dropoff).text = value;
+    (pickup ? _pickup : _dropoff).text = value.address;
     cubit.edit(
       pickup
-          ? cubit.state.draft.copyWith(pickup: value)
-          : cubit.state.draft.copyWith(dropoff: value),
+          ? cubit.state.draft.copyWith(
+              pickup: value.address,
+              pickupPoint: value.position,
+              clearPickupPoint: value.position == null,
+            )
+          : cubit.state.draft.copyWith(
+              dropoff: value.address,
+              dropoffPoint: value.position,
+              clearDropoffPoint: value.position == null,
+            ),
     );
   }
 

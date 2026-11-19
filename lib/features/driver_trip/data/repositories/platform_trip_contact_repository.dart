@@ -9,12 +9,13 @@ class PlatformTripContactRepository implements TripContactRepository {
       launchUrl(Uri(scheme: 'tel', path: phone));
   @override
   Future<bool> openNavigation(GeoPoint destination) => launchUrl(
-    Uri.https('www.google.com', '/maps/dir/', {
-      'api': '1',
-      'destination': '${destination.latitude},${destination.longitude}',
-      'travelmode': 'driving',
-      'dir_action': 'navigate',
-    }),
+    Uri(
+      scheme: 'geo',
+      path: '${destination.latitude},${destination.longitude}',
+      queryParameters: {
+        'q': '${destination.latitude},${destination.longitude}',
+      },
+    ),
     mode: LaunchMode.externalApplication,
   );
 }

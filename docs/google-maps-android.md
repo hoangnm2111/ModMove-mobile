@@ -1,5 +1,8 @@
 # Google Maps thật và vùng nhận đơn
 
+> Historical walkthrough. The app now uses MapVina; follow [MapVina setup](mapvina.md).
+> Google Maps SDK and Android Geocoder have been removed from the app.
+
 App dùng `google_maps_flutter` / Maps SDK for Android khi đã có key. Trong lúc
 chưa cấu hình key/Billing, app tự dùng lại bản đồ mô phỏng cũ, có kéo/zoom, nút
 trở về xe và vòng sóng tìm đơn. Nhãn **Bản đồ mô phỏng** phân biệt chế độ này;

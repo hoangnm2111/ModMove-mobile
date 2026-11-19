@@ -1,20 +1,31 @@
 import 'package:flutter/services.dart';
 
-/// Reads the configuration actually compiled into the Android manifest.
-/// Key presence does not imply that Google has authorized the key or billing.
+/// Reads the mobile MapVina key supplied locally at build time.
 class MapsConfiguration {
   static const _channel = MethodChannel('vn.modmove/maps_configuration');
 
-  static Future<bool> isConfigured() async {
+  static Future<String> apiKey() async {
+    const defined = String.fromEnvironment('MAPVINA_API_KEY');
+    var value = defined.trim();
     try {
-      return await _channel
-              .invokeMethod<bool>('isConfigured')
-              .timeout(const Duration(seconds: 2), onTimeout: () => false) ??
-          false;
+      if (value.isEmpty) {
+        value =
+            (await _channel
+                        .invokeMethod<String>('mapvinaApiKey')
+                        .timeout(
+                          const Duration(seconds: 2),
+                          onTimeout: () => null,
+                        ) ??
+                    '')
+                .trim();
+      }
     } on MissingPluginException {
-      return false;
+      return '';
     } on PlatformException {
-      return false;
+      return '';
     }
+    return value.startsWith('YOUR_') || value == 'REPLACE_ME' ? '' : value;
   }
+
+  static Future<bool> isConfigured() async => (await apiKey()).isNotEmpty;
 }

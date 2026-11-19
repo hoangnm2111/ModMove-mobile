@@ -165,9 +165,15 @@ class TripMetrics extends StatelessWidget {
 }
 
 class TripError extends StatelessWidget {
-  const TripError(this.message, {super.key, this.retry});
+  const TripError(
+    this.message, {
+    super.key,
+    this.retry,
+    this.retryLabel = 'Thử lại',
+  });
   final String message;
   final VoidCallback? retry;
+  final String retryLabel;
   @override
   Widget build(BuildContext context) => Padding(
     padding: const EdgeInsets.only(bottom: 10),
@@ -179,7 +185,7 @@ class TripError extends StatelessWidget {
         children: [
           Text(message, style: appText(size: 13, color: AppColors.red)),
           if (retry != null)
-            TextButton(onPressed: retry, child: const Text('Thử lại')),
+            TextButton(onPressed: retry, child: Text(retryLabel)),
         ],
       ),
     ),

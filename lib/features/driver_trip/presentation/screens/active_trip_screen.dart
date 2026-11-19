@@ -11,6 +11,7 @@ import 'pickup_approval_screen.dart';
 import 'driver_simulation_sheet.dart';
 import '../../domain/repositories/driver_trip_repository.dart';
 import 'delivery_screen.dart';
+import 'mapvina_navigation_screen.dart';
 
 class ActiveTripScreen extends StatelessWidget {
   const ActiveTripScreen({super.key});
@@ -44,6 +45,30 @@ class ActiveTripScreen extends StatelessWidget {
                 ),
               ],
             ),
+          ),
+        );
+      }
+      if (trip.onHold) {
+        return Scaffold(
+          appBar: const AppHeader('Chuyến đang tạm dừng'),
+          body: ListView(
+            padding: const EdgeInsets.all(20),
+            children: [
+              const Notice(
+                'Chờ điều phối xử lý sự cố bạn đã báo.',
+                detail:
+                    'Trạng thái sẽ tự cập nhật khi có quyết định. Bạn vẫn có thể xem sự cố và liên hệ khách.',
+                icon: 'warning',
+                peach: true,
+              ),
+              const SizedBox(height: 16),
+              const TripIncidentHistoryLink(),
+              OutlinedButton(
+                onPressed: () =>
+                    context.read<ActiveTripBloc>().add(CustomerCalled()),
+                child: const Text('Gọi khách'),
+              ),
+            ],
           ),
         );
       }
@@ -94,9 +119,7 @@ class ActiveTripScreen extends StatelessWidget {
                 icon: 'navigation',
                 onPressed: state.busy
                     ? null
-                    : () => context.read<ActiveTripBloc>().add(
-                        ExternalNavigationOpened(),
-                      ),
+                    : () => openTripNavigation(context),
               ),
             ],
           ),

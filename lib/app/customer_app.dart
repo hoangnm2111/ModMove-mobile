@@ -7,7 +7,7 @@ import '../features/customer/domain/customer_repository.dart';
 import '../features/customer/domain/customer_places.dart';
 import '../features/customer/data/remote_customer_repository.dart';
 import '../features/customer/data/customer_realtime.dart';
-import '../features/customer/data/device_customer_places.dart';
+import '../features/customer/data/mapvina_customer_places.dart';
 import '../features/customer/presentation/customer_cubits.dart';
 import '../features/customer/presentation/customer_home_screen.dart';
 import '../features/customer/presentation/customer_booking_screen.dart';
@@ -160,7 +160,10 @@ class _CustomerAppState extends State<CustomerApp> {
   Widget build(BuildContext context) => MultiRepositoryProvider(
     providers: [
       RepositoryProvider<CustomerRepository>.value(value: repo),
-      RepositoryProvider<CustomerPlaces>(create: (_) => DeviceCustomerPlaces()),
+      RepositoryProvider<CustomerPlaces>(
+        create: (_) => MapVinaCustomerPlaces(),
+        dispose: (places) => (places as MapVinaCustomerPlaces).close(),
+      ),
     ],
     child: MultiBlocListener(
       listeners: [

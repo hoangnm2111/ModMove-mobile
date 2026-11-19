@@ -15,9 +15,9 @@ val mapsSecrets = Properties().apply {
     val secretsFile = rootProject.file("secrets.properties")
     if (secretsFile.exists()) secretsFile.inputStream().use { load(it) }
 }
-val mapsApiKey = providers.environmentVariable("MAPS_API_KEY").orNull
+val mapsApiKey = providers.environmentVariable("MAPVINA_API_KEY").orNull
     ?.takeIf { it.isNotBlank() }
-    ?: mapsSecrets.getProperty("MAPS_API_KEY", "")
+    ?: mapsSecrets.getProperty("MAPVINA_API_KEY", "")
 
 android {
     namespace = "vn.modmove.modmove_mobile"
@@ -38,7 +38,7 @@ android {
         targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode
         versionName = flutter.versionName
-        manifestPlaceholders["MAPS_API_KEY"] = mapsApiKey.trim()
+        manifestPlaceholders["MAPVINA_API_KEY"] = mapsApiKey.trim()
     }
 
     buildTypes {
