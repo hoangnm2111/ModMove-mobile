@@ -21,6 +21,7 @@ class DriverProfileScreen extends StatefulWidget {
     this.onWallet,
     this.onIncidents,
     this.onNotifications,
+    this.onSecurity,
   });
   final VoidCallback onHome;
   final VoidCallback onOrders;
@@ -28,6 +29,7 @@ class DriverProfileScreen extends StatefulWidget {
   final VoidCallback? onDemo, onHistory, onLogout, onWallet;
   final VoidCallback? onIncidents;
   final VoidCallback? onNotifications;
+  final VoidCallback? onSecurity;
   @override
   State<DriverProfileScreen> createState() => _DriverProfileScreenState();
 }
@@ -166,6 +168,19 @@ class _DriverProfileScreenState extends State<DriverProfileScreen>
                 ),
                 title: Text('Thông báo'),
                 subtitle: Text('Đơn hàng và hoạt động tài khoản'),
+                trailing: Icon(Icons.chevron_right),
+              ),
+            ),
+            const SizedBox(height: 12),
+          ],
+          if (widget.onSecurity != null) ...[
+            AppCard(
+              onTap: widget.onSecurity,
+              child: const ListTile(
+                contentPadding: EdgeInsets.zero,
+                leading: Icon(Icons.security_outlined, color: AppColors.orange),
+                title: Text('Bảo mật và tài khoản'),
+                subtitle: Text('Đổi mật khẩu, quản lý tài khoản'),
                 trailing: Icon(Icons.chevron_right),
               ),
             ),

@@ -2,6 +2,10 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../core/network/api_client.dart';
+import '../core/platform/file_draft_store.dart';
+import '../features/account/data/remote_account_security_repository.dart';
+import '../features/account/presentation/account_security_cubit.dart';
+import '../features/account/presentation/account_security_screen.dart';
 import '../core/platform/secure_session_store.dart';
 import '../core/theme/app_theme.dart';
 import '../core/theme/customer_theme.dart';
@@ -126,6 +130,10 @@ class _DriverSessionApp extends StatefulWidget {
 }
 
 class _DriverSessionAppState extends State<_DriverSessionApp> {
+  late final _drafts = FileDraftStore(
+    widget.api.baseUrl,
+    widget.api.session!.userId,
+  );
   final _navigator = GlobalKey<NavigatorState>();
   bool _openingNotification = false;
 
@@ -270,6 +278,13 @@ class _DriverSessionAppState extends State<_DriverSessionApp> {
             _openNotification();
           }
           return ModMoveApp(
+            drafts: _drafts,
+            accountSecurityBuilder: (_) => BlocProvider(
+              create: (_) => AccountSecurityCubit(
+                RemoteAccountSecurityRepository(widget.api),
+              ),
+              child: const AccountSecurityScreen(),
+            ),
             notificationSettingsBuilder: (_) =>
                 const NotificationSettingsScreen(),
             navigatorKey: _navigator,
