@@ -4,6 +4,7 @@ import 'package:flutter_svg/flutter_svg.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/widgets/app_widgets.dart';
 import '../../domain/entities/trip_models.dart';
+import '../../domain/repositories/driver_trip_repository.dart';
 import '../bloc/active_trip_bloc.dart';
 import '../widgets/trip_components.dart';
 import '../widgets/trip_contact_actions.dart';
@@ -23,7 +24,9 @@ class PickupApprovalScreen extends StatelessWidget {
     return Scaffold(
       appBar: AppHeader(
         'Xác nhận hàng',
-        onHelp: () => showTripSimulation(context),
+        onHelp: context.read<DriverTripRepository>() is TripSimulator
+            ? () => showTripSimulation(context)
+            : null,
       ),
       body: ListView(
         padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
@@ -75,7 +78,7 @@ class PickupApprovalScreen extends StatelessWidget {
                       _step(
                         rejected ? 'Khách yêu cầu chụp lại' : 'Khách đang xem',
                         rejected
-                            ? trip.reason!
+                            ? trip.reason ?? 'Vui lòng liên hệ điều phối.'
                             : 'Vui lòng chờ khách xác nhận hàng',
                         AppColors.orange,
                         'clock',
@@ -142,6 +145,7 @@ class PickupApprovalScreen extends StatelessWidget {
             onPressed: state.busy ? null : () => showTripIncident(context),
             child: const Text('Báo sự cố'),
           ),
+          const TripIncidentHistoryLink(),
         ],
       ),
     );

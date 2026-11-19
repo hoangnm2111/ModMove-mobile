@@ -8,9 +8,24 @@ import '../bloc/job_offer_bloc.dart';
 import '../widgets/trip_components.dart';
 import 'driver_simulation_sheet.dart';
 
-class JobDetailsScreen extends StatelessWidget {
+class JobDetailsScreen extends StatefulWidget {
   const JobDetailsScreen({super.key, this.onAccepted});
   final VoidCallback? onAccepted;
+  @override
+  State<JobDetailsScreen> createState() => _JobDetailsScreenState();
+}
+
+class _JobDetailsScreenState extends State<JobDetailsScreen> {
+  @override
+  void initState() {
+    super.initState();
+    final bloc = context.read<JobOfferBloc>();
+    final id = bloc.state.offer?.job.id;
+    if (id != null && context.read<DriverTripRepository>() is! TripSimulator) {
+      bloc.add(OfferOpened(id));
+    }
+  }
+
   @override
   Widget build(
     BuildContext context,
@@ -18,8 +33,8 @@ class JobDetailsScreen extends StatelessWidget {
     listenWhen: (a, b) =>
         a.status != b.status && b.status == OfferStatus.accepted,
     listener: (context, state) {
-      if (onAccepted != null) {
-        onAccepted!();
+      if (widget.onAccepted != null) {
+        widget.onAccepted!();
       } else {
         Navigator.pop(context);
         ScaffoldMessenger.of(context).showSnackBar(
@@ -41,7 +56,9 @@ class JobDetailsScreen extends StatelessWidget {
       return Scaffold(
         appBar: AppHeader(
           'Chi tiết đơn',
-          onHelp: () => showTripSimulation(context),
+          onHelp: context.read<DriverTripRepository>() is TripSimulator
+              ? () => showTripSimulation(context)
+              : null,
         ),
         bottomNavigationBar: SafeArea(
           child: Padding(
@@ -69,7 +86,7 @@ class JobDetailsScreen extends StatelessWidget {
               children: [
                 Expanded(
                   child: Text(
-                    '#${job.id}',
+                    '#${job.displayCode}',
                     style: appText(size: 15, weight: FontWeight.w700),
                   ),
                 ),
@@ -112,10 +129,49 @@ class JobDetailsScreen extends StatelessWidget {
                           style: appText(size: 16, weight: FontWeight.w700),
                         ),
                         const SizedBox(height: 6),
-                        Text(
-                          'Thùng xe 3,1 × 1,6 × 1,6 m',
-                          style: appText(size: 13, color: AppColors.secondary),
-                        ),
+                        if (context.read<DriverTripRepository>()
+                            is TripSimulator)
+                          Text(
+                            'Thùng xe 3,1 × 1,6 × 1,6 m',
+                            style: appText(
+                              size: 13,
+                              color: AppColors.secondary,
+                            ),
+                          ),
+                        if (job.cargoDescription.isNotEmpty)
+                          Text(
+                            job.cargoDescription,
+                            style: appText(
+                              size: 13,
+                              color: AppColors.secondary,
+                            ),
+                          ),
+                        if (job.loadingService)
+                          const Text('Có dịch vụ bốc xếp'),
+                        if (job.notes.isNotEmpty)
+                          Padding(
+                            padding: const EdgeInsets.only(top: 8),
+                            child: Text(job.notes),
+                          ),
+                        if (job.photoUrls.isNotEmpty)
+                          SizedBox(
+                            height: 90,
+                            child: ListView.separated(
+                              scrollDirection: Axis.horizontal,
+                              itemCount: job.photoUrls.length,
+                              separatorBuilder: (_, _) =>
+                                  const SizedBox(width: 8),
+                              itemBuilder: (_, index) => Image.network(
+                                job.photoUrls[index],
+                                width: 110,
+                                fit: BoxFit.cover,
+                                errorBuilder: (_, _, _) => const SizedBox(
+                                  width: 110,
+                                  child: Icon(Icons.broken_image_outlined),
+                                ),
+                              ),
+                            ),
+                          ),
                         if (job.fragile) ...[
                           const SizedBox(height: 10),
                           const Notice(
@@ -191,15 +247,20 @@ class JobDetailsScreen extends StatelessWidget {
                       style: appText(size: 15, weight: FontWeight.w700),
                     ),
                   ),
+                  if (job.fareBreakdownAvailable) ...[
+                    _fare('Cước quãng đường', job.distanceFee),
+                    _fare('Dịch vụ bốc xếp', job.serviceFee),
+                    _fare('Giảm giá', -job.discount),
+                  ],
                   _fare('Cước chuyến', job.fare),
                   const Padding(
                     padding: EdgeInsets.symmetric(horizontal: 14),
                     child: Divider(height: 1),
                   ),
-                  _fare('Phí nền tảng (10%)', job.commission),
+                  _fare('Phí nền tảng', -job.commission),
                   ColoredBox(
                     color: AppColors.peach,
-                    child: _fare('Thực nhận', job.net, total: true),
+                    child: _fare('Thu nhập dự kiến', job.net, total: true),
                   ),
                 ],
               ),

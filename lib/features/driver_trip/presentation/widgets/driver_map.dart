@@ -1,379 +1,429 @@
+import 'dart:async';
+import 'dart:math' as math;
 import 'package:flutter/material.dart';
-import 'package:google_maps_flutter/google_maps_flutter.dart';
+import 'package:flutter_map/flutter_map.dart';
+import 'package:latlong2/latlong.dart';
+import '../../../../core/maps/mapvina_client.dart';
+import '../../../../core/maps/mapvina_map.dart';
+import '../../../../core/platform/maps_configuration.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/widgets/app_widgets.dart';
+import '../../domain/entities/driver_matching_policy.dart';
 import '../../domain/entities/trip_models.dart';
+import 'mock_driver_map.dart';
 
-/// Key-free map for the mock environment; never presented as live map tiles.
 class DriverMap extends StatefulWidget {
   const DriverMap({
     super.key,
     this.route = false,
-    this.near = false,
     this.available = true,
+    this.searching = false,
+    this.searchRadiusMeters = DriverMatchingPolicy.searchRadiusMeters,
     this.position,
     this.destination,
-  });
-  final bool route, near, available;
+    this.liveLocation = false,
+  }) : assert(searchRadiusMeters > 0);
+  final bool route, available, searching, liveLocation;
+  final double searchRadiusMeters;
   final GeoPoint? position, destination;
   @override
   State<DriverMap> createState() => _DriverMapState();
 }
 
-class _DriverMapState extends State<DriverMap> {
-  final _transform = TransformationController();
-  GoogleMapController? _google;
-  static const _googleEnabled = bool.fromEnvironment('GOOGLE_MAPS_ENABLED');
+class _DriverMapState extends State<DriverMap>
+    with SingleTickerProviderStateMixin, WidgetsBindingObserver {
+  late final AnimationController pulse;
+  final controller = MapController();
+  final client = MapVinaClient();
+  bool? configured;
+  bool ready = false, foreground = true, routeBusy = false;
+  double cameraZoom = 14;
+  MapVinaRoute? road;
+  String? routeError;
+  DateTime? requestedAt;
+  int version = 0, mapGeneration = 0;
+  Duration lastFrame = Duration.zero;
+  LatLng get position => point(
+    widget.position ?? widget.destination ?? const GeoPoint(10.7769, 106.7009),
+  );
+  bool get coverage =>
+      widget.searching &&
+      !widget.route &&
+      (!widget.liveLocation || widget.position != null);
+  LatLng point(GeoPoint p) => LatLng(p.latitude, p.longitude);
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+    pulse =
+        AnimationController(
+          vsync: this,
+          duration: const Duration(milliseconds: 2600),
+        )..addListener(() {
+          final elapsed = pulse.lastElapsedDuration ?? Duration.zero;
+          if (elapsed - lastFrame < const Duration(milliseconds: 66)) return;
+          lastFrame = elapsed;
+          if (mounted) setState(() {});
+        });
+    unawaited(loadConfiguration());
+  }
+
+  Future<void> loadConfiguration() async {
+    final value = await MapsConfiguration.isConfigured();
+    if (!mounted) return;
+    setState(() => configured = value);
+    syncPulse();
+    if (value) unawaited(loadRoute());
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    syncPulse();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    foreground = state == AppLifecycleState.resumed;
+    syncPulse();
+  }
+
+  @override
+  void didUpdateWidget(DriverMap oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    syncPulse();
+    final changedDestination =
+        widget.destination?.latitude != oldWidget.destination?.latitude ||
+        widget.destination?.longitude != oldWidget.destination?.longitude;
+    if (changedDestination || widget.route != oldWidget.route) {
+      version++;
+      road = null;
+      routeError = null;
+      requestedAt = null;
+      routeBusy = false;
+      unawaited(loadRoute());
+    } else if (widget.position != null && oldWidget.position == null) {
+      unawaited(loadRoute());
+    }
+    if (widget.searching && !oldWidget.searching && ready) showArea();
+  }
+
+  void syncPulse() {
+    final animate =
+        configured != null &&
+        widget.available &&
+        coverage &&
+        foreground &&
+        TickerMode.valuesOf(context).enabled &&
+        !MediaQuery.disableAnimationsOf(context);
+    if (animate && !pulse.isAnimating) {
+      lastFrame = Duration.zero;
+      pulse.repeat();
+    } else if (!animate) {
+      pulse.stop();
+    }
+  }
+
+  Future<void> loadRoute({bool force = false}) async {
+    if (!widget.route ||
+        !widget.liveLocation ||
+        configured != true ||
+        widget.position == null ||
+        widget.destination == null ||
+        routeBusy) {
+      return;
+    }
+    if (!force && requestedAt != null) return;
+    final current = ++version;
+    requestedAt = DateTime.now();
+    setState(() {
+      routeBusy = true;
+      routeError = null;
+    });
+    try {
+      final result = await client.route(position, point(widget.destination!));
+      if (!mounted || current != version) return;
+      setState(() => road = result);
+      if (ready) showArea();
+    } on MapVinaFailure catch (e) {
+      if (mounted && current == version) setState(() => routeError = e.message);
+    } finally {
+      if (mounted && current == version) setState(() => routeBusy = false);
+    }
+  }
+
+  void showArea() {
+    if (!ready) return;
+    if (coverage) {
+      final lat = widget.searchRadiusMeters / 111320;
+      final lng =
+          lat / math.cos(position.latitude * math.pi / 180).abs().clamp(.1, 1);
+      controller.fitCamera(
+        CameraFit.bounds(
+          bounds: LatLngBounds(
+            LatLng(position.latitude - lat, position.longitude - lng),
+            LatLng(position.latitude + lat, position.longitude + lng),
+          ),
+          padding: const EdgeInsets.all(30),
+        ),
+      );
+    } else if (widget.route && widget.destination != null) {
+      controller.fitCamera(
+        CameraFit.coordinates(
+          coordinates: [position, point(widget.destination!), ...?road?.points],
+          padding: const EdgeInsets.all(40),
+          maxZoom: 16,
+        ),
+      );
+    } else {
+      controller.move(position, 14);
+    }
+  }
+
+  List<CircleMarker> circles() => !coverage
+      ? []
+      : [
+          CircleMarker(
+            key: const Key('dispatch-boundary'),
+            point: position,
+            radius: widget.searchRadiusMeters,
+            useRadiusInMeter: true,
+            color: AppColors.orange.withValues(alpha: .07),
+            borderColor: AppColors.orange.withValues(alpha: .45),
+            borderStrokeWidth: 1,
+          ),
+          if (pulse.isAnimating)
+            for (var i = 0; i < 2; i++) ripple(i, (pulse.value + i * .5) % 1),
+        ];
+  CircleMarker ripple(int i, double phase) => CircleMarker(
+    key: ValueKey('dispatch-pulse-$i'),
+    point: position,
+    radius: widget.searchRadiusMeters * (.08 + .92 * phase),
+    useRadiusInMeter: true,
+    color: AppColors.orange.withValues(alpha: .10 * (1 - phase)),
+    borderColor: AppColors.orange.withValues(alpha: .32 * (1 - phase)),
+    borderStrokeWidth: 2,
+  );
   @override
   void dispose() {
-    _transform.dispose();
-    _google?.dispose();
+    version++;
+    WidgetsBinding.instance.removeObserver(this);
+    pulse.dispose();
+    controller.dispose();
+    client.close();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
     if (!widget.available) {
-      return const ColoredBox(
-        color: AppColors.pale,
-        child: Center(
-          child: Padding(
-            padding: EdgeInsets.all(24),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
+      return Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Text('Chưa tải được bản đồ'),
+            const Text(
+              'Bạn vẫn có thể xem địa chỉ và thông tin chuyến.',
+              textAlign: TextAlign.center,
+            ),
+            TextButton(
+              onPressed: loadConfiguration,
+              child: const Text('Thử lại bản đồ'),
+            ),
+          ],
+        ),
+      );
+    }
+    if (configured == null) {
+      return const Center(child: CircularProgressIndicator(strokeWidth: 2));
+    }
+    if (configured == false && !widget.liveLocation) {
+      return MockDriverMap(
+        route: widget.route,
+        searching: coverage,
+        phase: pulse.value,
+        animate: pulse.isAnimating,
+        searchRadiusMeters: widget.searchRadiusMeters,
+        position: widget.position,
+        destination: widget.destination,
+      );
+    }
+    return Column(
+      children: [
+        Expanded(
+          child: Stack(
+            fit: StackFit.expand,
+            children: [
+              MapVinaMap(
+                key: ValueKey('mapvina-driver-$mapGeneration'),
+                controller: controller,
+                center: position,
+                zoom: coverage ? 10.5 : 14,
+                onReady: () {
+                  setState(() {
+                    ready = true;
+                    cameraZoom = controller.camera.zoom;
+                  });
+                  showArea();
+                },
+                onZoomChanged: (zoom) {
+                  if (cameraZoom != zoom) setState(() => cameraZoom = zoom);
+                },
+                markers: [
+                  if (widget.position != null || !widget.liveLocation)
+                    mapVinaMarker(
+                      'driver',
+                      position,
+                      Icons.local_shipping,
+                      AppColors.orange,
+                      widget.liveLocation
+                          ? 'Vị trí tài xế'
+                          : 'Vị trí thử nghiệm',
+                    ),
+                  if (widget.destination != null)
+                    mapVinaMarker(
+                      'destination',
+                      point(widget.destination!),
+                      Icons.place,
+                      Colors.green,
+                      'Điểm đến',
+                    ),
+                ],
+                circles: circles(),
+                polylines: road == null
+                    ? []
+                    : [
+                        Polyline(
+                          points: road!.points,
+                          color: AppColors.orange,
+                          strokeWidth: 5,
+                        ),
+                      ],
+              ),
+              if (routeBusy)
+                const Align(
+                  alignment: Alignment.topCenter,
+                  child: LinearProgressIndicator(),
+                ),
+              Positioned(
+                right: 8,
+                bottom: 32,
+                child: Material(
+                  color: Colors.white,
+                  elevation: 2,
+                  borderRadius: BorderRadius.circular(12),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      IconButton(
+                        tooltip: 'Phóng to',
+                        onPressed: !ready || cameraZoom >= MapVinaMap.maxZoom
+                            ? null
+                            : () {
+                                if (ready) {
+                                  controller.move(
+                                    controller.camera.center,
+                                    (controller.camera.zoom + 1).clamp(
+                                      2,
+                                      MapVinaMap.maxZoom,
+                                    ),
+                                  );
+                                }
+                              },
+                        icon: const AppIcon('plus', size: 21),
+                      ),
+                      IconButton(
+                        tooltip: 'Thu nhỏ',
+                        onPressed: !ready || cameraZoom <= 2
+                            ? null
+                            : () {
+                                if (ready) {
+                                  controller.move(
+                                    controller.camera.center,
+                                    (controller.camera.zoom - 1).clamp(
+                                      2,
+                                      MapVinaMap.maxZoom,
+                                    ),
+                                  );
+                                }
+                              },
+                        icon: const AppIcon('minus', size: 21),
+                      ),
+                      IconButton(
+                        tooltip: 'Về vị trí tài xế',
+                        onPressed: () {
+                          if (ready) controller.move(position, 16);
+                        },
+                        icon: const AppIcon('target', size: 21),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+        Container(
+          width: double.infinity,
+          color: Colors.white,
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
+          child: Text(
+            coverage
+                ? 'Vùng nhận đơn · ${(widget.searchRadiusMeters / 1000).toStringAsFixed(0)} km · ${widget.liveLocation ? 'GPS thiết bị' : 'Vị trí thử nghiệm'}'
+                : road != null
+                ? 'MapVina · ${(road!.meters / 1000).toStringAsFixed(1)} km · ${(road!.seconds / 60).ceil()} phút'
+                : widget.liveLocation
+                ? (widget.position == null
+                      ? 'Đang chờ vị trí GPS của tài xế'
+                      : 'Vị trí GPS thiết bị')
+                : 'Vị trí tài xế thử nghiệm',
+            style: appText(size: 11, color: AppColors.secondary),
+          ),
+        ),
+        if (widget.route && widget.liveLocation && widget.position != null)
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 12),
+            child: Row(
               children: [
-                AppIcon('location-off', size: 36, color: AppColors.muted),
-                SizedBox(height: 10),
-                Text('Chưa tải được bản đồ', textAlign: TextAlign.center),
-                Text(
-                  'Địa chỉ và liên hệ vẫn có bên dưới.',
-                  textAlign: TextAlign.center,
+                if (routeError != null)
+                  Expanded(
+                    child: Text(
+                      routeError!,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(fontSize: 12),
+                    ),
+                  ),
+                if (road?.instructions.isNotEmpty == true)
+                  TextButton(
+                    onPressed: () => showModalBottomSheet<void>(
+                      context: context,
+                      showDragHandle: true,
+                      builder: (_) => ListView(
+                        padding: const EdgeInsets.all(20),
+                        children: [
+                          const Text(
+                            'Hướng dẫn đường đi',
+                            style: TextStyle(fontWeight: FontWeight.bold),
+                          ),
+                          for (final item in road!.instructions.indexed)
+                            ListTile(
+                              leading: Text('${item.$1 + 1}'),
+                              title: Text(item.$2),
+                            ),
+                        ],
+                      ),
+                    ),
+                    child: const Text('Hướng dẫn'),
+                  ),
+                TextButton(
+                  onPressed: routeBusy ? null : () => loadRoute(force: true),
+                  child: const Text('Cập nhật tuyến'),
                 ),
               ],
             ),
           ),
-        ),
-      );
-    }
-    return Stack(
-      fit: StackFit.expand,
-      children: [
-        if (_googleEnabled)
-          GoogleMap(
-            initialCameraPosition: CameraPosition(
-              target: _latLng(
-                widget.position ?? const GeoPoint(10.724, 106.7057),
-              ),
-              zoom: 14,
-            ),
-            onMapCreated: (controller) => _google = controller,
-            zoomControlsEnabled: false,
-            mapToolbarEnabled: false,
-            markers: {
-              Marker(
-                markerId: const MarkerId('driver'),
-                position: _latLng(
-                  widget.position ?? const GeoPoint(10.724, 106.7057),
-                ),
-                infoWindow: const InfoWindow(title: 'Vị trí GPS mô phỏng'),
-              ),
-              if (widget.destination != null)
-                Marker(
-                  markerId: const MarkerId('pickup'),
-                  position: _latLng(widget.destination!),
-                  icon: BitmapDescriptor.defaultMarkerWithHue(
-                    BitmapDescriptor.hueGreen,
-                  ),
-                ),
-            },
-            polylines:
-                widget.route &&
-                    widget.position != null &&
-                    widget.destination != null
-                ? {
-                    Polyline(
-                      polylineId: const PolylineId('mock-pickup-route'),
-                      color: AppColors.orange,
-                      width: 5,
-                      points: [
-                        _latLng(widget.position!),
-                        LatLng(
-                          widget.position!.latitude,
-                          widget.destination!.longitude,
-                        ),
-                        _latLng(widget.destination!),
-                      ],
-                    ),
-                  }
-                : {},
-          )
-        else
-          InteractiveViewer(
-            transformationController: _transform,
-            minScale: 1,
-            maxScale: 3,
-            child: LayoutBuilder(
-              builder: (_, constraints) => CustomPaint(
-                size: Size(constraints.maxWidth, constraints.maxHeight),
-                painter: _StreetPainter(
-                  route: widget.route,
-                  near: widget.near,
-                  progress:
-                      widget.position == null || widget.destination == null
-                      ? 0
-                      : (1 -
-                                widget.position!.distanceTo(
-                                      widget.destination!,
-                                    ) /
-                                    1200)
-                            .clamp(0, 1),
-                ),
-              ),
-            ),
-          ),
-        Positioned(
-          left: 8,
-          bottom: 6,
-          child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
-            color: Colors.white.withValues(alpha: .9),
-            child: Text(
-              _googleEnabled ? 'GPS / tuyến mô phỏng' : 'Bản đồ mô phỏng',
-              style: appText(size: 9, color: AppColors.secondary),
-            ),
-          ),
-        ),
-        Positioned(
-          right: 12,
-          bottom: 14,
-          child: Material(
-            color: Colors.white,
-            elevation: 2,
-            shape: const CircleBorder(),
-            child: IconButton(
-              tooltip: 'Về vị trí hiện tại',
-              onPressed: () {
-                _transform.value = Matrix4.identity();
-                _google?.animateCamera(
-                  CameraUpdate.newLatLng(
-                    _latLng(
-                      widget.position ?? const GeoPoint(10.724, 106.7057),
-                    ),
-                  ),
-                );
-              },
-              icon: const AppIcon('target'),
-            ),
-          ),
-        ),
       ],
     );
   }
-}
-
-LatLng _latLng(GeoPoint p) => LatLng(p.latitude, p.longitude);
-
-class _StreetPainter extends CustomPainter {
-  const _StreetPainter({
-    required this.route,
-    required this.near,
-    required this.progress,
-  });
-  final bool route, near;
-  final double progress;
-  @override
-  void paint(Canvas canvas, Size size) {
-    final w = size.width, h = size.height;
-    canvas.drawRect(
-      Offset.zero & size,
-      Paint()..color = const Color(0xFFEBEEEC),
-    );
-    canvas.save();
-    canvas.clipRect(Offset.zero & size);
-    canvas.translate(w * .4, h * .4);
-    canvas.rotate(-.28);
-    for (var x = -12; x < 15; x++) {
-      for (var y = -22; y < 25; y++) {
-        final rect = Rect.fromLTWH(x * 32.0, y * 22.0, 27, 17);
-        canvas.drawRect(
-          rect,
-          Paint()
-            ..color = (x + y) % 9 == 0
-                ? const Color(0xFFDCE8D5)
-                : const Color(0xFFF4F3EF),
-        );
-        canvas.drawRect(
-          rect,
-          Paint()
-            ..color = const Color(0xFFD6DCD9)
-            ..style = PaintingStyle.stroke
-            ..strokeWidth = .6,
-        );
-      }
-    }
-    canvas.restore();
-    final river = Path()
-      ..moveTo(w * .82, -20)
-      ..cubicTo(w * .52, h * .3, w * 1.2, h * .42, w * .85, h * .65)
-      ..cubicTo(w * .7, h * .8, w * .86, h * .95, w * .75, h + 30);
-    canvas.drawPath(
-      river,
-      Paint()
-        ..color = Colors.white
-        ..style = PaintingStyle.stroke
-        ..strokeWidth = 40,
-    );
-    canvas.drawPath(
-      river,
-      Paint()
-        ..color = const Color(0xFFB5D9ED)
-        ..style = PaintingStyle.stroke
-        ..strokeWidth = 32,
-    );
-    final roads = [
-      Path()
-        ..moveTo(-10, h * .84)
-        ..cubicTo(w * .2, h * .56, w * .65, h * .75, w + 10, h * .43),
-      Path()
-        ..moveTo(w * .15, -10)
-        ..lineTo(w * .32, h * .36)
-        ..lineTo(w * .28, h * .74)
-        ..lineTo(w * .48, h + 10),
-      Path()
-        ..moveTo(w * .58, -10)
-        ..lineTo(w * .50, h * .4)
-        ..lineTo(w * .65, h + 10),
-    ];
-    for (final road in roads) {
-      canvas.drawPath(
-        road,
-        Paint()
-          ..color = const Color(0xFFCCD8DC)
-          ..style = PaintingStyle.stroke
-          ..strokeWidth = 11,
-      );
-      canvas.drawPath(
-        road,
-        Paint()
-          ..color = Colors.white
-          ..style = PaintingStyle.stroke
-          ..strokeWidth = 8,
-      );
-      canvas.drawPath(
-        road,
-        Paint()
-          ..color = const Color(0xFFFFE7AE)
-          ..style = PaintingStyle.stroke
-          ..strokeWidth = 2,
-      );
-    }
-    _label(canvas, 'PHÚ MỸ HƯNG', Offset(w * .49, h * .88), 10);
-    _label(canvas, 'Tân Phong', Offset(w * .08, h * .4), 11);
-    _label(canvas, 'Tân Thuận', Offset(w * .68, h * .2), 11);
-    _label(canvas, 'Nguyễn Văn Linh', Offset(w * .32, h * .71), 11);
-    final start = Offset(w * .21, h * .82), end = Offset(w * .69, h * .36);
-    var vehiclePoint = start;
-    if (route) {
-      final path = Path()
-        ..moveTo(start.dx, start.dy)
-        ..lineTo(w * .27, h * .72)
-        ..lineTo(w * .52, h * .64)
-        ..lineTo(w * .5, h * .56)
-        ..lineTo(w * .63, h * .49)
-        ..lineTo(end.dx, end.dy);
-      canvas.drawPath(
-        path,
-        Paint()
-          ..color = Colors.white
-          ..style = PaintingStyle.stroke
-          ..strokeWidth = 9
-          ..strokeJoin = StrokeJoin.round,
-      );
-      canvas.drawPath(
-        path,
-        Paint()
-          ..color = const Color(0xFFF66818)
-          ..style = PaintingStyle.stroke
-          ..strokeWidth = 5
-          ..strokeJoin = StrokeJoin.round,
-      );
-      _pin(canvas, end);
-      final metric = path.computeMetrics().first;
-      vehiclePoint = metric
-          .getTangentForOffset(metric.length * progress)!
-          .position;
-    } else {
-      canvas.drawCircle(
-        Offset(w * .51, h * .5),
-        48,
-        Paint()..color = AppColors.orange.withValues(alpha: .12),
-      );
-      canvas.drawCircle(
-        Offset(w * .51, h * .5),
-        48,
-        Paint()
-          ..color = AppColors.orange.withValues(alpha: .3)
-          ..style = PaintingStyle.stroke,
-      );
-    }
-    final truck = route ? vehiclePoint : Offset(w * .51, h * .5);
-    canvas.save();
-    canvas.translate(truck.dx, truck.dy);
-    canvas.rotate(.2);
-    for (final x in [-13.0, 9.0]) {
-      for (final y in [-14.0, 10.0]) {
-        canvas.drawRRect(
-          RRect.fromRectAndRadius(
-            Rect.fromLTWH(x, y, 4, 7),
-            const Radius.circular(1.5),
-          ),
-          Paint()..color = AppColors.ink,
-        );
-      }
-    }
-    canvas.drawRRect(
-      RRect.fromRectAndRadius(
-        const Rect.fromLTWH(-11, -21, 22, 42),
-        const Radius.circular(5),
-      ),
-      Paint()..color = Colors.white,
-    );
-    canvas.drawRRect(
-      RRect.fromRectAndRadius(
-        const Rect.fromLTWH(-9, -19, 18, 38),
-        const Radius.circular(3),
-      ),
-      Paint()..color = AppColors.orange,
-    );
-    canvas.drawRect(
-      const Rect.fromLTWH(-6, -15, 12, 23),
-      Paint()..color = Colors.white,
-    );
-    canvas.drawRect(
-      const Rect.fromLTWH(-6, 11, 12, 4),
-      Paint()..color = AppColors.ink,
-    );
-    canvas.restore();
-  }
-
-  void _pin(Canvas canvas, Offset p) {
-    canvas.drawCircle(p, 18, Paint()..color = Colors.white);
-    canvas.drawCircle(p, 14, Paint()..color = AppColors.green);
-    canvas.drawCircle(p, 5, Paint()..color = Colors.white);
-  }
-
-  void _label(Canvas canvas, String text, Offset at, double size) {
-    final painter = TextPainter(
-      text: TextSpan(
-        text: text,
-        style: appText(size: size, color: const Color(0xFF5D6872)),
-      ),
-      textDirection: TextDirection.ltr,
-    )..layout();
-    painter.paint(canvas, at);
-  }
-
-  @override
-  bool shouldRepaint(_StreetPainter old) =>
-      old.route != route || old.near != near || old.progress != progress;
 }

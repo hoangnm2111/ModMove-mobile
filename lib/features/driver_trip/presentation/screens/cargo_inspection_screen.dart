@@ -3,6 +3,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/widgets/app_widgets.dart';
 import '../../domain/entities/trip_models.dart';
+import '../../domain/repositories/driver_trip_repository.dart';
 import '../bloc/active_trip_bloc.dart';
 import '../bloc/evidence_cubit.dart';
 import '../widgets/cargo_photo_tile.dart';
@@ -20,11 +21,14 @@ class CargoInspectionScreen extends StatelessWidget {
     builder: (context, state) {
       final trip = tripState.session.trip!;
       final job = trip.job;
-      final needsCash = job.payment == PaymentMethod.cashSender;
+      final needsCash =
+          job.payment == PaymentMethod.cashSender && !trip.cashCollected;
       return Scaffold(
         appBar: AppHeader(
           'Kiểm tra hàng',
-          onHelp: () => showTripSimulation(context),
+          onHelp: context.read<DriverTripRepository>() is TripSimulator
+              ? () => showTripSimulation(context)
+              : null,
         ),
         bottomNavigationBar: SafeArea(
           child: Padding(
@@ -75,7 +79,9 @@ class CargoInspectionScreen extends StatelessWidget {
                           style: appText(size: 15, weight: FontWeight.w700),
                         ),
                         Text(
-                          'Đồ gia dụng',
+                          job.cargoDescription.isEmpty
+                              ? 'Hàng hóa'
+                              : job.cargoDescription,
                           style: appText(size: 12, color: AppColors.secondary),
                         ),
                       ],
@@ -211,22 +217,24 @@ class CargoInspectionScreen extends StatelessWidget {
               ),
               const SizedBox(height: 8),
             ],
-            const SectionTitle('Ghi chú chênh lệch (nếu có)', size: 13),
-            const SizedBox(height: 6),
-            TextFormField(
-              key: ValueKey('note-${job.id}'),
-              initialValue: state.note,
-              enabled: !state.busy,
-              maxLength: 500,
-              maxLines: 2,
-              minLines: 1,
-              onChanged: context.read<EvidenceCubit>().setNote,
-              decoration: const InputDecoration(
-                hintText: 'Nhập ghi chú…',
-                counterText: '',
+            if (context.read<DriverTripRepository>() is TripSimulator) ...[
+              const SectionTitle('Ghi chú chênh lệch (nếu có)', size: 13),
+              const SizedBox(height: 6),
+              TextFormField(
+                key: ValueKey('note-${job.id}'),
+                initialValue: state.note,
+                enabled: !state.busy,
+                maxLength: 500,
+                maxLines: 2,
+                minLines: 1,
+                onChanged: context.read<EvidenceCubit>().setNote,
+                decoration: const InputDecoration(
+                  hintText: 'Nhập ghi chú…',
+                  counterText: '',
+                ),
               ),
-            ),
-            const SizedBox(height: 9),
+              const SizedBox(height: 9),
+            ],
             AppCard(
               color: AppColors.pale,
               onTap: state.busy ? null : () => showTripIncident(context),
@@ -249,6 +257,7 @@ class CargoInspectionScreen extends StatelessWidget {
                 ],
               ),
             ),
+            const TripIncidentHistoryLink(),
             const SizedBox(height: 5),
           ],
         ),

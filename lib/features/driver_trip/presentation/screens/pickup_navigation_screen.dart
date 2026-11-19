@@ -7,6 +7,8 @@ import '../widgets/driver_map.dart';
 import '../widgets/trip_components.dart';
 import '../widgets/trip_contact_actions.dart';
 import 'driver_simulation_sheet.dart';
+import 'mapvina_navigation_screen.dart';
+import '../../domain/repositories/driver_trip_repository.dart';
 
 class PickupNavigationScreen extends StatelessWidget {
   const PickupNavigationScreen({super.key, required this.state});
@@ -14,10 +16,11 @@ class PickupNavigationScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final trip = state.session.trip!;
+    final demo = context.read<DriverTripRepository>() is TripSimulator;
     return Scaffold(
       appBar: AppHeader(
         'Đến điểm lấy hàng',
-        onHelp: () => showTripSimulation(context),
+        onHelp: demo ? () => showTripSimulation(context) : null,
       ),
       body: LayoutBuilder(
         builder: (context, size) => SingleChildScrollView(
@@ -29,11 +32,11 @@ class PickupNavigationScreen extends StatelessWidget {
                   children: [
                     Positioned.fill(
                       child: DriverMap(
+                        liveLocation: !demo,
                         route: true,
-                        near: state.distance <= 500,
                         available: state.session.mapAvailable,
                         position: state.session.fix?.point,
-                        destination: trip.job.pickupPoint,
+                        destination: trip.job.collectionPoint,
                       ),
                     ),
                     Positioned(
@@ -44,16 +47,16 @@ class PickupNavigationScreen extends StatelessWidget {
                         children: [
                           AppCard(
                             shadow: true,
-                            onTap: () => context.read<ActiveTripBloc>().add(
-                              ExternalNavigationOpened(),
-                            ),
+                            onTap: () => openTripNavigation(context),
                             child: Row(
                               children: [
                                 const AppIcon('truck', size: 21),
                                 const SizedBox(width: 10),
                                 Expanded(
                                   child: Text(
-                                    state.fresh
+                                    state.fresh && !demo
+                                        ? 'Cách điểm lấy ${km(state.distance)}'
+                                        : state.fresh
                                         ? 'Còn ${km(state.distance)} · ${(state.distance / 260).ceil().clamp(1, 60)} phút'
                                         : 'Đang chờ vị trí GPS',
                                     style: appText(
@@ -86,7 +89,9 @@ class PickupNavigationScreen extends StatelessWidget {
                                         CrossAxisAlignment.start,
                                     children: [
                                       Text(
-                                        state.distance <= 500
+                                        !demo
+                                            ? 'Mở Google Maps để xem chỉ đường'
+                                            : state.distance <= 500
                                             ? 'Bạn đã ở gần điểm lấy'
                                             : state.distance > 900
                                             ? 'Rẽ phải sau 300 m'
@@ -155,7 +160,9 @@ class PickupNavigationScreen extends StatelessWidget {
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               Text(
-                                trip.job.pickup,
+                                trip.job.handoverPoint == null
+                                    ? trip.job.pickup
+                                    : 'Điểm bàn giao từ tài xế trước',
                                 style: appText(
                                   size: 15,
                                   weight: FontWeight.w700,
@@ -163,7 +170,9 @@ class PickupNavigationScreen extends StatelessWidget {
                               ),
                               const SizedBox(height: 5),
                               Text(
-                                '${trip.job.customerName} · 09•• ••• 321',
+                                trip.job.customerPhone.isEmpty
+                                    ? 'Chưa có thông tin liên hệ từ server'
+                                    : '${trip.job.customerName} · ${trip.job.customerPhone}',
                                 style: appText(size: 12),
                               ),
                             ],
@@ -171,7 +180,8 @@ class PickupNavigationScreen extends StatelessWidget {
                         ),
                         IconButton(
                           tooltip: 'Gọi khách',
-                          onPressed: state.busy
+                          onPressed:
+                              state.busy || trip.job.customerPhone.isEmpty
                               ? null
                               : () => context.read<ActiveTripBloc>().add(
                                   CustomerCalled(),
@@ -192,7 +202,7 @@ class PickupNavigationScreen extends StatelessWidget {
                         icon: 'check',
                       ),
                     const Notice(
-                      'Chỉ xác nhận khi cách điểm lấy hàng không quá 500 m.',
+                      'Chỉ xác nhận khi cách điểm lấy hoặc bàn giao không quá 500 m.',
                       icon: 'warning',
                       peach: true,
                     ),
@@ -213,6 +223,7 @@ class PickupNavigationScreen extends StatelessWidget {
                           : () => showTripIncident(context),
                       child: const Text('Báo sự cố'),
                     ),
+                    const TripIncidentHistoryLink(),
                   ],
                 ),
               ),

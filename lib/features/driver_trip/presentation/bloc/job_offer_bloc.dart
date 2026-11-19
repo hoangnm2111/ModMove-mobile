@@ -7,6 +7,7 @@ import '../../domain/usecases/driver_trip_actions.dart';
 enum OfferStatus {
   idle,
   available,
+  loading,
   accepting,
   accepted,
   declined,
@@ -88,7 +89,7 @@ class JobOfferBloc extends Bloc<JobOfferEvent, JobOfferState> {
     }
 
     if (event is OfferSessionUpdated) {
-      final session = event.session;
+      final session = actions.repository.current;
       if (state.offer != null &&
           session.trip?.job.id == state.offer!.job.id &&
           session.trip!.ongoing) {
@@ -140,6 +141,13 @@ class JobOfferBloc extends Bloc<JobOfferEvent, JobOfferState> {
     }
     try {
       if (event is OfferOpened) {
+        publish(
+          JobOfferState(
+            offer: state.offer,
+            seconds: state.seconds,
+            status: OfferStatus.loading,
+          ),
+        );
         await actions.repository.openOffer(event.id);
         publish(available(actions.repository.current.offer!));
       } else if (event is OfferDeclined) {

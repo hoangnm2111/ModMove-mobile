@@ -32,6 +32,7 @@ void main() {
       'refresh',
       'location-off',
       'map',
+      'minus',
     ];
     const illustrations = [
       'waiting-customer',

@@ -28,6 +28,8 @@ class DriverController extends Cubit<DriverPresentationState> {
     this._profile,
     this.simulator,
     this.onDispose,
+    this.validation = const ValidateDriverApplication(),
+    this.vehicleTypes = const ['Xe tải 1 tấn', 'Xe van 500 kg', 'Xe bán tải'],
   }) : super(DriverPresentationState()) {
     _apply(loadApplication(), initial: true);
     if (_profile == null) online = application.canGoOnline;
@@ -38,7 +40,9 @@ class DriverController extends Cubit<DriverPresentationState> {
   final ManageDriverProfile? _profile;
   final DriverReviewSimulator? simulator;
   final void Function()? onDispose;
-  static const validation = ValidateDriverApplication();
+  final ValidateDriverApplication validation;
+  final List<String> vehicleTypes;
+  bool get remote => validation.backendContract;
   late ApprovalStatus _status;
   ApprovalStatus get status => _status;
   final Map<String, String> fields = {};
@@ -109,7 +113,9 @@ class DriverController extends Cubit<DriverPresentationState> {
       : 'Chưa thể xử lý. Dữ liệu được giữ lại để bạn thử lại.';
 
   void setField(String key, String value) {
-    if (status == ApprovalStatus.draft && !busy) fields[key] = value;
+    if ((status == ApprovalStatus.draft || remote && canEdit) && !busy) {
+      fields[key] = value;
+    }
   }
 
   Future<bool> Function(bool)? availabilityDelegate;
@@ -130,6 +136,13 @@ class DriverController extends Cubit<DriverPresentationState> {
   void reportAvailabilityError(String? message) {
     lastError = message;
     _notify();
+  }
+
+  void receiveOnline(bool value) {
+    if (online != value) {
+      online = value;
+      _notify();
+    }
   }
 
   /// The composition root shares the trip BLoC with the legacy profile toggle.
@@ -166,6 +179,7 @@ class DriverController extends Cubit<DriverPresentationState> {
         documents.entries
             .where(
               (item) =>
+                  validation.requiredDocuments.contains(item.key) &&
                   (!personalOnly || item.key.index < 4) &&
                   item.value.remoteReference == null,
             )
@@ -274,6 +288,11 @@ class DriverController extends Cubit<DriverPresentationState> {
     lastError = null;
     _notify();
     try {
+      if (remote && canEdit) {
+        // Text edits live in the controller until saved. Preserve them before
+        // polling/reloading a rejected application or returning to its profile.
+        await _profile!.saveDraft(application);
+      }
       await action();
       final latest = await _profile!.refresh();
       if (_disposed) return null;
@@ -332,6 +351,7 @@ class DriverController extends Cubit<DriverPresentationState> {
     lastError = null;
     _notify();
     try {
+      if (remote && canEdit) await _profile!.saveDraft(application);
       final receipt = await _submitApplication(application);
       version = receipt.version;
       submittedAt = receipt.submittedAt;

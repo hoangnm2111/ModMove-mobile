@@ -1,7 +1,15 @@
 import 'dart:math' as math;
 import 'dart:typed_data';
 
-enum TripStage { accepted, arrived, pickedUp, inTransit, cancelled }
+enum TripStage {
+  accepted,
+  arrived,
+  pickedUp,
+  inTransit,
+  delivered,
+  completed,
+  cancelled,
+}
 
 enum EvidenceReview { none, pending, approved, rejected }
 
@@ -16,6 +24,18 @@ class TripFailure implements Exception {
   final String message;
   @override
   String toString() => message;
+}
+
+enum DriverLocationIssue {
+  permissionDenied,
+  permissionBlocked,
+  serviceDisabled,
+  unavailable,
+}
+
+class DriverLocationFailure extends TripFailure {
+  const DriverLocationFailure(this.issue, super.message);
+  final DriverLocationIssue issue;
 }
 
 class GeoPoint {
@@ -66,6 +86,20 @@ class DeliveryJob {
     this.vehicle = 'Xe tải 1 tấn',
     this.customerName = 'Anh Hùng',
     this.customerPhone = '0900000321',
+    this.detailsAvailable = true,
+    this.orderCode = '',
+    this.cargoDescription = '',
+    this.notes = '',
+    this.photoUrls = const [],
+    this.loadingService = false,
+    this.receiverName = '',
+    this.receiverPhone = '',
+    this.distanceFee = 0,
+    this.serviceFee = 0,
+    this.discount = 0,
+    this.commissionRate = 0,
+    this.handoverPoint,
+    this.fareBreakdownAvailable = false,
   });
   final String id, pickup, dropoff, vehicle, customerName, customerPhone;
   final GeoPoint pickupPoint, dropoffPoint;
@@ -74,6 +108,17 @@ class DeliveryJob {
   final int minutes, boxes, weightKg, fare, commission;
   final PaymentMethod payment;
   final bool paid, fragile;
+  final bool detailsAvailable;
+  final String orderCode, cargoDescription, notes;
+  final List<String> photoUrls;
+  final bool loadingService;
+  final String receiverName, receiverPhone;
+  final int distanceFee, serviceFee, discount;
+  final double commissionRate;
+  final GeoPoint? handoverPoint;
+  final bool fareBreakdownAvailable;
+  GeoPoint get collectionPoint => handoverPoint ?? pickupPoint;
+  String get displayCode => orderCode.isEmpty ? id : orderCode;
   int get net => fare - commission;
   bool get cash => payment != PaymentMethod.payos;
   bool expiredAt(DateTime now) =>
@@ -110,9 +155,14 @@ class ActiveTrip {
     this.attempts = 0,
     this.reason,
     this.arrivedAt,
+    this.assignedAt,
     this.submittedAt,
     this.cashCollected = false,
     this.note = '',
+    this.deliveryPhotoUrl,
+    this.deliveredAt,
+    this.completedAt,
+    this.incidents = const [],
     List<UploadedEvidence> evidence = const [],
   }) : evidence = List.unmodifiable(evidence);
   final DeliveryJob job;
@@ -121,14 +171,27 @@ class ActiveTrip {
   final int attempts;
   final String? reason;
   final String note;
-  final DateTime? arrivedAt, submittedAt;
+  final DateTime? arrivedAt, submittedAt, assignedAt;
   final bool cashCollected;
   final List<UploadedEvidence> evidence;
+  final String? deliveryPhotoUrl;
+  final DateTime? deliveredAt, completedAt;
+  final List<TripIncident> incidents;
+  bool get onHold => incidents.any(
+    (incident) =>
+        incident.reportedByYou &&
+        ['Open', 'InProgress'].contains(incident.status),
+  );
   bool get editable =>
+      !onHold &&
       (stage == TripStage.arrived ||
           stage == TripStage.pickedUp && review == EvidenceReview.rejected) &&
       attempts < 5;
-  bool get ongoing => stage != TripStage.cancelled;
+  bool get ongoing => ![
+    TripStage.cancelled,
+    TripStage.delivered,
+    TripStage.completed,
+  ].contains(stage);
   ActiveTrip copyWith({
     TripStage? stage,
     EvidenceReview? review,
@@ -139,6 +202,9 @@ class ActiveTrip {
     bool? cashCollected,
     String? note,
     List<UploadedEvidence>? evidence,
+    String? deliveryPhotoUrl,
+    DateTime? deliveredAt,
+    DateTime? completedAt,
   }) => ActiveTrip(
     job: job,
     stage: stage ?? this.stage,
@@ -146,11 +212,29 @@ class ActiveTrip {
     attempts: attempts ?? this.attempts,
     reason: reason,
     arrivedAt: arrivedAt ?? this.arrivedAt,
+    assignedAt: assignedAt,
     submittedAt: submittedAt ?? this.submittedAt,
     cashCollected: cashCollected ?? this.cashCollected,
     note: note ?? this.note,
     evidence: evidence ?? this.evidence,
+    deliveryPhotoUrl: deliveryPhotoUrl ?? this.deliveryPhotoUrl,
+    deliveredAt: deliveredAt ?? this.deliveredAt,
+    completedAt: completedAt ?? this.completedAt,
+    incidents: incidents,
   );
+}
+
+class TripIncident {
+  const TripIncident(
+    this.id,
+    this.description,
+    this.status,
+    this.resolution, {
+    this.reportedByYou = false,
+  });
+  final String id, description, status;
+  final String? resolution;
+  final bool reportedByYou;
 }
 
 class ShiftSummary {
@@ -158,14 +242,17 @@ class ShiftSummary {
     this.completed = 0,
     this.income = 0,
     this.acceptanceRate = 0,
+    this.available = true,
   });
   final int completed, income, acceptanceRate;
+  final bool available;
 }
 
 class DriverSession {
   DriverSession({
     this.online = false,
     this.gpsEnabled = true,
+    this.locationFailure,
     this.mapAvailable = true,
     this.fix,
     this.offer,
@@ -178,6 +265,7 @@ class DriverSession {
     this.notice,
   }) : jobs = List.unmodifiable(jobs);
   final bool online, gpsEnabled, mapAvailable;
+  final DriverLocationFailure? locationFailure;
   final GpsFix? fix;
   final JobOffer? offer;
   final ActiveTrip? trip;

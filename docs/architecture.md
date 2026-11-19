@@ -1,60 +1,128 @@
 # Mobile architecture
 
-The app uses feature-first Clean Architecture with BLoC/Cubit in the
-presentation layer and customized Flutter Material components as its UI kit.
+The Flutter Android app uses feature-first Clean Architecture and BLoC/Cubit.
+Shared Material widgets are customized with the ModMove Inter/orange design
+system. Dependency direction is `presentation → domain ← data`; composition
+and route wiring belong to `lib/app/`.
 
 ```text
 lib/
-  main.dart                     Android/system startup
-  app/                          Composition root and routes
+  main.dart                         Startup; real API is the default
+  app/                              Auth/session composition and routes
   core/
-    theme/                      Shared colors and typography
-    widgets/                    Shared visual components
+    network/                        HTTP, token refresh, API errors
+    domain/                         Shared paged result
+    formatting/                     Integer VND and Vietnam time
+    theme/                          Colors, typography, Material component theme
+    widgets/                        Cards, buttons, navigation
   features/
-    home/
-    driver_trip/                FE-19 to FE-23, shared trip lifecycle
-    onboarding/
-      domain/
-        entities/               Pure Dart business values
-        repositories/           Repository contracts
-        usecases/               Validation and application operations
-      data/
-        repositories/           Demo or remote contract implementations
-        services/               Platform/plugin adapters when needed
-      presentation/
-        controllers/            Observable UI state, injected use cases
-        bloc/                   Trip BLoC events/states and evidence Cubit
-        models/                 Display labels/formatting
-        screens/                Flutter pages
-        widgets/                Feature widgets
+    auth/                           Driver registration, OTP, encrypted session
+    home/                           Public home and fare information
+    onboarding/                     FE-43 and FE-27
+    driver_trip/                    FE-19..23, FE-25 and FE-26
+    wallet/                         FE-28
+    earnings/                       FE-29
+    incidents/                      FE-32: report, history, dispatcher response
+      domain/                       Pure Dart entities and repository contracts
+      data/                         Remote implementations / DTO mapping
+      presentation/                 Cubits, screens and feature widgets
 ```
 
-Dependency direction: presentation → domain ← data. `lib/app/` chooses concrete
-repository implementations and injects use cases/controllers. Domain imports
-neither Flutter, Provider, platform plugins nor data-layer classes. Widgets do
-not instantiate repositories. Data fixtures stay outside presentation/domain.
+Domain does not import Flutter, plugins, transport or data classes. Widgets do
+not construct API repositories. Financial and trip mutations use domain
+contracts; server values determine balances, settlement and allowed transitions.
+Fixtures belong to explicit mock adapters or tests.
 
-The driver pickup feature groups home, matching, navigation and evidence around
-one trip repository so all screens observe the same order state. Its three Blocs
-and EvidenceCubit are composed in `app/driver_trip_scope.dart`, which owns stream
-and timer lifetimes. Profile and trip availability use the same DriverHomeBloc;
-the profile API remains the persistence gateway. See the
-[pickup walkthrough](driver-pickup-mock.md) for boundaries and mock scenarios.
+## Composition and session
 
-Public fares use a demo repository. Driver profiles use `ApiDriverRepository`,
-which maps domain entities to JSON and sends HTTP requests through an injected
-`http.Client`. The app currently injects `MockClient` from `MockDriverApi`: an
-in-process mock transport with latency, HTTP errors, serialized mutations,
-idempotent submission and persistent version history. The proposed contract is
-documented in [the profile walkthrough](driver-profile-mock.md).
+`RemoteApp` owns the authenticated session. `ApiClient` shares the access token,
+serializes refresh-token rotation and converts backend errors into user-facing
+messages. `SecureSessionStore` encrypts tokens and account/server-specific local
+drafts. Signing out disposes the driver's repositories, streams and timers.
+`RemoteDriverRepository` reads the real profile, onboarding status and vehicle
+catalog. Existing onboarding controllers are Cubits despite their file names.
 
-`DriverProfileRepository` extends the basic fixture contract with asynchronous
-load, draft save, upload, history and availability. `DriverReviewSimulator` is a
-separate contract for demo controls, not production driver permissions. Domain
-still imports neither Flutter nor transport/plugin APIs. `lib/app/` selects the
-adapters; `main.dart` opens the local file store for normal runs.
+`DriverTripScope` provides the trip, photo and contact contracts together with
+`DriverHomeBloc`, `JobOfferBloc`, `ActiveTripBloc` and `EvidenceCubit`.
+The remote trip repository also implements `TripHistoryRepository` and
+`DriverDeliveryRepository`. Route-scoped `DeliveryCubit`,
+`TripHistoryCubit` and `TripDetailCubit` share that same authoritative trip
+repository. Wallet and revenue routes inject `RemoteWalletRepository` /
+`WalletCubit` and `RemoteEarningsRepository` / `RevenueCubit`.
 
-Photo selection remains an injected adapter; the demo adds a labelled sample
-image option. File validation and editing rules live in domain, and mock server
-validation independently checks its authoritative version and document decisions.
-This is not authentication, payment, Cloudinary or a real review backend.
+Incidents injects `RemoteDriverIncidentRepository` with the same authenticated
+API client. Route-scoped `IncidentReportCubit`, `IncidentListCubit` and
+`IncidentDetailCubit` handle uploads, paginated filters, resolution updates
+and reconciliation after uncertain submissions. Reports bind to a specific
+active order and never switch silently when the assigned trip changes.
+See [the Incidents walkthrough](driver-incidents.md).
+
+## Trip consistency
+
+The trip repository polls status/nearby orders and receives SignalR notifications.
+On refresh it fetches full assigned-trip details, including customer contacts,
+pickup review, POD, incidents and replacement handover points. A fresh install
+can restore an existing trip without a local cache.
+
+Offer countdowns use an absolute deadline, at most 30 seconds and no later than
+the server matching expiry. Polling never extends a displayed offer. Before and
+after a mutation the repository reads server state. If an acceptance/transition
+response is lost, it reconciles using GET instead of replaying a POST. A delivered
+receipt remains available while awaiting customer confirmation; only Completed
+contributes to revenue.
+
+Photo selection is a platform adapter. Evidence upload uses multipart
+`/api/driver/uploads`; Cloudinary credentials remain on the backend. Pickup
+needs 2–5 distinct uploaded URLs; POD needs one. The API is responsible for URL
+ownership, valid transitions, cash rules and pickup resubmission limits.
+
+## Wallet and revenue
+
+Wallet state holds the server balance, ledger, withdrawal history and current
+PayOS session. Opening checkout does not credit money. Confirmation requires the
+matching top-up transaction to become Completed on the server. Withdrawal checks
+re-read the balance immediately before submitting; lost responses trigger reads,
+not automatic financial retries.
+
+Revenue ranges are Vietnam calendar dates, with Monday-based weeks. The server
+provides totals and the previous-period comparison. Every page of completed
+orders is loaded before chart aggregation; the UI reveals rows in smaller
+batches. A generation guard prevents a slow prior filter response replacing the
+currently selected period.
+
+## Maps and location
+
+`MapVinaMap` renders MapVina Streets Raster v2 with `flutter_map`; the same
+component serves customer tracking, address selection and driver maps.
+`MapVinaClient` calls Search, Reverse Geocoding and Directions v2 through a
+dedicated HTTP client without app session tokens. `MapVinaCustomerPlaces`
+maps provider responses to pure domain entities and uses Geolocator for GPS.
+Rendering uses the shared dispatch radius; animation respects lifecycle and
+reduced motion. Mock maps are limited to demo mode. See [MapVina setup](mapvina.md).
+
+Location sent to the API always comes from the device in real mode, including
+when map tiles are unavailable. SignalR sends location about every 5 seconds,
+with REST fallback and an Android foreground location service. Routing opens
+an in-app MapVina road polyline and instruction list; explicit refresh recalculates
+from the latest GPS fix. This is not voice guidance or automatic rerouting.
+
+## Push notifications
+
+`notifications/domain` defines device/token contracts and validates notification
+destinations. Firebase and HTTP adapters live in `data`; `PushCubit` owns permission,
+registration, token refresh, retries and pending taps. The composition root waits
+for authentication and driver loading before opening routes. Foreground messages
+use an Android notification channel; background messages use FCM display. Logout
+drains registration and clears this device's token. See [Firebase setup and tests](firebase-push.md).
+
+## Optional legacy demo and validation
+
+`USE_MOCK_API=true` explicitly selects the previous onboarding/pickup demo.
+Only that mode exposes simulated approvals, evidence decisions and sample media;
+an API error never activates it. See [profile demo](driver-profile-mock.md) and
+[pickup demo](driver-pickup-mock.md) for historical fixture scenarios.
+
+See [the real API walkthrough](backend-api.md) for all 11 Driver tasks, sequential
+testing, live verification and external-service limitations. Unit/widget tests
+cover repository contracts, timing, race handling, financial state and responsive
+layouts. Review screenshots and agent files remain ignored by Git.

@@ -29,6 +29,10 @@ abstract interface class CargoPhotoRepository {
   Future<CargoPhoto?> pick(CargoPhotoKind kind, CargoPhotoSource source);
 }
 
+abstract interface class DriverLocationRecovery {
+  Future<void> recoverLocation();
+}
+
 abstract interface class TripContactRepository {
   Future<bool> callCustomer(String phone);
   Future<bool> openNavigation(GeoPoint destination);

@@ -4,6 +4,7 @@ import 'package:flutter_svg/flutter_svg.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/widgets/app_widgets.dart';
 import '../../domain/entities/trip_models.dart';
+import '../../domain/entities/driver_matching_policy.dart';
 import '../bloc/driver_home_bloc.dart';
 import '../widgets/driver_map.dart';
 import '../widgets/trip_components.dart';
@@ -14,27 +15,100 @@ class DriverHomeScreen extends StatelessWidget {
     this.onJob,
     this.onActiveTrip,
     this.onSimulation,
+    this.onNotifications,
   });
   final ValueChanged<DeliveryJob>? onJob;
-  final VoidCallback? onActiveTrip, onSimulation;
+  final VoidCallback? onActiveTrip, onSimulation, onNotifications;
   @override
   Widget build(
     BuildContext context,
   ) => BlocBuilder<DriverHomeBloc, DriverHomeState>(
     builder: (context, state) {
       final session = state.session;
+      final error = state.error ?? (session.gpsEnabled ? session.notice : null);
       return Scaffold(
         appBar: AppBar(
           automaticallyImplyLeading: false,
-          title: const Text('Trang chủ tài xế'),
+          centerTitle: false,
+          toolbarHeight: 64,
+          titleSpacing: 16,
+          title: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Trang chủ tài xế',
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: appText(size: 17, weight: FontWeight.w700),
+              ),
+              const SizedBox(height: 3),
+              Row(
+                children: [
+                  Container(
+                    width: 7,
+                    height: 7,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: session.online ? AppColors.green : AppColors.muted,
+                    ),
+                  ),
+                  const SizedBox(width: 6),
+                  Expanded(
+                    child: Text(
+                      session.online
+                          ? !session.gpsEnabled
+                                ? 'Trực tuyến · Chờ vị trí'
+                                : 'Bạn đang trực tuyến'
+                          : 'Bạn đang ngoại tuyến',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: appText(
+                        size: 12,
+                        color: session.online
+                            ? AppColors.green
+                            : AppColors.secondary,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
           actions: [
+            if (state.loading)
+              const SizedBox(
+                width: 60,
+                child: Center(
+                  child: SizedBox(
+                    width: 22,
+                    height: 22,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  ),
+                ),
+              )
+            else
+              Semantics(
+                label: 'Bật hoặc tắt nhận đơn',
+                child: Switch(
+                  key: const Key('driver-online'),
+                  value: session.online,
+                  onChanged: (value) => context.read<DriverHomeBloc>().add(
+                    AvailabilityChanged(value),
+                  ),
+                  activeThumbColor: Colors.white,
+                  activeTrackColor: AppColors.orange,
+                ),
+              ),
             IconButton(
               tooltip: 'Thông báo',
-              onPressed: () => showInfoSheet(
-                context,
-                'Thông báo',
-                session.notice ?? 'Bạn chưa có thông báo mới.',
-              ),
+              onPressed:
+                  onNotifications ??
+                  () => showInfoSheet(
+                    context,
+                    'Thông báo',
+                    session.notice ?? 'Bạn chưa có thông báo mới.',
+                  ),
               icon: const AppIcon('bell'),
             ),
           ],
@@ -45,6 +119,10 @@ class DriverHomeScreen extends StatelessWidget {
           onSelect: (i) {
             if (i == 3) Navigator.pushNamed(context, '/profile');
             if (i == 1) {
+              if (onSimulation == null) {
+                Navigator.pushNamed(context, '/trips');
+                return;
+              }
               if (session.trip?.ongoing ?? false) {
                 onActiveTrip?.call();
               } else {
@@ -56,6 +134,10 @@ class DriverHomeScreen extends StatelessWidget {
               }
             }
             if (i == 2) {
+              if (onSimulation == null) {
+                Navigator.pushNamed(context, '/wallet');
+                return;
+              }
               showInfoSheet(
                 context,
                 'Số dư ví',
@@ -70,90 +152,53 @@ class DriverHomeScreen extends StatelessWidget {
           child: ListView(
             padding: const EdgeInsets.only(bottom: 8),
             children: [
-              Padding(
-                padding: const EdgeInsets.fromLTRB(14, 4, 14, 10),
-                child: AppCard(
-                  color: session.online ? AppColors.greenBg : AppColors.pale,
-                  borderColor: session.online
-                      ? const Color(0xFFC1E9CD)
-                      : AppColors.line,
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 14,
-                    vertical: 9,
-                  ),
-                  child: Row(
-                    children: [
-                      Container(
-                        width: 17,
-                        height: 17,
-                        decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          color: session.online
-                              ? AppColors.green
-                              : AppColors.muted,
-                        ),
-                      ),
-                      const SizedBox(width: 14),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              session.online
-                                  ? 'Bạn đang trực tuyến'
-                                  : 'Bạn đang ngoại tuyến',
-                              style: appText(size: 15, weight: FontWeight.w700),
-                            ),
-                            Text(
-                              session.online
-                                  ? (session.trip?.ongoing ?? false)
-                                        ? 'Đang thực hiện chuyến'
-                                        : 'Đang tìm chuyến phù hợp'
-                                  : 'Bật hoạt động để nhận đơn',
-                              style: appText(size: 11),
-                            ),
-                          ],
-                        ),
-                      ),
-                      if (state.loading)
-                        const SizedBox(
-                          width: 23,
-                          height: 23,
-                          child: CircularProgressIndicator(strokeWidth: 2),
-                        )
-                      else
-                        Switch(
-                          key: const Key('driver-online'),
-                          value: session.online,
-                          onChanged: (value) => context
-                              .read<DriverHomeBloc>()
-                              .add(AvailabilityChanged(value)),
-                          activeThumbColor: Colors.white,
-                          activeTrackColor: AppColors.orange,
-                        ),
-                    ],
-                  ),
-                ),
-              ),
-              if (state.error != null)
+              if (error != null)
                 Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 14),
                   child: TripError(
-                    state.error!,
+                    error,
                     retry: () =>
                         context.read<DriverHomeBloc>().add(HomeRefreshed()),
                   ),
                 ),
               if (!session.gpsEnabled)
-                const Padding(
-                  padding: EdgeInsets.symmetric(horizontal: 14),
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 14),
                   child: TripError(
-                    'Chưa có quyền vị trí. Bật lại GPS để xem đơn và xác nhận đến điểm.',
+                    session.locationFailure?.message ??
+                        'Chưa lấy được vị trí. Kiểm tra quyền vị trí và GPS của thiết bị.',
+                    retry: state.loading
+                        ? null
+                        : () => context.read<DriverHomeBloc>().add(
+                            LocationRecoveryRequested(),
+                          ),
+                    retryLabel: switch (session.locationFailure?.issue) {
+                      DriverLocationIssue.permissionDenied =>
+                        'Cấp quyền vị trí',
+                      DriverLocationIssue.permissionBlocked =>
+                        'Mở cài đặt ứng dụng',
+                      DriverLocationIssue.serviceDisabled =>
+                        'Bật vị trí thiết bị',
+                      _ => 'Thử lại vị trí',
+                    },
                   ),
                 ),
               SizedBox(
-                height: 165,
-                child: DriverMap(available: session.mapAvailable),
+                key: const Key('driver-home-map'),
+                height: (MediaQuery.sizeOf(context).height * .38).clamp(
+                  280,
+                  360,
+                ),
+                child: DriverMap(
+                  liveLocation: onSimulation == null,
+                  available: session.mapAvailable,
+                  position: session.fix?.point,
+                  searching:
+                      session.online &&
+                      session.gpsEnabled &&
+                      !(session.trip?.ongoing ?? false),
+                  searchRadiusMeters: DriverMatchingPolicy.searchRadiusMeters,
+                ),
               ),
               Padding(
                 padding: const EdgeInsets.fromLTRB(14, 10, 14, 0),
@@ -207,13 +252,17 @@ class DriverHomeScreen extends StatelessWidget {
                               ),
                               Text(
                                 session.online
-                                    ? 'Chưa có đơn phù hợp'
+                                    ? session.gpsEnabled
+                                          ? 'Chưa có đơn phù hợp'
+                                          : 'Cần vị trí để tìm đơn gần bạn'
                                     : 'Sẵn sàng cho chuyến tiếp theo?',
                                 style: appText(weight: FontWeight.w600),
                               ),
                               Text(
                                 session.online
-                                    ? 'Đơn mới sẽ được cập nhật tự động.'
+                                    ? session.gpsEnabled
+                                          ? 'Đơn mới sẽ được cập nhật tự động.'
+                                          : 'Hoàn tất thiết lập vị trí ở phía trên.'
                                     : 'Bật công tắc để bắt đầu nhận chuyến.',
                                 style: appText(
                                   size: 12,
@@ -235,7 +284,7 @@ class DriverHomeScreen extends StatelessWidget {
                         ),
                       ),
                     ],
-                    if (session.deposit < 200000)
+                    if (session.deposit < 200000 && onSimulation != null)
                       const Padding(
                         padding: EdgeInsets.only(bottom: 8),
                         child: Notice(
@@ -258,20 +307,28 @@ class DriverHomeScreen extends StatelessWidget {
                             children: [
                               _summary(
                                 'route',
-                                '${session.shift.completed}',
+                                !session.shift.available
+                                    ? '—'
+                                    : '${session.shift.completed}',
                                 'chuyến',
                               ),
                               const SizedBox(width: 5),
                               _summary(
                                 'coins',
-                                vnd(session.shift.income),
+                                !session.shift.available
+                                    ? '—'
+                                    : vnd(session.shift.income),
                                 'Thu nhập',
                               ),
                               const SizedBox(width: 5),
                               _summary(
                                 'chart-bar',
-                                '${session.shift.acceptanceRate}%',
-                                'Tỷ lệ nhận',
+                                onSimulation == null
+                                    ? '${session.jobs.length}'
+                                    : '${session.shift.acceptanceRate}%',
+                                onSimulation == null
+                                    ? 'Đơn gần bạn'
+                                    : 'Tỷ lệ nhận',
                               ),
                             ],
                           ),
@@ -290,7 +347,7 @@ class DriverHomeScreen extends StatelessWidget {
                       children: [
                         Expanded(
                           child: Text(
-                            'Mô phỏng • GPS ${session.online ? '5 giây/lần' : 'đã tắt'}',
+                            '${onSimulation == null ? 'GPS thiết bị' : 'Mô phỏng • GPS'} ${session.online || session.trip != null ? '5 giây/lần' : 'đã tắt'}',
                             style: appText(size: 9, color: AppColors.muted),
                           ),
                         ),

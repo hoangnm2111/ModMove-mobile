@@ -1,6 +1,8 @@
 import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import '../../../../core/domain/draft_store.dart';
+import '../../domain/entities/photo_draft.dart';
 import '../../domain/entities/trip_models.dart';
 import '../../domain/repositories/driver_trip_repository.dart';
 import '../../domain/usecases/driver_trip_actions.dart';
@@ -57,12 +59,122 @@ class EvidenceState {
 }
 
 class EvidenceCubit extends Cubit<EvidenceState> {
-  EvidenceCubit(this.actions, this.photos) : super(EvidenceState()) {
+  EvidenceCubit(this.actions, this.photos, {this.drafts})
+    : super(EvidenceState(busy: drafts != null)) {
     _tripId = actions.repository.current.trip?.job.id;
+    _attempts = actions.repository.current.trip?.attempts;
+    _assignedAt = actions.repository.current.trip?.assignedAt;
+    _lastReview = actions.repository.current.trip?.review;
     _subscription = actions.repository.changes.listen(_session);
+    if (drafts != null) unawaited(_restore());
   }
   final DriverTripActions actions;
   final CargoPhotoRepository photos;
+  final DraftStore? drafts;
+  int? _attempts;
+  DateTime? _assignedAt;
+  Timer? _saveTimer;
+  bool _restoring = false;
+  bool get _draftAllowed {
+    final trip = actions.repository.current.trip;
+    return trip != null &&
+        (trip.stage == TripStage.arrived ||
+            trip.stage == TripStage.pickedUp &&
+                trip.review == EvidenceReview.rejected);
+  }
+
+  Future<void> _persist() async {
+    final id = _tripId;
+    if (drafts == null || id == null || _restoring) return;
+    if (!_draftAllowed) return drafts!.remove('pickup_$id');
+    await drafts!.write('pickup_$id', {
+      'attempts': _attempts,
+      'review': actions.repository.current.trip!.review.name,
+      'assignment': _assignedAt?.toIso8601String(),
+      'items': state.items.values
+          .map(
+            (i) => {
+              ...photoDraft(i.photo, i.uploaded),
+              'retake': i.needsRetake,
+            },
+          )
+          .toList(),
+      'checklist': state.checklist,
+      'note': state.note,
+      'cash': state.cashCollected,
+    });
+  }
+
+  Future<void> _restore() async {
+    final id = _tripId, epoch = _epoch;
+    if (id == null || drafts == null) {
+      if (!isClosed) emit(EvidenceState());
+      return;
+    }
+    _restoring = true;
+    try {
+      final saved = await drafts!.read('pickup_$id');
+      if (isClosed || epoch != _epoch) return;
+      final trip = actions.repository.current.trip;
+      if (_draftAllowed &&
+          saved != null &&
+          saved['attempts'] == trip?.attempts &&
+          saved['review'] == trip?.review.name &&
+          saved['assignment'] == trip?.assignedAt?.toIso8601String()) {
+        final items = <CargoPhotoKind, EvidenceItem>{};
+        for (final raw in saved['items'] as List) {
+          final j = Map<String, dynamic>.from(raw as Map);
+          final photo = readPhotoDraft(j);
+          final retake = j['retake'] == true;
+          items[photo.kind] = EvidenceItem(
+            photo,
+            uploaded: retake ? null : readUploadDraft(j),
+            needsRetake: retake,
+          );
+        }
+        emit(
+          EvidenceState(
+            items: items,
+            checklist: List<bool>.from(saved['checklist'] as List),
+            note: saved['note'] as String,
+            cashCollected: saved['cash'] == true,
+          ),
+        );
+      } else {
+        await drafts!.remove('pickup_$id');
+        if (!isClosed && epoch == _epoch) emit(EvidenceState());
+      }
+    } catch (_) {
+      if (!isClosed && epoch == _epoch) {
+        emit(
+          EvidenceState(
+            error: 'Chưa khôi phục được ảnh đã lưu. Vui lòng chụp lại.',
+          ),
+        );
+      }
+    } finally {
+      _restoring = false;
+    }
+  }
+
+  @override
+  void onChange(Change<EvidenceState> change) {
+    super.onChange(change);
+    if (drafts == null || _restoring) return;
+    _saveTimer?.cancel();
+    _saveTimer = Timer(const Duration(milliseconds: 200), () {
+      unawaited(
+        _persist().catchError((Object _) {
+          const message =
+              'Không lưu được bản nháp ảnh trên máy. Kiểm tra dung lượng trống.';
+          if (!isClosed && state.error != message) {
+            emit(state.copyWith(error: message));
+          }
+        }),
+      );
+    });
+  }
+
   late final StreamSubscription<DriverSession> _subscription;
   String? _tripId;
   EvidenceReview? _lastReview;
@@ -71,10 +183,27 @@ class EvidenceCubit extends Cubit<EvidenceState> {
   void _session(DriverSession session) {
     if (isClosed) return;
     final trip = session.trip;
-    if (trip?.job.id != _tripId) {
+    if (trip?.job.id != _tripId || trip?.assignedAt != _assignedAt) {
+      final previous = _tripId;
+      if (previous != null) {
+        unawaited(drafts?.remove('pickup_$previous').catchError((Object _) {}));
+      }
       _tripId = trip?.job.id;
+      _attempts = trip?.attempts;
+      _assignedAt = trip?.assignedAt;
       _epoch++;
       emit(EvidenceState());
+    }
+    if (trip?.attempts != _attempts) {
+      _attempts = trip?.attempts;
+      _epoch++;
+      // Keep previews while waiting; a rejection below invalidates their URLs.
+      // The previous attempt is removed from disk as soon as it is submitted.
+      final id = _tripId;
+      if (id != null) {
+        unawaited(drafts?.remove('pickup_$id').catchError((Object _) {}));
+      }
+      emit(state.copyWith(busy: false));
     }
     if (trip?.review == EvidenceReview.rejected &&
         _lastReview != EvidenceReview.rejected) {
@@ -139,6 +268,7 @@ class EvidenceCubit extends Cubit<EvidenceState> {
         );
       }
       _item(kind, EvidenceItem(photo));
+      await _persist();
       await _upload(kind, photo, epoch);
     } catch (e) {
       if (!isClosed && epoch == _epoch) {
@@ -220,6 +350,8 @@ class EvidenceCubit extends Cubit<EvidenceState> {
 
   @override
   Future<void> close() async {
+    _saveTimer?.cancel();
+    await _persist().catchError((Object _) {});
     _epoch++;
     await _subscription.cancel();
     return super.close();

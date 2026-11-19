@@ -2,11 +2,19 @@ import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'driver_trip_scope.dart';
+import '../core/domain/draft_store.dart';
+import '../features/incidents/domain/driver_incident_repository.dart';
+import '../features/incidents/presentation/incident_list_screen.dart';
+import '../features/incidents/presentation/incident_detail_screen.dart';
+import '../features/incidents/presentation/incident_report_screen.dart';
 import '../features/driver_trip/domain/repositories/driver_trip_repository.dart';
 import '../features/driver_trip/presentation/screens/driver_dashboard.dart';
 import '../features/driver_trip/presentation/screens/job_details_screen.dart';
 import '../features/driver_trip/presentation/screens/active_trip_screen.dart';
+import '../features/driver_trip/presentation/screens/trip_history_screen.dart';
+import '../features/driver_trip/presentation/screens/trip_earnings_screen.dart';
 import '../core/theme/app_theme.dart';
+import '../core/widgets/app_widgets.dart';
 import '../features/home/data/repositories/demo_fare_repository.dart';
 import '../features/home/domain/usecases/get_public_fares.dart';
 import '../features/home/presentation/controllers/home_controller.dart';
@@ -34,12 +42,28 @@ class ModMoveApp extends StatelessWidget {
     this.mockApi,
     this.tripRepository,
     this.cargoPhotos,
+    this.onLogout,
+    this.walletBuilder,
+    this.revenueBuilder,
+    this.incidentRepository,
+    this.navigatorKey,
+    this.notificationSettingsBuilder,
+    this.drafts,
+    this.accountSecurityBuilder,
   });
   final String screen;
   final DriverController? driverController;
   final MockDriverApi? mockApi;
   final DriverTripRepository? tripRepository;
   final CargoPhotoRepository? cargoPhotos;
+  final VoidCallback? onLogout;
+  final WidgetBuilder? walletBuilder;
+  final WidgetBuilder? revenueBuilder;
+  final DriverIncidentRepository? incidentRepository;
+  final GlobalKey<NavigatorState>? navigatorKey;
+  final WidgetBuilder? notificationSettingsBuilder;
+  final DraftStore? drafts;
+  final WidgetBuilder? accountSecurityBuilder;
 
   DriverController _createDriver() {
     final fixture = DemoDriverRepository(
@@ -91,7 +115,10 @@ class ModMoveApp extends StatelessWidget {
       child: DriverTripScope(
         repository: tripRepository,
         cargoPhotos: cargoPhotos,
+        incidents: incidentRepository,
+        drafts: drafts,
         child: MaterialApp(
+          navigatorKey: navigatorKey,
           title: 'ModMove',
           debugShowCheckedModeBanner: false,
           theme: buildAppTheme(),
@@ -100,7 +127,11 @@ class ModMoveApp extends StatelessWidget {
           localizationsDelegates: GlobalMaterialLocalizations.delegates,
           home: Builder(
             builder: (context) => screen == 'driver-home'
-                ? const DriverDashboard()
+                ? DriverDashboard(
+                    onNotifications: notificationSettingsBuilder == null
+                        ? null
+                        : () => Navigator.pushNamed(context, '/notifications'),
+                  )
                 : screen == 'pricing'
                 ? const PricingScreen()
                 : screen.startsWith('verification') ||
@@ -116,6 +147,65 @@ class ModMoveApp extends StatelessWidget {
                 : _home(context),
           ),
           onGenerateRoute: (settings) {
+            if (settings.name == '/account-security' &&
+                accountSecurityBuilder != null) {
+              return MaterialPageRoute<void>(
+                settings: settings,
+                builder: accountSecurityBuilder!,
+              );
+            }
+            if (settings.name == '/notifications' &&
+                notificationSettingsBuilder != null) {
+              return MaterialPageRoute<void>(
+                settings: settings,
+                builder: notificationSettingsBuilder!,
+              );
+            }
+            if (incidentRepository != null) {
+              final incidentPage = switch (settings.name) {
+                '/incidents' => IncidentListScreen(
+                  orderId: settings.arguments as String?,
+                ),
+                '/incident-detail' => IncidentDetailScreen(
+                  id: settings.arguments as String,
+                ),
+                '/incident-report' => IncidentReportScreen(
+                  orderId: settings.arguments as String,
+                ),
+                _ => null,
+              };
+              if (incidentPage != null) {
+                return MaterialPageRoute<void>(
+                  settings: settings,
+                  builder: (_) => incidentPage,
+                );
+              }
+            }
+            if (settings.name == '/revenue' && revenueBuilder != null) {
+              return MaterialPageRoute<void>(
+                settings: settings,
+                builder: revenueBuilder!,
+              );
+            }
+            if (settings.name == '/trips') {
+              return MaterialPageRoute<void>(
+                settings: settings,
+                builder: (_) => const TripHistoryScreen(),
+              );
+            }
+            if (settings.name == '/trip-earnings') {
+              return MaterialPageRoute<void>(
+                settings: settings,
+                builder: (_) =>
+                    TripEarningsScreen(id: settings.arguments as String),
+              );
+            }
+            if (settings.name == '/wallet' && walletBuilder != null) {
+              return MaterialPageRoute<void>(
+                settings: settings,
+                builder: walletBuilder!,
+              );
+            }
             if (settings.name == '/active-trip') {
               return MaterialPageRoute<void>(
                 settings: settings,
@@ -134,7 +224,11 @@ class ModMoveApp extends StatelessWidget {
             if (settings.name == '/driver-home') {
               return MaterialPageRoute<void>(
                 settings: settings,
-                builder: (_) => const DriverDashboard(),
+                builder: (context) => DriverDashboard(
+                  onNotifications: notificationSettingsBuilder == null
+                      ? null
+                      : () => Navigator.pushNamed(context, '/notifications'),
+                ),
               );
             }
             if (settings.name == '/driver-demo') {
@@ -189,19 +283,58 @@ class ModMoveApp extends StatelessWidget {
     );
   }
 
-  Widget _home(BuildContext context) => HomeScreen(
-    onRegister: () => Navigator.pushNamed(
-      context,
-      context.read<DriverController>().status == ApprovalStatus.draft
-          ? '/verification'
-          : '/profile',
-    ),
-    onAccount: () => Navigator.pushNamed(context, '/profile'),
-  );
+  Widget _home(BuildContext context) => context.read<DriverController>().remote
+      ? _profile(context)
+      : HomeScreen(
+          onRegister: () => Navigator.pushNamed(
+            context,
+            context.read<DriverController>().status == ApprovalStatus.draft
+                ? '/verification'
+                : '/profile',
+          ),
+          onAccount: () => Navigator.pushNamed(context, '/profile'),
+        );
 
   Widget _profile(BuildContext context) => DriverProfileScreen(
+    onSecurity: accountSecurityBuilder == null
+        ? null
+        : () => Navigator.pushNamed(context, '/account-security'),
+    onNotifications: notificationSettingsBuilder == null
+        ? null
+        : () => Navigator.pushNamed(context, '/notifications'),
+    onIncidents: incidentRepository == null
+        ? null
+        : () => Navigator.pushNamed(context, '/incidents'),
+    onLogout: onLogout,
+    onWallet: walletBuilder == null
+        ? null
+        : () => Navigator.pushNamed(context, '/wallet'),
     onDemo: () => Navigator.pushNamed(context, '/driver-demo'),
     onHistory: () => Navigator.pushNamed(context, '/driver-history'),
+    onOrders: () {
+      if (context.read<DriverController>().remote &&
+          context.read<DriverController>().canGoOnline) {
+        Navigator.pushNamed(context, '/trips');
+        return;
+      }
+      final trip = context.read<DriverTripRepository>().current.trip;
+      if (trip?.ongoing ?? false) {
+        Navigator.pushNamed(context, '/active-trip');
+      } else if (context.read<DriverController>().canGoOnline) {
+        Navigator.pushNamedAndRemoveUntil(
+          context,
+          '/driver-home',
+          (_) => false,
+        );
+      } else {
+        showInfoSheet(
+          context,
+          'Chưa thể nhận đơn',
+          'Hoàn thiện hồ sơ tài xế và chờ xét duyệt. Sau khi hồ sơ được duyệt '
+              'và tài khoản hoạt động, bạn có thể vào trang chủ tài xế để nhận đơn.',
+        );
+      }
+    },
     onHome: () => Navigator.pushNamedAndRemoveUntil(
       context,
       context.read<DriverController>().canGoOnline ? '/driver-home' : '/home',

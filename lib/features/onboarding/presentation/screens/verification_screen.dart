@@ -199,7 +199,11 @@ class _VerificationScreenState extends State<VerificationScreen> {
               mainAxisSize: MainAxisSize.min,
               children: [
                 PrimaryButton(
-                  step == 0 ? 'Tiếp tục' : 'Gửi hồ sơ xét duyệt',
+                  step == 0
+                      ? 'Tiếp tục'
+                      : driver.status == ApprovalStatus.rejected
+                      ? 'Gửi lại hồ sơ'
+                      : 'Gửi hồ sơ xét duyệt',
                   busy: driver.submitting || driver.syncing,
                   onPressed: driver.canEdit && !driver.busy ? _continue : null,
                 ),
@@ -212,7 +216,9 @@ class _VerificationScreenState extends State<VerificationScreen> {
                         onPressed: driver.canEdit && !driver.busy
                             ? _save
                             : null,
-                        child: const Text('Lưu nháp'),
+                        child: Text(
+                          driver.remote ? 'Lưu nháp trên máy' : 'Lưu nháp',
+                        ),
                       ),
                       if (driver.demoEnabled && widget.onDemo != null)
                         TextButton(
@@ -243,7 +249,7 @@ class _VerificationScreenState extends State<VerificationScreen> {
                 if (driver.hasApi) ...[
                   Text(
                     driver.savedAt == null
-                        ? 'Bản demo • Có thể lưu nháp và tiếp tục sau'
+                        ? 'Có thể lưu nháp và tiếp tục sau'
                         : 'Bản nháp đã lưu lúc ${formatStamp(driver.savedAt)}',
                     style: appText(size: 11, color: AppColors.secondary),
                   ),
@@ -255,9 +261,22 @@ class _VerificationScreenState extends State<VerificationScreen> {
                 ],
                 VerificationProgress(step),
                 const SizedBox(height: 6),
+                if (driver.status == ApprovalStatus.rejected) ...[
+                  Notice(
+                    'Chỉ cập nhật mục được yêu cầu',
+                    detail:
+                        'Thông tin và ảnh đã nộp được giữ nguyên. '
+                        'Bạn chỉ cần sửa thông tin hoặc thay ảnh theo yêu cầu của admin.'
+                        '${driver.fields['rejectionReasons']?.isNotEmpty == true ? '\n\nYêu cầu bổ sung:\n${driver.fields['rejectionReasons']}' : ''}',
+                    peach: true,
+                  ),
+                  const SizedBox(height: 10),
+                ],
                 if (!driver.canEdit) ...[
-                  const Notice(
-                    'Hồ sơ đang được khóa để xét duyệt.',
+                  Notice(
+                    driver.status == ApprovalStatus.approved
+                        ? 'Hồ sơ đã được duyệt. Thông tin và giấy tờ được giữ nguyên.'
+                        : 'Hồ sơ đang được khóa để xét duyệt.',
                     peach: true,
                   ),
                   const SizedBox(height: 10),
@@ -293,7 +312,11 @@ class _VerificationScreenState extends State<VerificationScreen> {
       TextFormField(
         key: ValueKey('field-$key'),
         initialValue: driver.fields[key],
-        readOnly: driver.status != ApprovalStatus.draft || driver.busy,
+        readOnly:
+            (driver.remote
+                ? !driver.canEdit
+                : driver.status != ApprovalStatus.draft) ||
+            driver.busy,
         keyboardType: keyboard,
         style: appText(size: 14),
         onChanged: (value) => driver.setField(key, value),
@@ -377,17 +400,23 @@ class _VerificationScreenState extends State<VerificationScreen> {
     Text('Loại xe', style: appText(size: 13)),
     const SizedBox(height: 5),
     DropdownButtonFormField<String>(
-      initialValue: driver.fields['vehicleType'],
+      initialValue: driver.vehicleTypes.contains(driver.fields['vehicleType'])
+          ? driver.fields['vehicleType']
+          : null,
       style: appText(size: 14),
       isExpanded: true,
       icon: const AppIcon('chevron-down', size: 17, color: AppColors.secondary),
       decoration: const InputDecoration(
         contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 10),
       ),
-      items: ['Xe tải 1 tấn', 'Xe van 500 kg', 'Xe bán tải']
+      items: driver.vehicleTypes
           .map((value) => DropdownMenuItem(value: value, child: Text(value)))
           .toList(),
-      onChanged: driver.status == ApprovalStatus.draft && !driver.busy
+      onChanged:
+          (driver.remote
+                  ? driver.canEdit
+                  : driver.status == ApprovalStatus.draft) &&
+              !driver.busy
           ? (value) => driver.setField('vehicleType', value!)
           : null,
     ),
@@ -408,40 +437,42 @@ class _VerificationScreenState extends State<VerificationScreen> {
       ],
     ),
     const SizedBox(height: 14),
-    const SectionTitle('Kích thước thùng xe (m)', size: 14),
-    const SizedBox(height: 9),
-    Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Expanded(
-          child: _field(
-            driver,
-            'length',
-            'Dài',
-            keyboard: const TextInputType.numberWithOptions(decimal: true),
+    if (!driver.remote) ...[
+      const SectionTitle('Kích thước thùng xe (m)', size: 14),
+      const SizedBox(height: 9),
+      Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Expanded(
+            child: _field(
+              driver,
+              'length',
+              'Dài',
+              keyboard: const TextInputType.numberWithOptions(decimal: true),
+            ),
           ),
-        ),
-        const SizedBox(width: 12),
-        Expanded(
-          child: _field(
-            driver,
-            'width',
-            'Rộng',
-            keyboard: const TextInputType.numberWithOptions(decimal: true),
+          const SizedBox(width: 12),
+          Expanded(
+            child: _field(
+              driver,
+              'width',
+              'Rộng',
+              keyboard: const TextInputType.numberWithOptions(decimal: true),
+            ),
           ),
-        ),
-        const SizedBox(width: 12),
-        Expanded(
-          child: _field(
-            driver,
-            'height',
-            'Cao',
-            keyboard: const TextInputType.numberWithOptions(decimal: true),
+          const SizedBox(width: 12),
+          Expanded(
+            child: _field(
+              driver,
+              'height',
+              'Cao',
+              keyboard: const TextInputType.numberWithOptions(decimal: true),
+            ),
           ),
-        ),
-      ],
-    ),
-    const SizedBox(height: 14),
+        ],
+      ),
+      const SizedBox(height: 14),
+    ],
     const SectionTitle('Giấy tờ & ảnh xe', size: 18),
     const SizedBox(height: 5),
     Text(

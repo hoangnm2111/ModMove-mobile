@@ -1,5 +1,7 @@
 # Hồ sơ Driver với mock API — hướng dẫn thao tác và đọc source
 
+> Tài liệu bản mock. App mặc định đã dùng backend thật: xem [hướng dẫn API](backend-api.md). Thêm `--dart-define=USE_MOCK_API=true` vào các lệnh demo bên dưới.
+
 Phạm vi: **đăng ký hồ sơ → gửi duyệt → bổ sung giấy tờ → được duyệt → bật/tắt hoạt động**. Đây là phần hồ sơ Driver trong mobile, giữ BLoC/Cubit. Không triển khai nhận chuyến, giao hàng, ví, đăng nhập hoặc backend thật trong thay đổi này.
 
 ## 1. Chạy và demo

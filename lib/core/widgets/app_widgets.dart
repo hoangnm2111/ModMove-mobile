@@ -284,16 +284,21 @@ class Notice extends StatelessWidget {
     super.key,
     this.icon = 'shield',
     this.peach = false,
+    this.success = false,
     this.detail,
   });
   final String text, icon;
-  final bool peach;
+  final bool peach, success;
   final String? detail;
   @override
   Widget build(BuildContext context) => Container(
     padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 9),
     decoration: BoxDecoration(
-      color: peach ? AppColors.peach : AppColors.pale,
+      color: success
+          ? AppColors.greenBg
+          : peach
+          ? AppColors.peach
+          : AppColors.pale,
       borderRadius: BorderRadius.circular(8),
     ),
     child: Row(
@@ -302,7 +307,11 @@ class Notice extends StatelessWidget {
         AppIcon(
           icon,
           size: 20,
-          color: peach ? AppColors.orange : AppColors.secondary,
+          color: success
+              ? AppColors.green
+              : peach
+              ? AppColors.orange
+              : AppColors.secondary,
         ),
         const SizedBox(width: 9),
         Expanded(
@@ -313,7 +322,11 @@ class Notice extends StatelessWidget {
                 text,
                 style: appText(
                   size: 11.5,
-                  color: peach ? const Color(0xFF984018) : AppColors.secondary,
+                  color: success
+                      ? AppColors.green
+                      : peach
+                      ? const Color(0xFF984018)
+                      : AppColors.secondary,
                 ),
               ),
               if (detail != null) ...[

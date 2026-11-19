@@ -1,0 +1,60 @@
+{
+  "version": 1,
+  "date": "2026-11-17",
+  "tool": "built-in image_gen",
+  "purpose": "Approved Customer UI V1 production assets",
+  "font": "Inter (existing bundled SIL OFL assets)",
+  "raster": [
+    {
+      "file": "assets/images/customer-email.png",
+      "prompt": "Use case: stylized-concept. Asset type: production Flutter mobile app illustration, transparent PNG. Generate one isolated object matching the approved ModMove Customer design and the supplied delivery illustration's refined softly modeled 3D/cartoon style. An open white envelope with a burnt-orange lining and a white rounded letter emerging, containing a simple orange checkmark. A small orange circular verified badge at lower right. No text. Palette burnt orange #D94B18, peach #FFF1E8, warm white; no blue/purple. Front view, centered, object occupies 80% of canvas, generous even transparent padding, soft subtle ambient shading, crisp high quality edges. True transparent background, no background scene, no rectangular panel, no checkerboard texture, no text, no watermark. This is an illustration asset, NOT a phone screen or app mockup.",
+      "reference": "assets/images/hero-delivery.png",
+      "transparent": true
+    },
+    {
+      "file": "assets/images/customer-security.png",
+      "prompt": "Use case: stylized-concept. Asset type: production Flutter mobile app illustration, transparent PNG. Generate one isolated object matching the approved ModMove Customer design and the supplied delivery illustration's refined softly modeled 3D/cartoon style. A single friendly substantial closed padlock, burnt orange body, rounded white inset, dark orange keyhole, softly rounded metallic orange shackle. Two tiny restrained orange accent strokes at upper right. No text. Palette burnt orange #D94B18, peach #FFF1E8, warm white; no blue/purple. Front view, centered, object occupies 80% of canvas, generous even transparent padding, soft subtle ambient shading, crisp high quality edges. True transparent background, no background scene, no rectangular panel, no checkerboard texture, no text, no watermark. This is an illustration asset, NOT a phone screen or app mockup.",
+      "reference": "assets/images/hero-delivery.png",
+      "transparent": true
+    },
+    {
+      "file": "assets/images/customer-notifications.png",
+      "prompt": "Use case: stylized-concept. Asset type: production Flutter mobile app illustration, transparent PNG. Generate one isolated object matching the approved ModMove Customer design and the supplied delivery illustration's refined softly modeled 3D/cartoon style. A single friendly golden orange notification bell, with a darker burnt orange lower inner lip and small clapper. Two restrained curved orange ringing marks, one on either side. No logo or text. Palette burnt orange #D94B18, peach #FFF1E8, warm white; no blue/purple. Front view, centered, object occupies 80% of canvas, generous even transparent padding, soft subtle ambient shading, crisp high quality edges. True transparent background, no background scene, no rectangular panel, no checkerboard texture, no text, no watermark. This is an illustration asset, NOT a phone screen or app mockup.",
+      "reference": "assets/images/hero-delivery.png",
+      "transparent": true
+    }
+  ],
+  "reused": [
+    "assets/images/hero-delivery.png",
+    "assets/images/modmove-app-icon.png",
+    "assets/images/vehicle-van.png",
+    "assets/images/vehicle-pickup.png",
+    "assets/images/vehicle-truck-orange.png",
+    "assets/images/vehicle-truck-white.png"
+  ],
+  "vector": {
+    "method": "Original SVG paths matching existing 1.8-unit stroke icon system",
+    "files": [
+      "assets/icons/customer-parcel.svg",
+      "assets/icons/customer-cargo.svg",
+      "assets/icons/customer-moving.svg",
+      "assets/icons/mail.svg",
+      "assets/icons/search.svg",
+      "assets/icons/star.svg",
+      "assets/icons/coupon.svg",
+      "assets/icons/eye-off.svg",
+      "assets/icons/logout.svg",
+      "assets/icons/edit.svg",
+      "assets/icons/trash.svg",
+      "assets/icons/ruler.svg",
+      "assets/icons/history.svg"
+    ]
+  },
+  "dynamicContent": [
+    "Shipment/POD/incident evidence comes only from API upload URLs.",
+    "Payment QR is rendered from the backend payload; no illustrative payment destinations.",
+    "Google Maps displays real geographic coordinates; no raster map or invented road polyline.",
+    "Fares, vehicle capacities, names and statuses use real API responses."
+  ],
+  "designReference": "../output/customer-redesign-v1 (review screenshots are not committed)"
+}
