@@ -1,3 +1,4 @@
+import '../../notifications/presentation/live_refresh.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../core/widgets/app_logo.dart';
@@ -131,7 +132,7 @@ class _CustomerDashboard extends StatelessWidget {
       ],
     ],
     child: Builder(
-      builder: (context) => RefreshIndicator(
+      builder: (context) => LiveRefresh(
         onRefresh: () async {
           await context.read<ResourceCubit<BookingCatalog>>().load();
           if (!guest && context.mounted) {
@@ -648,7 +649,7 @@ class _CustomerOrdersScreenState extends State<CustomerOrdersScreen> {
   Widget build(BuildContext context) => BlocProvider.value(
     value: cubit,
     child: BlocBuilder<PagedCubit<OrderSummary>, ListState<OrderSummary>>(
-      builder: (context, s) => RefreshIndicator(
+      builder: (context, s) => LiveRefresh(
         onRefresh: () => cubit.load(),
         child: CustomScrollView(
           physics: const AlwaysScrollableScrollPhysics(),

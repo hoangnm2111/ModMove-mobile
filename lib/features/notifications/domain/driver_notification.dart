@@ -26,9 +26,12 @@ class DriverNotification {
     'REFUND_DECIDED' ||
     'REFUND_BANK_INFO_REQUIRED' ||
     'REFUND_PAYOUT_FAILED' => refundId == null ? '/refunds' : '/refund',
-    'INCIDENT_RESOLVED' || 'INCIDENT_IN_PROGRESS' => '/incidents',
+    'INCIDENT_RESOLVED' ||
+    'INCIDENT_IN_PROGRESS' ||
+    'INCIDENT_REPORTED' => '/incidents',
     'ORDER_ACCEPTED' ||
     'DRIVER_ARRIVED' ||
+    'DRIVER_ARRIVED_DROPOFF' ||
     'PICKUP_PHOTOS_TO_REVIEW' ||
     'ORDER_DELIVERED' ||
     'ORDER_COMPLETED' ||
@@ -41,7 +44,7 @@ class DriverNotification {
     'PICKUP_APPROVED' || 'PICKUP_REJECTED' => '/active-trip',
     'ORDER_CANCELLED' => '/trips',
     'ORDER_COMPLETED' => orderId == null ? '/trips' : '/trip-earnings',
-    'INCIDENT_REPORTED' || 'INCIDENT_DECIDED' =>
+    'INCIDENT_REPORTED' || 'INCIDENT_DECIDED' || 'INCIDENT_IN_PROGRESS' =>
       incidentId == null ? '/incidents' : '/incident-detail',
     'DRIVER_APPLICATION_APPROVED' ||
     'DRIVER_APPLICATION_REJECTED' ||

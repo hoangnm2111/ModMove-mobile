@@ -13,9 +13,15 @@ diện, hợp đồng domain và adapter Firebase/API nằm riêng trong feature
   và được Git ignore. Máy khác cần lấy file đúng project/package trước khi chạy.
 - File **service account/private key chỉ nằm ở backend**. Không sao chép vào
   Flutter assets, `google-services.json`, Dart hoặc Git.
-- Backend local đọc `Firebase:CredentialsPath` trong cấu hình Development,
-  trỏ tới file service account. Khởi động lại backend sau khi đổi cấu hình.
-- Cấu hình Firebase không cần ngrok; ngrok vẫn là yêu cầu riêng của webhook PayOS.
+- Backend đọc `Firebase:CredentialsPath` trỏ tới file service account. Trên VPS,
+  biến `Firebase__CredentialsPath` trỏ tới file được mount trong container;
+  dùng cùng Firebase project với `google-services.json` của Android.
+- Mobile mặc định đăng ký FCM token với API VPS tại
+  `https://modmove-103-178-235-191.sslip.io` sau khi đăng nhập.
+- Firebase không cần ngrok. PayOS trên VPS dùng webhook HTTPS
+  `https://modmove-103-178-235-191.sslip.io/api/webhooks/payos`, đăng ký ở phía PayOS;
+  mobile nhận URL thanh toán từ backend và giữ callback `modmove://orders/success`
+  hoặc `modmove://orders/cancel`.
 
 ```powershell
 flutter pub get
@@ -48,9 +54,11 @@ Thêm plugin native yêu cầu chạy lại app; hot reload không đủ.
 | `PICKUP_APPROVED`, `PICKUP_REJECTED` | Chuyến đang chạy nếu đúng đơn; nếu không, lịch sử chuyến |
 | `ORDER_CANCELLED` | Lịch sử chuyến |
 | `ORDER_COMPLETED` | Thu nhập của chuyến |
-| `INCIDENT_REPORTED`, `INCIDENT_DECIDED` | Chi tiết sự cố, hoặc danh sách nếu thiếu ID |
+| `INCIDENT_REPORTED`, `INCIDENT_DECIDED`, `INCIDENT_IN_PROGRESS` | Chi tiết sự cố tài xế, hoặc danh sách nếu thiếu ID |
 | `DRIVER_APPLICATION_APPROVED`, `DRIVER_APPLICATION_REJECTED`, `RATING_RECEIVED` | Hồ sơ tài xế, tải lại trạng thái |
 | `WITHDRAWAL_DECIDED` | Ví, tải số dư và giao dịch thật |
+
+Customer còn nhận `DRIVER_ARRIVED_DROPOFF` để mở đơn và `INCIDENT_REPORTED` để mở danh sách sự cố của đơn. Push khi app đang mở phát tín hiệu làm mới dữ liệu cho các màn hình đang hiển thị; polling 15 giây và resume là phương án bổ sung khi không nhận được push.
 
 Loại không hỗ trợ hoặc ID đơn không hợp lệ không được dùng để điều hướng.
 Backend chưa có API hộp thư/lịch sử thông báo; màn hình Thông báo hiện quản lý

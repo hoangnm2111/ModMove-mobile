@@ -1,3 +1,4 @@
+import '../../notifications/presentation/live_refresh.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../domain/customer_models.dart';
@@ -183,7 +184,7 @@ class CustomerSupportList extends StatelessWidget {
     ListState<T> s,
     PagedCubit<T> cubit,
     List<Widget> items,
-  ) => RefreshIndicator(
+  ) => LiveRefresh(
     onRefresh: () => cubit.load(),
     child: ListView(
       padding: const EdgeInsets.all(20),

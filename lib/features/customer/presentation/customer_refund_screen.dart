@@ -1,3 +1,4 @@
+import '../../notifications/presentation/live_refresh.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../domain/customer_models.dart';
@@ -41,7 +42,7 @@ class _CustomerRefundScreenState extends State<CustomerRefundScreen> {
       appBar: AppBar(title: const Text('Chi tiết hoàn tiền')),
       body: BlocBuilder<ResourceCubit<Refund>, ResourceState<Refund>>(
         builder: (context, s) => BlocBuilder<ActionCubit, ActionState>(
-          builder: (context, a) => RefreshIndicator(
+          builder: (context, a) => LiveRefresh(
             onRefresh: data.load,
             child: ListView(
               padding: const EdgeInsets.all(20),

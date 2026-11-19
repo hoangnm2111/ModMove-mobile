@@ -23,6 +23,8 @@ class PushCubit extends Cubit<PushState> {
   final PushTokenRepository repository;
   final _subscriptions = <StreamSubscription<dynamic>>[];
   final _seen = <String>{};
+  final _updates = StreamController<void>.broadcast();
+  Stream<void> get updates => _updates.stream;
   String? _user, _token;
   int _generation = 0;
   bool _ready = false;
@@ -62,6 +64,7 @@ class PushCubit extends Cubit<PushState> {
       );
       _subscriptions.add(
         device.messages.listen((message) async {
+          if (_user != null && !_updates.isClosed) _updates.add(null);
           if (_user == null || state.permission != PushPermission.allowed) {
             return;
           }
@@ -202,6 +205,7 @@ class PushCubit extends Cubit<PushState> {
       await subscription.cancel();
     }
     await device.close();
+    await _updates.close();
     return super.close();
   }
 }
