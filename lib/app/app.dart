@@ -41,7 +41,7 @@ import '../features/driver_account/driver_wallet_screen.dart';
 import '../features/driver_trip/data/driver_api.dart';
 import '../features/onboarding/data/repositories/backend_driver_repository.dart';
 import '../features/onboarding/data/repositories/demo_driver_repository.dart';
-import '../features/onboarding/data/repositories/api_driver_repository.dart';
+import '../features/onboarding/data/repositories/mock_api_driver_repository.dart';
 import '../features/onboarding/data/repositories/demo_photo_repository.dart';
 import '../features/onboarding/data/services/mock_driver_api.dart';
 import '../features/onboarding/data/repositories/device_photo_repository.dart';
@@ -132,7 +132,7 @@ class ModMoveApp extends StatelessWidget {
               ? MockDriverApi.freshApplication()
               : fixture.loadCachedApplication(),
         );
-    final repository = ApiDriverRepository(
+    final repository = MockApiDriverRepository(
       client: api.client,
       cached: api.cachedApplication,
     );

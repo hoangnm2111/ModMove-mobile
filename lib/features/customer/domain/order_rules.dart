@@ -64,5 +64,9 @@ abstract final class InputRules {
   static bool address(String v) => v.trim().length >= 5;
 
   /// GB-53
-  static bool password(String v) => v.length >= 8 && v.length <= 100;
+  /// GB-53 (K-13): mật khẩu mới 8–20 ký tự.
+  static bool password(String v) => v.length >= 8 && v.length <= 20;
+
+  /// Ô đăng nhập vẫn nhận tới 100 ký tự để tài khoản cũ không bị chặn (BE A-04).
+  static bool loginPassword(String v) => v.length >= 8 && v.length <= 100;
 }

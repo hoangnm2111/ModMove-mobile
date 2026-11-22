@@ -24,7 +24,6 @@ class CustomerApi {
   /// Giới thiệu, khu vực phục vụ, lợi ích (Admin nhập ở master data SERVICE_INFO).
   Future<List<LookupItem>> serviceInfo() async => _items(await _api.get('/public/ServiceInfo'), LookupItem.fromJson);
 
-  Future<void> supportRequest(String fullName, String contact, String content) => _api.post('/public/SupportRequests', {'fullName': fullName, 'contact': contact, 'content': content});
 
   Future<FareEstimate> fareEstimate({
     required int vehicleTypeId,
@@ -71,6 +70,8 @@ class CustomerApi {
 
   /// App gửi platform=App: server chọn returnUrl là deep link modmove://orders/... (DECISIONS 3.1).
   Future<PaymentSession> createPayment(int id) async => PaymentSession.fromJson(await _api.post('/customer/Orders/$id/payment', {'platform': 'App'}) as Map<String, dynamic>);
+  /// UC-CUS-27 4a (K-28): khách đóng màn thanh toán → huỷ mã PayOS đang chờ; đơn vẫn chờ thanh toán.
+  Future<void> cancelPayment(int id) => _api.post('/customer/Orders/$id/payment/cancel', null);
 
   Future<void> reviewPickup(int id, {required bool approve, String? reason}) => _api.post('/customer/Orders/$id/pickup-evidence', {'approve': approve, 'reason': approve ? null : reason});
 

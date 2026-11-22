@@ -456,7 +456,8 @@ void main() {
     expect(env.backend.requests, contains('post /driver/location'));
 
     await repository.openOffer('7');
-    expect(repository.current.offer!.remainingAt(repository.now), inInclusiveRange(29, 30));
+    // K-02: không còn cửa sổ 30 giây; hạn là hạn ghép đơn của BE (tối đa 10 phút)
+    expect(repository.current.offer!.remainingAt(repository.now), greaterThan(30));
     await repository.acceptOffer('7');
     session = repository.current;
     expect(session.trip!.stage, TripStage.accepted);

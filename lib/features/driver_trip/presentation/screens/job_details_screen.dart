@@ -73,7 +73,7 @@ class JobDetailsScreen extends StatelessWidget {
                   ),
                 ),
                 TripBadge(
-                  expired ? 'Hết thời gian' : 'Còn ${state.seconds} giây',
+                  expired ? 'Hết thời gian' : 'Còn ${offerTimeLeft(state.seconds)}',
                   icon: 'clock',
                 ),
               ],
@@ -83,7 +83,7 @@ class JobDetailsScreen extends StatelessWidget {
               TripError(
                 state.error ??
                     (expired
-                        ? 'Đã hết 30 giây nhận chuyến.'
+                        ? 'Đơn đã hết thời gian chờ tài xế.'
                         : 'Đơn không còn khả dụng.'),
               ),
             RouteCard(

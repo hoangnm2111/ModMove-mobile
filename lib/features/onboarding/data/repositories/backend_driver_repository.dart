@@ -174,7 +174,8 @@ class BackendDriverRepository implements DriverProfileRepository, VehicleTypeCat
 
   @override
   Future<VerificationDocument> upload(DocumentKind kind, SelectedPhoto photo) async {
-    final url = await _call(() => api.upload(photo.name, photo.bytes));
+    // K-33: giấy tờ hồ sơ là ảnh riêng tư; ảnh xem lại lấy từ link 10 phút trong trạng thái hồ sơ.
+    final url = await _call(() => api.upload(photo.name, photo.bytes, document: true));
     return VerificationDocument(bytes: photo.bytes, fileName: photo.name, remoteReference: url);
   }
 

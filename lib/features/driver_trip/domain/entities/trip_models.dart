@@ -253,11 +253,20 @@ class DeliveryJob {
 
 class JobOffer {
   const JobOffer(this.job, this.deadline);
+
+  /// GB-08 (K-02): đơn chờ tài xế tối đa 10 phút kể từ khi tạo, không có cửa sổ 30 giây cho từng tài xế.
+  static const matchingWindow = Duration(minutes: 10);
+
   final DeliveryJob job;
   final DateTime deadline;
-  int remainingAt(DateTime now) =>
-      (deadline.difference(now).inMilliseconds / 1000).ceil().clamp(0, 30);
+  int remainingAt(DateTime now) => (deadline.difference(now).inMilliseconds / 1000)
+      .ceil()
+      .clamp(0, matchingWindow.inSeconds);
 }
+
+/// "9:05" – thời gian còn lại của đơn đang chờ ghép.
+String offerTimeLeft(int seconds) =>
+    '${seconds ~/ 60}:${(seconds % 60).toString().padLeft(2, '0')}';
 
 class CargoPhoto {
   CargoPhoto({required this.kind, required this.name, required Uint8List bytes})

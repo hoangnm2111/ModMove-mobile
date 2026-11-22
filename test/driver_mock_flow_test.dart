@@ -8,7 +8,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:modmove_mobile/features/driver_trip/domain/repositories/driver_trip_repository.dart';
 import 'package:modmove_mobile/features/driver_trip/domain/entities/trip_models.dart';
 import 'package:modmove_mobile/features/driver_trip/presentation/screens/driver_dashboard.dart';
-import 'package:modmove_mobile/features/onboarding/data/repositories/api_driver_repository.dart';
+import 'package:modmove_mobile/features/onboarding/data/repositories/mock_api_driver_repository.dart';
 import 'package:modmove_mobile/features/onboarding/data/repositories/demo_photo_repository.dart';
 import 'package:modmove_mobile/features/onboarding/data/repositories/device_photo_repository.dart';
 import 'package:modmove_mobile/features/onboarding/data/services/mock_driver_api.dart';
@@ -41,7 +41,7 @@ DriverController controller(
   MockDriverApi api, {
   DocumentPhotoRepository? photos,
 }) {
-  final repository = ApiDriverRepository(
+  final repository = MockApiDriverRepository(
     client: api.client,
     cached: api.cachedApplication,
   );

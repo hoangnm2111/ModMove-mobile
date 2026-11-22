@@ -201,26 +201,6 @@ class _HomeTabState extends State<_HomeTab> {
                 );
               },
             ),
-            const SizedBox(height: 10),
-            AppCard(
-              onTap: () => showSupportSheet(context),
-              child: Row(
-                children: [
-                  const AppIcon('headphones', color: AppColors.orange),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text('Cần hỗ trợ?', style: appText(weight: FontWeight.w700)),
-                        Text('Gửi câu hỏi, đội ngũ ModMove sẽ liên hệ lại.', style: appText(size: 12, color: AppColors.secondary)),
-                      ],
-                    ),
-                  ),
-                  const AppIcon('chevron-right', color: AppColors.muted),
-                ],
-              ),
-            ),
           ],
         ),
       ),
