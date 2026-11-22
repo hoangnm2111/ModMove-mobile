@@ -22,7 +22,7 @@ class ApiDriverTripRepository implements DriverTripRepository, TripSimulator {
     this._access = const DriverAccess(approved: false, active: true),
     this.availabilityGateway,
     this.pollInterval = AppConfig.driverPollInterval,
-    this.offerWindow = const Duration(seconds: 30),
+    this.offerWindow = JobOffer.matchingWindow,
     DateTime Function()? clock,
   }) : _location = location ?? const DeviceLocationSource(),
        _clock = clock ?? DateTime.now;
@@ -32,7 +32,8 @@ class ApiDriverTripRepository implements DriverTripRepository, TripSimulator {
   final Future<bool> Function(bool)? availabilityGateway;
   final Duration pollInterval;
 
-  /// Thời gian tài xế cân nhắc một đơn sau khi mở (giao diện đếm ngược 30 giây).
+  /// GB-08 (K-02): đơn phát cho mọi tài xế trong bán kính, ai nhận trước được; BE tự huỷ sau 10 phút không ai nhận.
+  /// Hạn thật lấy từ `matchingExpiresAt`; giá trị này chỉ dùng khi BE không trả hạn.
   final Duration offerWindow;
   final DateTime Function() _clock;
 

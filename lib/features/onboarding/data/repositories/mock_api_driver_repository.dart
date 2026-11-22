@@ -5,9 +5,11 @@ import '../../domain/entities/driver_application.dart';
 import '../../domain/repositories/driver_repository.dart';
 import '../models/driver_application_dto.dart';
 
-class ApiDriverRepository
+/// CHẾ ĐỘ DEMO (X-05): chỉ nói chuyện với [MockDriverApi] (https://mock.modmove.local), không phải BE thật.
+/// Các đường dẫn /driver/application, /driver/draft, /driver/documents… chỉ có trong mock. BE thật dùng [BackendDriverRepository].
+class MockApiDriverRepository
     implements DriverProfileRepository, DriverReviewSimulator {
-  ApiDriverRepository({
+  MockApiDriverRepository({
     required this._client,
     required this._cached,
     this.baseUrl = 'https://mock.modmove.local/v1',

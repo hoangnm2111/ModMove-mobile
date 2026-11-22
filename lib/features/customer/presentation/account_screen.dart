@@ -85,7 +85,6 @@ class _AccountScreenState extends State<AccountScreen> {
               'Chính sách & điều khoản',
               () => Navigator.push(context, MaterialPageRoute<void>(builder: (_) => _InfoListScreen(title: 'Chính sách & điều khoản', load: context.read<CustomerApi>().policies))),
             ),
-            _tile('headphones', 'Gửi yêu cầu hỗ trợ', () => showSupportSheet(context, name: p.fullName, contact: p.email)),
             _tile('warning', 'Xoá tài khoản', () => _deleteAccount(context), color: AppColors.red),
             const SizedBox(height: 16),
             const LogoutButton(),
@@ -248,7 +247,7 @@ class _ChangePasswordState extends State<_ChangePassword> {
         'Đổi mật khẩu',
         busy: _busy,
         onPressed: () async {
-          if (!InputRules.password(_next.text)) return showSnack(context, 'Mật khẩu mới từ 8 đến 100 ký tự.', error: true);
+          if (!InputRules.password(_next.text)) return showSnack(context, 'Mật khẩu mới từ 8 đến 20 ký tự.', error: true);
           setState(() => _busy = true);
           final auth = context.read<AuthCubit>();
           final ok = await runAction(context, () => context.read<CustomerApi>().changePassword(_current.text, _next.text), success: 'Đã đổi mật khẩu. Vui lòng đăng nhập lại.');
@@ -306,77 +305,5 @@ class _InfoListScreenState extends State<_InfoListScreen> {
         );
       },
     ),
-  );
-}
-
-/// UC-GST-05 – POST /public/SupportRequests.
-Future<void> showSupportSheet(BuildContext context, {String name = '', String contact = ''}) => showModalBottomSheet<void>(
-  context: context,
-  isScrollControlled: true,
-  showDragHandle: true,
-  builder: (c) => Padding(
-    padding: EdgeInsets.fromLTRB(20, 0, 20, 20 + MediaQuery.viewInsetsOf(c).bottom),
-    child: _SupportForm(name: name, contact: contact, api: context.read<CustomerApi>()),
-  ),
-);
-
-class _SupportForm extends StatefulWidget {
-  const _SupportForm({required this.name, required this.contact, required this.api});
-  final String name, contact;
-  final CustomerApi api;
-  @override
-  State<_SupportForm> createState() => _SupportFormState();
-}
-
-class _SupportFormState extends State<_SupportForm> {
-  late final _name = TextEditingController(text: widget.name);
-  late final _contact = TextEditingController(text: widget.contact);
-  final _content = TextEditingController();
-  bool _busy = false;
-  @override
-  void dispose() {
-    for (final c in [_name, _contact, _content]) {
-      c.dispose();
-    }
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) => Column(
-    mainAxisSize: MainAxisSize.min,
-    crossAxisAlignment: CrossAxisAlignment.stretch,
-    children: [
-      const SectionTitle('Gửi yêu cầu hỗ trợ'),
-      const SizedBox(height: 12),
-      TextField(
-        controller: _name,
-        decoration: const InputDecoration(labelText: 'Họ và tên'),
-      ),
-      const SizedBox(height: 10),
-      TextField(
-        controller: _contact,
-        decoration: const InputDecoration(labelText: 'Email hoặc số điện thoại'),
-      ),
-      const SizedBox(height: 10),
-      TextField(
-        controller: _content,
-        maxLines: 4,
-        maxLength: 2000,
-        decoration: const InputDecoration(labelText: 'Nội dung cần hỗ trợ'),
-      ),
-      const SizedBox(height: 8),
-      PrimaryButton(
-        'Gửi',
-        busy: _busy,
-        onPressed: () async {
-          if ([_name, _contact, _content].any((c) => c.text.trim().isEmpty)) return showSnack(context, 'Nhập đủ họ tên, liên hệ và nội dung.', error: true);
-          setState(() => _busy = true);
-          final ok = await runAction(context, () => widget.api.supportRequest(_name.text.trim(), _contact.text.trim(), _content.text.trim()), success: 'Đã gửi yêu cầu. ModMove sẽ liên hệ lại.');
-          if (!context.mounted) return;
-          setState(() => _busy = false);
-          if (ok) Navigator.pop(context);
-        },
-      ),
-    ],
   );
 }

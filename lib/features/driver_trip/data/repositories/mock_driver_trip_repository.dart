@@ -263,7 +263,7 @@ class MockDriverTripRepository implements DriverTripRepository, TripSimulator {
 
   JobOffer _makeOffer(DeliveryJob job) => JobOffer(
     job,
-    _deadlines.putIfAbsent(job.id, () => now.add(const Duration(seconds: 30))),
+    _deadlines.putIfAbsent(job.id, () => now.add(JobOffer.matchingWindow)),
   );
 
   @override

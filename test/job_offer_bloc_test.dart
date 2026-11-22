@@ -6,7 +6,7 @@ import 'package:modmove_mobile/features/driver_trip/presentation/bloc/job_offer_
 
 void main() {
   test(
-    'offer uses one absolute 30-second deadline across reopen and background',
+    'offer uses one absolute 10-minute matching deadline across reopen and background (K-02)',
     () {
       fakeAsync((async) {
         final start = DateTime(2026, 11, 8, 9);
@@ -20,11 +20,11 @@ void main() {
         async.elapse(Duration.zero);
         bloc.add(OfferOpened(repo.current.jobs.first.id));
         async.elapse(Duration.zero);
-        expect(bloc.state.seconds, 30);
+        expect(bloc.state.seconds, 600);
         final deadline = bloc.state.offer!.deadline;
         final firstId = bloc.state.offer!.job.id;
         async.elapse(const Duration(seconds: 7));
-        expect(bloc.state.seconds, 23);
+        expect(bloc.state.seconds, 593);
         bloc.add(OfferOpened(repo.current.jobs.last.id));
         async.elapse(Duration.zero);
         bloc.add(OfferOpened(firstId));
@@ -34,7 +34,7 @@ void main() {
         async.elapse(Duration.zero);
         expect(bloc.state.offer!.deadline, deadline);
         repo.setForeground(false);
-        async.elapse(const Duration(seconds: 24));
+        async.elapse(const Duration(seconds: 594));
         expect(bloc.state.seconds, 0);
         expect(bloc.state.canAccept, isFalse);
         expect(bloc.state.status, OfferStatus.expired);

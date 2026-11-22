@@ -81,8 +81,10 @@ void main() {
     expect(repo.current.trip, isNull);
     await repo.simulate(TripSimulation.newOffer);
     final secondId = repo.current.offer!.job.id;
-    now = now.add(const Duration(seconds: 30));
+    final before = now;
+    now = now.add(JobOffer.matchingWindow); // K-02: hết hạn ghép 10 phút
     await expectLater(repo.acceptOffer(secondId), throwsA(isA<TripFailure>()));
+    now = before; // phần sau cần đơn còn hạn
     expect(repo.current.trip, isNull);
     await repo.simulate(TripSimulation.newOffer);
     final thirdId = repo.current.offer!.job.id;

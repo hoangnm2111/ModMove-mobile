@@ -667,6 +667,11 @@ class _PayOsSheetState extends State<PayOsSheet> with WidgetsBindingObserver {
     WidgetsBinding.instance.removeObserver(this);
     _tick?.cancel();
     _auto?.cancel();
+    // K-28: đóng sheet khi chưa xác nhận đã trả và mã còn sống → huỷ mã ở BE (và PayOS). Lỗi mạng bỏ qua.
+    final s = _session;
+    if (!_closed && s != null && s.expiresAt.isAfter(DateTime.now())) {
+      unawaited(widget.api.cancelPayment(widget.order.id).catchError((Object _) {}));
+    }
     super.dispose();
   }
 

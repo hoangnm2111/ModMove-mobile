@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/widgets/app_widgets.dart';
+import '../../domain/entities/trip_models.dart';
 import '../../domain/repositories/driver_trip_repository.dart';
 import '../bloc/job_offer_bloc.dart';
 import 'trip_components.dart';
@@ -41,7 +42,7 @@ class JobAlertSheet extends StatelessWidget {
                     ),
                   ),
                   Semantics(
-                    label: 'Còn ${state.seconds} giây',
+                    label: 'Còn ${offerTimeLeft(state.seconds)}',
                     child: SizedBox(
                       width: 66,
                       height: 66,
@@ -50,14 +51,14 @@ class JobAlertSheet extends StatelessWidget {
                         children: [
                           SizedBox.expand(
                             child: CircularProgressIndicator(
-                              value: state.seconds / 30,
+                              value: state.seconds / JobOffer.matchingWindow.inSeconds,
                               strokeWidth: 5,
                               color: AppColors.orange,
                               backgroundColor: AppColors.peach,
                             ),
                           ),
                           Text(
-                            '${state.seconds}s',
+                            offerTimeLeft(state.seconds),
                             style: appText(
                               size: 20,
                               weight: FontWeight.w700,

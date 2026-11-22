@@ -65,8 +65,15 @@ class DriverApi {
       _list(await _api.get('/public/VehicleTypes'));
 
   /// Upload một ảnh JPG/PNG ≤ 5 MB → URL Cloudinary.
-  Future<String> upload(String fileName, List<int> bytes) async =>
-      _map(await _api.uploadBytes('/driver/Uploads', fileName, bytes))['url']
+  /// [document] = một trong 7 ảnh hồ sơ (K-33, NFR 2.3): BE lưu riêng tư, URL trả về chỉ để nộp hồ sơ, không mở được ảnh.
+  Future<String> upload(String fileName, List<int> bytes, {bool document = false}) async =>
+      _map(
+            await _api.uploadBytes(
+              document ? '/driver/Uploads?purpose=Document' : '/driver/Uploads',
+              fileName,
+              bytes,
+            ),
+          )['url']
           as String;
 
   /* ------------------------------------------------------ trạng thái + GPS */

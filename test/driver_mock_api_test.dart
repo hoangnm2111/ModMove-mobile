@@ -2,7 +2,7 @@ import 'dart:convert';
 import 'dart:io';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:modmove_mobile/features/onboarding/data/models/driver_application_dto.dart';
-import 'package:modmove_mobile/features/onboarding/data/repositories/api_driver_repository.dart';
+import 'package:modmove_mobile/features/onboarding/data/repositories/mock_api_driver_repository.dart';
 import 'package:modmove_mobile/features/onboarding/data/services/mock_driver_api.dart';
 import 'package:modmove_mobile/features/onboarding/data/services/profile_mock_store.dart';
 import 'package:modmove_mobile/features/onboarding/domain/entities/driver_application.dart';
@@ -32,7 +32,7 @@ DriverApplication withDocuments(
 
 void main() {
   late MockDriverApi api;
-  late ApiDriverRepository repository;
+  late MockApiDriverRepository repository;
   final photo = SelectedPhoto(
     'sample.png',
     File('assets/images/demo-document.png').readAsBytesSync(),
@@ -42,7 +42,7 @@ void main() {
       initial: MockDriverApi.freshApplication(complete: true),
       latency: Duration.zero,
     );
-    repository = ApiDriverRepository(
+    repository = MockApiDriverRepository(
       client: api.client,
       cached: api.cachedApplication,
     );
@@ -110,7 +110,7 @@ void main() {
   test(
     'independent concurrent submit requests cannot create two pending versions',
     () async {
-      final second = ApiDriverRepository(
+      final second = MockApiDriverRepository(
         client: api.client,
         cached: api.cachedApplication,
       );
@@ -236,7 +236,7 @@ void main() {
         store: store,
         latency: Duration.zero,
       );
-      final repo = ApiDriverRepository(
+      final repo = MockApiDriverRepository(
         client: server.client,
         cached: server.cachedApplication,
       );
@@ -270,7 +270,7 @@ void main() {
         store: store,
         latency: Duration.zero,
       );
-      final repo = ApiDriverRepository(
+      final repo = MockApiDriverRepository(
         client: server.client,
         cached: server.cachedApplication,
       );
@@ -297,7 +297,7 @@ void main() {
         restored.cachedApplication.documents[DocumentKind.vehicle]!.bytes,
         photo.bytes,
       );
-      final restoredRepo = ApiDriverRepository(
+      final restoredRepo = MockApiDriverRepository(
         client: restored.client,
         cached: restored.cachedApplication,
       );

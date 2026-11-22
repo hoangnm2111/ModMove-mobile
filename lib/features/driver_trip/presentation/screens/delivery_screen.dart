@@ -72,13 +72,18 @@ class _DeliveryScreenState extends State<DeliveryScreen> {
     final state = widget.state;
     final trip = state.session.trip!;
     final job = trip.job;
-    final needCash = job.cash && !trip.cashCollected;
+    // K-19 (DECISIONS 5.4): tiền người gửi thu ở điểm lấy (Arrived/PickedUp); màn giao chỉ thu tiền người nhận.
+    final receiverCash = job.payment == PaymentMethod.cashReceiver;
+    final needCash = receiverCash && !trip.cashCollected;
+    // Đơn cũ bị kẹt (người gửi chưa trả mà đã sang InTransit): không thu được nữa, BE sẽ từ chối giao.
+    final senderUnpaid = job.payment == PaymentMethod.cashSender && !trip.cashCollected;
     final paused = state.paused;
-    final canFinish = _proof != null && !needCash && !state.busy && !paused && state.atDropoff;
-    final payer = job.payment == PaymentMethod.cashReceiver ? 'người nhận' : 'người gửi';
+    final canFinish = _proof != null && !needCash && !senderUnpaid && !state.busy && !paused && state.atDropoff;
+    const payer = 'người nhận';
     // Việc còn thiếu trước khi bấm "Hoàn tất giao hàng" (giữ nguyên điều kiện nghiệp vụ, chỉ nói rõ ra).
     final missing = [
       if (needCash) 'xác nhận thu tiền',
+      if (senderUnpaid) 'Điều phối viên xử lý tiền người gửi chưa thu',
       if (_proof == null) 'chụp ảnh giao hàng',
       if (!state.atDropoff) 'đến gần điểm giao hàng',
     ];
@@ -167,7 +172,11 @@ class _DeliveryScreenState extends State<DeliveryScreen> {
                 Notice(state.session.notice!, icon: 'info'),
               ],
               const SizedBox(height: 16),
-              if (job.cash) ...[
+              if (senderUnpaid) ...[
+                const TripError('Đơn chưa thu tiền người gửi ở điểm lấy hàng nên không hoàn tất được. Hãy báo sự cố để Điều phối viên xử lý.'),
+                const SizedBox(height: 16),
+              ],
+              if (receiverCash) ...[
                 const SectionTitle('Thu tiền mặt', size: 16),
                 const SizedBox(height: 8),
                 AppCard(
