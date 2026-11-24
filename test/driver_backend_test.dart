@@ -30,6 +30,9 @@ class FakeBackend {
   bool activeGone = false;
   final incidents = <Map<String, Object?>>[];
 
+  /// Trường thêm vào chi tiết chuyến (ví dụ người gửi, ghi chú); mặc định trống như đơn đặt trước khi có người gửi.
+  Map<String, Object?> tripExtra = {};
+
   static const _trip = {
     'id': 7,
     'orderCode': 'MM20261110007',
@@ -54,6 +57,7 @@ class FakeBackend {
 
   Map<String, Object?> get tripJson => {
     ..._trip,
+    ...tripExtra,
     'orderStatus': orderStatus,
     'incidents': incidents,
     'paymentStatus': paid ? 'Paid' : 'Pending',
@@ -505,6 +509,28 @@ void main() {
     expect((env.backend.bodies['post /driver/trips/7/deliver'] as Map)['deliveryPhotoUrl'], contains('pod.jpg'));
     expect(repository.current.trip, isNull);
     expect(repository.current.notice, contains('MM20261110007'));
+  });
+
+  test('liên hệ ở điểm lấy là người gửi; đơn cũ chưa có người gửi thì là khách đặt', () async {
+    for (final withSender in [true, false]) {
+      final env = _setup();
+      if (withSender) env.backend.tripExtra = {'senderName': 'Chị Hoa', 'senderPhone': '0987654321', 'pickupNote': 'Cửa hầm B1', 'dropoffNote': 'Gọi trước 15 phút'};
+      final repository = ApiDriverTripRepository(
+        api: env.api,
+        location: _FixedLocation(),
+        access: const DriverAccess(approved: true, active: true),
+        pollInterval: const Duration(hours: 1),
+      );
+      addTearDown(repository.close);
+      repository.onSessionChanged(isDriver: true);
+      await repository.refresh();
+      await repository.openOffer('7');
+      await repository.acceptOffer('7');
+
+      final job = repository.current.trip!.job;
+      expect(job.customerName, withSender ? 'Chị Hoa' : 'Khách hàng Demo');
+      expect(job.customerPhone, withSender ? '0987654321' : '0900000003');
+    }
   });
 
   test('thu tiền gửi toạ độ thật của nguồn GPS cho BE kiểm tra bán kính', () async {

@@ -41,7 +41,7 @@ lib/features/customer/
 | Màn | API | Luật |
 |---|---|---|
 | Đăng nhập / đăng ký / OTP / quên mật khẩu | `public/Auth/*` | GB-02, GB-25, GB-44, GB-53 |
-| Đặt xe 4 bước: lộ trình → hàng hoá (ảnh) → loại xe → thanh toán | `public/FareEstimate`, `customer/Uploads`, `customer/Coupons`, `customer/Orders` | GB-05, GB-06, GB-07, GB-10, GB-21, GB-29; `expectedTotalFee` → `FARE_CHANGED` |
+| Đặt xe 4 bước: lộ trình (người gửi, người nhận, ghi chú từng điểm) → hàng hoá (ảnh) → loại xe (+ bản đồ) → thanh toán (+ bản đồ) | `public/FareEstimate`, `customer/Uploads`, `customer/Coupons`, `customer/Orders` | Giống web: số di động VN, hai điểm phải khác nhau, ghi chú ≤ 500 ký tự (mô tả + ghi chú bốc xếp gộp làm `specialNotes`), cam kết hàng cấm hỏi lại ở bước cuối, báo giá lại ngay trước khi gửi (`expectedTotalFee` → `FARE_CHANGED`). Khách chưa đăng nhập vẫn lập nháp, đăng nhập khi thêm ảnh hoặc gửi đơn. Nháp lưu trong máy 24 giờ (`booking-draft-v1.json`), xoá khi đăng xuất; mở lại không giữ mã giảm giá và ô đồng ý |
 | Thanh toán PayOS | `customer/Orders/{id}/payment` (`platform=App`) | GB-13, GB-31; chỉ tin webhook, quay về app qua `modmove://` |
 | Đơn hàng (lọc, tìm, phân trang) | `customer/Orders` | |
 | Chi tiết đơn + "việc cần làm tiếp" | `customer/Orders/{id}`, `/tracking`, `/cancel`, `/pickup-evidence`, `/confirm-receipt` | GB-22, GB-26, GB-18, GB-23 |
@@ -53,7 +53,7 @@ lib/features/customer/
 
 - Thông báo đẩy FCM (`PUT account/fcmtoken`) – cần cấu hình Firebase.
 - ~~Cập nhật tức thời qua SignalR~~ – đã có: `NotificationReceived` → banner trên đỉnh màn + hộp thông báo (chuông); chi tiết đơn tải lại ngay khi có thông báo của đơn đó. Vẫn giữ tải định kỳ (đơn 20 giây, vị trí tài xế 60 giây) làm dự phòng. Chưa có: FCM đẩy khi app đóng (xem docs/firebase-push.md).
-- Bản đồ trong app – hiện mở Google Maps ngoài app để chỉ đường (không cần API key).
+- Bản đồ MapVina (đặt xe, tài xế): style/tile lấy qua BE `GET /public/Map/style`, BE giữ key. Muốn dùng key riêng trên máy dev: `--dart-define=MAPVINA_KEY=...`.
 
 ## Test
 

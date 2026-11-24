@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
+import '../../../../core/config/platform_config.dart';
 import '../../../../core/format/formatters.dart';
 import '../../../../core/notifications/app_notice.dart';
 import '../../../../core/theme/app_theme.dart';
@@ -364,12 +365,16 @@ class _DetailViewState extends State<_DetailView> with WidgetsBindingObserver {
     }
   }
 
-  /// GB-34: không sửa đơn đã gửi → tạo đơn mới từ thông tin cũ.
+  /// Không sửa đơn đã gửi: tạo đơn mới từ thông tin cũ.
   BookingDraft _draftFrom(OrderDetail o) => BookingDraft(
     pickupAddress: o.pickupAddress,
     dropoffAddress: o.dropoffAddress,
+    senderName: o.senderName ?? '',
+    senderPhone: o.senderPhone ?? '',
+    pickupNote: o.pickupNote ?? '',
     receiverName: o.receiverName,
     receiverPhone: o.receiverPhone,
+    dropoffNote: o.dropoffNote ?? '',
     cargoType: o.cargo.cargoType,
     quantity: o.cargo.quantity,
     weightKg: o.cargo.weightKg,
@@ -377,7 +382,8 @@ class _DetailViewState extends State<_DetailView> with WidgetsBindingObserver {
     widthCm: o.cargo.widthCm,
     heightCm: o.cargo.heightCm,
     photos: o.cargo.photoUrls,
-    specialNotes: o.cargo.specialNotes ?? '',
+    // Mô tả và ghi chú được gộp làm một khi gửi lên: đặt lại thì đưa cả vào ô mô tả.
+    description: o.cargo.specialNotes ?? '',
     loadingService: o.hasLoadingService,
   );
 }
@@ -557,7 +563,7 @@ class _NextActionState extends State<_NextAction> {
           AppColors.amber,
           'clock',
           'Đang tìm tài xế gần điểm lấy',
-          'Đơn hiển thị cho mọi tài xế đủ điều kiện; tài xế nhận trước được giao đơn. Không ai nhận trong 10 phút, đơn tự huỷ.',
+          'Đơn hiển thị cho mọi tài xế đủ điều kiện; tài xế nhận trước được giao đơn. Không ai nhận trong ${AppRules.rules.matchingTimeoutMinutes} phút, đơn tự huỷ.',
           [cancel],
         );
       case OrderStatus.accepted:
@@ -629,7 +635,7 @@ class _NextActionState extends State<_NextAction> {
             'Tài xế đã đến điểm giao',
             'Tài xế báo đã tới điểm giao lúc ${timeOfDay(arrivedAt)}.'
                 '${payCash ? ' Người nhận thanh toán ${money(o.totalFee)} tiền mặt cho tài xế.' : ''}'
-                ' Tài xế sẽ chụp ảnh giao hàng để hoàn tất; sau đó bạn xác nhận nhận hàng hoặc khiếu nại trong 24 giờ.'
+                ' Tài xế sẽ chụp ảnh giao hàng để hoàn tất; sau đó bạn xác nhận nhận hàng hoặc khiếu nại trong ${OrderRules.complaintWindow.inHours} giờ.'
                 ' Có vấn đề với hàng, hãy báo sự cố ngay.',
             [incident],
           );
@@ -654,7 +660,7 @@ class _NextActionState extends State<_NextAction> {
           'Hàng đã giao – kiểm tra và xác nhận',
           widget.hasOpenComplaint
               ? 'Đơn đang có khiếu nại mở. Đơn sẽ hoàn tất sau khi khiếu nại được đóng.'
-              : 'Hàng ổn: xác nhận đã nhận hàng. Có vấn đề: khiếu nại (còn ${timeLeft(left)}). Xác nhận rồi sẽ không khiếu nại được; quá 24 giờ đơn tự hoàn tất.',
+              : 'Hàng ổn: xác nhận đã nhận hàng. Có vấn đề: khiếu nại (còn ${timeLeft(left)}). Xác nhận rồi sẽ không khiếu nại được; quá ${OrderRules.autoCompleteAfter.inHours} giờ đơn tự hoàn tất.',
           [
             if (!widget.hasOpenComplaint)
               FilledButton(
@@ -707,7 +713,7 @@ class _NextActionState extends State<_NextAction> {
           'Đơn đã hoàn thành',
           left.inSeconds > 0
               ? 'Hãy đánh giá tài xế (còn ${timeLeft(left)}, chỉ 1 lần).'
-              : 'Đã quá thời hạn 1 ngày để đánh giá.',
+              : 'Đã quá thời hạn ${OrderRules.ratingWindow.inHours} giờ để đánh giá.',
           [
             if (left.inSeconds > 0)
               FilledButton(
@@ -931,13 +937,24 @@ class _DriverCard extends StatelessWidget {
 class _RouteCargoCard extends StatelessWidget {
   const _RouteCargoCard(this.o);
   final OrderDetail o;
+  Widget _note(String text) => Padding(
+    padding: const EdgeInsets.only(left: 26, top: 4),
+    child: Text('Ghi chú: $text', style: appText(size: 12.5, color: AppColors.secondary)),
+  );
+
   @override
   Widget build(BuildContext context) => SectionCard(
     title: 'Lộ trình & hàng hoá',
     child: Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        _place('map-pin', AppColors.orange, 'Điểm lấy', o.pickupAddress),
+        _place('map-pin', AppColors.orange, o.senderName == null ? 'Điểm lấy' : 'Điểm lấy • ${o.senderName}', o.pickupAddress),
+        if (o.senderPhone != null)
+          Padding(
+            padding: const EdgeInsets.only(left: 26, top: 4),
+            child: PhoneText(o.senderPhone!, style: appText(size: 13, weight: FontWeight.w600)),
+          ),
+        if (o.pickupNote != null) _note(o.pickupNote!),
         const SizedBox(height: 8),
         _place(
           'target',
@@ -958,9 +975,10 @@ class _RouteCargoCard extends StatelessWidget {
             ],
           ),
         ),
+        if (o.dropoffNote != null) _note(o.dropoffNote!),
         const SizedBox(height: 6),
         Text(
-          '${o.distanceKm} km • ~${o.durationMin} phút • ${o.vehicleTypeName}${o.hasLoadingService ? ' • Có bốc xếp' : ''}',
+          '${kmCeil(o.distanceKm)} • khoảng ${o.durationMin} phút • ${o.vehicleTypeName}${o.hasLoadingService ? ' • Có bốc xếp' : ''}',
           style: appText(size: 12, color: AppColors.muted),
         ),
         const Divider(height: 22),
@@ -1302,7 +1320,7 @@ class _RefundTile extends StatelessWidget {
             Padding(
               padding: const EdgeInsets.only(top: 6),
               child: Text(
-                'Quyết định của Admin: ${r.decisionReason}',
+                'Quyết định của Quản trị viên: ${r.decisionReason}',
                 style: appText(size: 12.5),
               ),
             ),

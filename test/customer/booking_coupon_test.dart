@@ -65,6 +65,7 @@ void main() {
         vehicleTypeId: 1,
         couponCode: 'MODMOVE100K',
         agreedWarranty: true,
+        noProhibitedCargo: true,
       ),
     );
     await settle();
@@ -95,6 +96,7 @@ void main() {
         vehicleTypeId: 1,
         couponCode: 'MODMOVE100K',
         agreedWarranty: true,
+        noProhibitedCargo: true,
       ),
     );
     await settle();

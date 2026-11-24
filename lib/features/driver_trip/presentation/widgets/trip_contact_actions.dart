@@ -147,7 +147,6 @@ class _IncidentFormSheetState extends State<IncidentFormSheet> {
               maxLength: 1000,
               decoration: const InputDecoration(
                 labelText: 'Mô tả *',
-                hintText: 'Mô tả vấn đề để điều phối viên hỗ trợ…',
               ),
             ),
             Text('Ảnh đính kèm', style: appText(size: 12, color: AppColors.secondary)),

@@ -58,6 +58,6 @@ const proofStatusTone = <String, Tone>{
   'Verified': Tone('Đã duyệt', AppColors.green, AppColors.greenBg),
   'Rejected': Tone('Đã từ chối', AppColors.red, AppColors.redBg),
 };
-const changedByLabel = {'Customer': 'Khách hàng', 'Driver': 'Tài xế', 'Dispatcher': 'Điều phối', 'Administrator': 'Admin', 'System': 'Hệ thống'};
+const changedByLabel = {'Customer': 'Khách hàng', 'Driver': 'Tài xế', 'Dispatcher': 'Điều phối viên', 'Administrator': 'Quản trị viên', 'System': 'Hệ thống'};
 
 Tone toneOf(Map<String, Tone> map, String key) => map[key] ?? Tone(key, _slate, _slateBg);

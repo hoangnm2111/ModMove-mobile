@@ -6,6 +6,7 @@ double? _dn(Object? v) => v == null ? null : (v as num).toDouble();
 int _i(Object? v) => v == null ? 0 : (v as num).toInt();
 int? _in(Object? v) => v == null ? null : (v as num).toInt();
 String _s(Object? v) => v as String? ?? '';
+String? _blankToNull(Object? v) => (v is String && v.trim().isNotEmpty) ? v : null;
 DateTime _dt(Object? v) => DateTime.parse(v as String).toLocal();
 DateTime? _dtn(Object? v) => v == null ? null : DateTime.parse(v as String).toLocal();
 List<String> _sl(Object? v) => v == null ? const [] : (v as List).map((e) => '$e').toList();
@@ -91,12 +92,24 @@ class LookupItem {
   factory LookupItem.fromJson(Map<String, dynamic> j) => LookupItem(_s(j['code']), _s(j['name']), j['description'] as String?);
 }
 
+/// Báo giá. [pickup]/[dropoff] là hai điểm BE tìm được từ địa chỉ, [polyline] là đường đi (5 chữ số) để vẽ bản đồ.
 class FareEstimate {
-  const FareEstimate(this.distanceKm, this.durationMinutes, this.distanceFee, this.serviceFee, this.discountAmount, this.totalFee);
+  const FareEstimate(this.distanceKm, this.durationMinutes, this.distanceFee, this.serviceFee, this.discountAmount, this.totalFee, {this.pickup, this.dropoff, this.polyline});
   final double distanceKm, distanceFee, serviceFee, discountAmount, totalFee;
   final int durationMinutes;
-  factory FareEstimate.fromJson(Map<String, dynamic> j) =>
-      FareEstimate(_d(j['distanceKm']), _i(j['durationMinutes']), _d(j['distanceFee']), _d(j['serviceFee']), _d(j['discountAmount']), _d(j['totalFee']));
+  final GeoPoint? pickup, dropoff;
+  final String? polyline;
+  factory FareEstimate.fromJson(Map<String, dynamic> j) => FareEstimate(
+    _d(j['distanceKm']),
+    _i(j['durationMinutes']),
+    _d(j['distanceFee']),
+    _d(j['serviceFee']),
+    _d(j['discountAmount']),
+    _d(j['totalFee']),
+    pickup: j['pickup'] is Map<String, dynamic> ? GeoPoint.fromJson(j['pickup'] as Map<String, dynamic>) : null,
+    dropoff: j['dropoff'] is Map<String, dynamic> ? GeoPoint.fromJson(j['dropoff'] as Map<String, dynamic>) : null,
+    polyline: j['polyline'] as String?,
+  );
 }
 
 class AvailableCoupon {
@@ -229,7 +242,14 @@ class OrderDetail {
     required this.couponCode,
     required this.payment,
     this.pendingDriverIncidentId,
+    this.senderName,
+    this.senderPhone,
+    this.pickupNote,
+    this.dropoffNote,
   });
+
+  /// Người giao hàng ở điểm lấy và ghi chú hai điểm; null ở các đơn đặt trước khi có các thông tin này.
+  final String? senderName, senderPhone, pickupNote, dropoffNote;
 
   /// Sự cố do tài xế báo còn mở: chuyến tạm dừng, khách chưa duyệt được ảnh lấy hàng (null = không chặn).
   final int? pendingDriverIncidentId;
@@ -255,6 +275,10 @@ class OrderDetail {
     vehicleTypeName: _s(j['vehicleTypeName']),
     receiverName: _s(j['receiverName']),
     receiverPhone: _s(j['receiverPhone']),
+    senderName: _blankToNull(j['senderName']),
+    senderPhone: _blankToNull(j['senderPhone']),
+    pickupNote: _blankToNull(j['pickupNote']),
+    dropoffNote: _blankToNull(j['dropoffNote']),
     distanceKm: _d(j['estimatedDistanceKm']),
     durationMin: _i(j['estimatedDurationMin']),
     hasLoadingService: j['hasLoadingService'] as bool? ?? false,

@@ -7,6 +7,7 @@ import '../../domain/entities/driver_application.dart';
 import '../controllers/driver_controller.dart';
 import '../models/document_display.dart';
 import '../widgets/document_widgets.dart';
+import '../../../../core/config/platform_config.dart';
 
 class VerificationScreen extends StatefulWidget {
   const VerificationScreen({
@@ -78,9 +79,9 @@ class _VerificationScreenState extends State<VerificationScreen> {
                 ),
                 onTap: () => Navigator.pop(context, PhotoSource.sample),
               ),
-            const Padding(
-              padding: EdgeInsets.fromLTRB(20, 4, 20, 20),
-              child: Text('JPG hoặc PNG · Tối đa 5 MB/ảnh'),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 4, 20, 20),
+              child: Text('JPG hoặc PNG · Tối đa ${AppRules.rules.maxPhotoSizeMb} MB/ảnh'),
             ),
           ],
         ),
@@ -203,7 +204,7 @@ class _VerificationScreenState extends State<VerificationScreen> {
           onHelp: () => showInfoSheet(
             context,
             'Chuẩn bị hồ sơ',
-            'Dùng ảnh JPG hoặc PNG dưới 5 MB, rõ thông tin và đủ 4 góc. Giấy tờ cần còn hiệu lực. Các mục đã đạt được giữ nguyên khi bổ sung hồ sơ.',
+            'Dùng ảnh JPG hoặc PNG dưới ${AppRules.rules.maxPhotoSizeMb} MB, rõ thông tin và đủ 4 góc. Giấy tờ cần còn hiệu lực. Các mục đã đạt được giữ nguyên khi bổ sung hồ sơ.',
           ),
         ),
         bottomNavigationBar: SafeArea(
@@ -328,7 +329,7 @@ class _VerificationScreenState extends State<VerificationScreen> {
     const SectionTitle('Giấy tờ cá nhân', size: 20),
     const SizedBox(height: 5),
     Text(
-      'JPG hoặc PNG · Tối đa 5 MB/ảnh',
+      'JPG hoặc PNG · Tối đa ${AppRules.rules.maxPhotoSizeMb} MB/ảnh',
       style: appText(size: 12, color: AppColors.muted),
     ),
     const SizedBox(height: 16),
@@ -456,7 +457,7 @@ class _VerificationScreenState extends State<VerificationScreen> {
     const SectionTitle('Giấy tờ & ảnh xe', size: 18),
     const SizedBox(height: 5),
     Text(
-      'JPG hoặc PNG · Tối đa 5 MB/ảnh',
+      'JPG hoặc PNG · Tối đa ${AppRules.rules.maxPhotoSizeMb} MB/ảnh',
       style: appText(size: 12, color: AppColors.muted),
     ),
     const SizedBox(height: 10),

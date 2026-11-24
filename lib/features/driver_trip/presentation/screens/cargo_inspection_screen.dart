@@ -9,6 +9,7 @@ import '../widgets/cargo_photo_tile.dart';
 import '../widgets/trip_components.dart';
 import '../widgets/trip_contact_actions.dart';
 import 'driver_simulation_sheet.dart';
+import '../../../../core/config/platform_config.dart';
 
 class CargoInspectionScreen extends StatelessWidget {
   const CargoInspectionScreen({super.key, required this.tripState});
@@ -46,7 +47,7 @@ class CargoInspectionScreen extends StatelessWidget {
             IncidentBanner(trip),
             if (trip.review == EvidenceReview.rejected)
               TripError(
-                '${trip.reason}\nLần gửi ${trip.attempts}/5. Chụp lại 2 ảnh trước khi gửi.',
+                '${trip.reason}\nLần gửi ${trip.attempts}/${AppRules.rules.maxPickupSubmissions}. Chụp lại ${AppRules.rules.minPickupPhotos} ảnh trước khi gửi.',
               ),
             if (state.error != null) TripError(state.error!),
             if (tripState.error != null) TripError(tripState.error!),
@@ -227,7 +228,6 @@ class CargoInspectionScreen extends StatelessWidget {
               minLines: 1,
               onChanged: context.read<EvidenceCubit>().setNote,
               decoration: const InputDecoration(
-                hintText: 'Nhập ghi chú…',
                 counterText: '',
               ),
             ),

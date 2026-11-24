@@ -4,6 +4,7 @@ import 'package:image_picker/image_picker.dart';
 import '../../domain/entities/driver_application.dart';
 import '../../domain/repositories/driver_repository.dart';
 import '../../domain/usecases/validate_driver_application.dart';
+import '../../../../core/config/platform_config.dart';
 
 class DevicePhotoRepository implements DocumentPhotoRepository {
   DevicePhotoRepository({ImagePicker? picker})
@@ -20,9 +21,9 @@ class DevicePhotoRepository implements DocumentPhotoRepository {
       );
       if (file == null) return null;
       final length = await file.length();
-      if (length > 5 * 1024 * 1024) {
-        throw const ApplicationFailure(
-          'Ảnh vượt quá 5 MB. Vui lòng chọn ảnh nhỏ hơn.',
+      if (length > AppRules.rules.maxPhotoSizeMb * 1024 * 1024) {
+        throw ApplicationFailure(
+          'Ảnh vượt quá ${AppRules.rules.maxPhotoSizeMb} MB. Vui lòng chọn ảnh nhỏ hơn.',
         );
       }
       final bytes = await file.readAsBytes();

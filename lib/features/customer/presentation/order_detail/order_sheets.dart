@@ -245,7 +245,7 @@ class _CancelOrderSheetState extends State<CancelOrderSheet> {
           () => widget.api.cancelOrder(o.id, _code!, _reason.text.trim()),
           notice: 'ORDER_CANCELLED',
           data: {'orderId': '${o.id}', 'orderCode': o.code},
-          noticeBody: 'Đã huỷ đơn ${o.code}.${paid ? ' Yêu cầu hoàn 100% đã gửi tới Admin.' : ''}',
+          noticeBody: 'Đã huỷ đơn ${o.code}.${paid ? ' Yêu cầu hoàn toàn bộ số tiền đã được gửi tới Quản trị viên.' : ''}',
         );
       },
       children: [
@@ -309,7 +309,7 @@ class _RejectPickupSheetState extends State<RejectPickupSheet> {
         controller: _reason,
         maxLines: 3,
         maxLength: 500,
-        decoration: const InputDecoration(labelText: 'Lý do từ chối', hintText: 'VD: Ảnh mờ, thiếu thùng hàng số 2…'),
+        decoration: const InputDecoration(labelText: 'Lý do từ chối'),
       ),
     ],
   );
@@ -450,7 +450,7 @@ class _IncidentSheetState extends State<IncidentSheet> {
         controller: _desc,
         maxLines: 3,
         maxLength: 1000,
-        decoration: const InputDecoration(labelText: 'Mô tả sự cố *', hintText: 'Chuyện gì đã xảy ra? Ghi rõ để điều phối viên xử lý đúng.'),
+        decoration: const InputDecoration(labelText: 'Mô tả sự cố *'),
       ),
       PhotoPicker(label: 'Ảnh minh chứng', urls: _photos, max: OrderRules.maxEvidencePhotos, upload: widget.api.upload, onChanged: (p) => setState(() => _photos = p)),
     ],
@@ -549,7 +549,7 @@ class _ReplyInfoSheetState extends State<ReplyInfoSheet> {
 
   @override
   Widget build(BuildContext context) {
-    final room = (OrderRules.maxEvidencePhotos - widget.refund.evidenceUrls.length).clamp(0, 5);
+    final room = (OrderRules.maxEvidencePhotos - widget.refund.evidenceUrls.length).clamp(0, OrderRules.maxEvidencePhotos);
     return _Form(
       title: 'Bổ sung thông tin',
       submitLabel: 'Gửi trả lời',
@@ -572,7 +572,7 @@ class _ReplyInfoSheetState extends State<ReplyInfoSheet> {
         if (room > 0)
           PhotoPicker(label: 'Ảnh bổ sung', urls: _photos, max: room, upload: widget.api.upload, onChanged: (p) => setState(() => _photos = p))
         else
-          Text('Đã đủ 5 ảnh bằng chứng.', style: appText(size: 12, color: AppColors.muted)),
+          Text('Đã đủ ${OrderRules.maxEvidencePhotos} ảnh bằng chứng.', style: appText(size: 12, color: AppColors.muted)),
       ],
     );
   }

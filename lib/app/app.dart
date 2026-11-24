@@ -8,7 +8,11 @@ import '../core/session/session_store.dart';
 import '../features/auth/data/auth_api.dart';
 import '../features/auth/presentation/auth_cubit.dart';
 import '../features/auth/presentation/login_screen.dart';
+import '../core/config/platform_config_cubit.dart';
+import '../features/customer/data/booking_draft_store.dart';
 import '../features/customer/data/customer_api.dart';
+import '../features/customer/presentation/booking/booking_cubit.dart';
+import '../features/customer/presentation/booking/booking_screen.dart';
 import '../features/customer/presentation/customer_shell.dart';
 import 'driver_trip_scope.dart';
 import 'push_host.dart';
@@ -65,6 +69,7 @@ class ModMoveApp extends StatelessWidget {
     this.httpClient,
     this.pushDevice,
     this.realtimeSource,
+    this.bookingDrafts,
   });
   final String screen;
   final DriverController? driverController;
@@ -83,6 +88,9 @@ class ModMoveApp extends StatelessWidget {
 
   /// Nguồn thông báo thời gian thực (SignalR); test chèn nguồn giả. Mặc định: SignalR thật (tắt khi chạy `flutter test`).
   final RealtimeSource? realtimeSource;
+
+  /// Nơi lưu nháp đặt xe; mặc định là file trong thư mục riêng của app.
+  final BookingDraftStore? bookingDrafts;
 
   /// Mã đơn của màn chi tiết đang mở (OrderDetailScreen đặt/xoá): chạm thông báo của đúng đơn đó thì không đẩy màn trùng.
 
@@ -171,6 +179,9 @@ class ModMoveApp extends StatelessWidget {
         RepositoryProvider<CustomerApi>(
           create: (c) => CustomerApi(c.read<ApiClient>()),
         ),
+        RepositoryProvider<BookingDraftStore>(
+          create: (_) => bookingDrafts ?? FileBookingDraftStore(),
+        ),
       ],
       child: MultiBlocProvider(
         providers: [
@@ -213,6 +224,10 @@ class ModMoveApp extends StatelessWidget {
               return auth;
             },
           ),
+          // Số liệu thật từ BE (phí bốc xếp, tiền cọc, bán kính ghép đơn, giới hạn nghiệp vụ): không cần đăng nhập.
+          BlocProvider(
+            create: (c) => PlatformConfigCubit(c.read<CustomerApi>().publicConfig)..load(),
+          ),
           BlocProvider(
             create: (c) => HomeController(c.read<CustomerApi>()),
           ),
@@ -241,10 +256,11 @@ class ModMoveApp extends StatelessWidget {
       // Không dùng popUntil(isFirst): nhiều luồng tài xế đặt màn tài xế làm màn gốc
       // (pushNamedAndRemoveUntil('/driver-home', ...)), khi đó đăng xuất vẫn ở lại màn tài xế
       // và các API trả "phiên hết hạn". '/home' luôn đi qua _gate nên khách vãng lai thấy trang công khai.
-      listener: (_, _) => navigatorKey.currentState?.pushNamedAndRemoveUntil(
-        '/home',
-        (_) => false,
-      ),
+      // Nháp đặt xe của phiên trước cũng được xoá.
+      listener: (context, _) {
+        context.read<BookingDraftStore>().clear();
+        navigatorKey.currentState?.pushNamedAndRemoveUntil('/home', (_) => false);
+      },
       child: DriverTripScope(
         useBackend: _useBackend,
         navigatorKey: navigatorKey,
@@ -517,7 +533,30 @@ class ModMoveApp extends StatelessWidget {
     onAccount: () => _useBackend
         ? _login(context)
         : Navigator.pushNamed(context, '/profile'),
-    onDeliver: () => _login(context),
+    onDeliver: () => _bookAsGuest(context),
+  );
+
+  /// Giống web: khách chưa đăng nhập vẫn lập đơn nháp; đến lúc gửi đơn (hoặc thêm ảnh) mới đăng nhập.
+  /// Đặt xong thì mở chi tiết đơn, đơn chuyển khoản tự mở thanh toán.
+  Future<void> _bookAsGuest(BuildContext context) async {
+    final created = await Navigator.push<CreatedOrder>(
+      context,
+      MaterialPageRoute(
+        builder: (_) => BookingScreen(onSignIn: () => _signInForBooking(context)),
+      ),
+    );
+    final navigator = navigatorKey.currentState;
+    if (created == null || navigator == null || !navigator.mounted) return;
+    notify(navigator.context, 'ORDER_CREATED', {'orderId': '${created.id}', 'orderCode': created.code});
+    navigator.push<void>(
+      MaterialPageRoute(builder: (_) => OrderDetailScreen(orderId: created.id, openPayment: created.payOs)),
+    );
+  }
+
+  /// Đăng nhập giữa lúc đặt xe: chỉ trả phiên về màn đặt xe, không mở luồng tài xế.
+  Future<Session?> _signInForBooking(BuildContext context) => Navigator.push<Session>(
+    context,
+    MaterialPageRoute(builder: (_) => const LoginScreen()),
   );
 
   Widget _profile(BuildContext context) => DriverProfileScreen(

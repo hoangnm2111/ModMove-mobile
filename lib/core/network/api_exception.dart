@@ -1,3 +1,4 @@
+import '../config/platform_config.dart';
 /// Lỗi từ backend (ProblemDetails `{ status, title, detail, code, errors }`).
 /// App rẽ nhánh theo [code] ổn định, không theo `detail` tiếng Anh (DECISIONS 9.4).
 class ApiException implements Exception {
@@ -18,7 +19,7 @@ class ApiException implements Exception {
       final text = first is List && first.isNotEmpty ? '${first.first}' : '$first';
       return ApiException(text, code: code ?? 'VALIDATION', status: status);
     }
-    final known = code == null ? null : errorMessages[code];
+    final known = code == null ? null : knownErrorMessage(code);
     if (known != null) {
       final detail = body?['detail'] as String?;
       final withDetail = (code == 'FARE_CHANGED' || code == 'REFUND_TOTAL_EXCEEDED') && detail != null;
@@ -28,7 +29,21 @@ class ApiException implements Exception {
     return ApiException(fallback ?? (status == 401 ? errorMessages['UNAUTHORIZED']! : 'Đã có lỗi xảy ra.'), code: code, status: status);
   }
 
-  static const network = ApiException('Không kết nối được tới máy chủ. Kiểm tra mạng hoặc địa chỉ API rồi thử lại.', code: 'NETWORK');
+  static const network = ApiException('Không kết nối được tới máy chủ. Vui lòng kiểm tra mạng rồi thử lại.', code: 'NETWORK');
+}
+
+/// Câu báo lỗi theo mã. Các câu có số liệu (hạn khiếu nại, số ảnh, dung lượng ảnh…) dựng từ số thật của BE
+/// ([AppRules]); các câu còn lại tra trong [errorMessages].
+String? knownErrorMessage(String code) {
+  final r = AppRules.rules;
+  return switch (code) {
+    'RATING_WINDOW_CLOSED' => 'Đã quá ${r.ratingWindowHours} giờ kể từ khi hoàn thành, không thể đánh giá.',
+    'COMPLAINT_WINDOW_CLOSED' => 'Chỉ khiếu nại được khi đơn đã giao và trong vòng ${r.complaintWindowHours} giờ.',
+    'TOO_MANY_PHOTOS' => 'Tối đa ${r.maxEvidencePhotos} ảnh bằng chứng.',
+    'FILE_TOO_LARGE' => 'Ảnh vượt quá ${r.maxPhotoSizeMb} MB. Vui lòng chọn ảnh nhỏ hơn.',
+    'COLLECT_CASH_WRONG_LOCATION' => 'Bạn cần ở trong bán kính ${r.arrivalRadiusMeters} m quanh điểm thu tiền.',
+    _ => errorMessages[code],
+  };
 }
 
 /// Bảng mã lỗi → câu tiếng Việt (ModMove-backend/docs/api/README.md "Mã lỗi").
@@ -46,7 +61,7 @@ const errorMessages = <String, String>{
   'VERIFY_PASSWORD_MISMATCH': 'Mã đúng nhưng mật khẩu không khớp với mật khẩu lúc đăng ký. Hãy đăng ký lại với mật khẩu bạn muốn dùng.',
   'WRONG_PASSWORD': 'Mật khẩu hiện tại không đúng.',
   'ACCOUNT_HAS_OPEN_ORDERS': 'Còn đơn hàng đang chạy nên chưa thể xoá tài khoản.',
-  'ACCOUNT_HAS_PENDING_WITHDRAWAL': 'Còn yêu cầu rút tiền đang chờ Admin chuyển. Hãy chờ xử lý xong rồi xoá tài khoản.',
+  'ACCOUNT_HAS_PENDING_WITHDRAWAL': 'Còn yêu cầu rút tiền đang chờ Quản trị viên chuyển. Hãy chờ xử lý xong rồi xoá tài khoản.',
   'ACCOUNT_HAS_WALLET_BALANCE': 'Ví còn tiền hoặc tiền cọc đang âm. Hãy rút hết hoặc nạp cho đủ trước khi xoá tài khoản.',
   'DRIVER_HAS_ACTIVE_ORDER': 'Đang có đơn chạy nên chưa thể tắt nhận đơn. Hãy hoàn tất chuyến trước.',
   'ACCOUNT_HAS_OPEN_REFUNDS': 'Không thể xoá tài khoản khi còn yêu cầu hoàn tiền đang mở.',
@@ -55,13 +70,10 @@ const errorMessages = <String, String>{
   'ORDER_NOT_YOURS': 'Đơn hàng không thuộc tài khoản của bạn.',
   'ORDER_CANCELLED': 'Đơn hàng đã bị huỷ.',
   'RATING_NOT_ALLOWED': 'Chỉ đánh giá được đơn đã hoàn thành.',
-  'RATING_WINDOW_CLOSED': 'Đã quá 1 ngày kể từ khi hoàn thành, không thể đánh giá.',
-  'COMPLAINT_WINDOW_CLOSED': 'Chỉ khiếu nại được khi đơn đã giao và trong vòng 24 giờ.',
   'REFUND_AMOUNT_INVALID': 'Số tiền yêu cầu phải lớn hơn 0 và không vượt tổng cước đơn.',
   'REFUND_TOTAL_EXCEEDED': 'Tổng các khoản hoàn của đơn sẽ vượt tổng cước.',
   'INCIDENT_PENDING': 'Tài xế đã báo sự cố, chuyến đang tạm dừng chờ điều phối viên.',
   'INCIDENT_NOT_ALLOWED': 'Đơn không ở trạng thái cho phép báo sự cố.',
-  'TOO_MANY_PHOTOS': 'Tối đa 5 ảnh bằng chứng.',
   'NO_INFO_REQUEST': 'Chưa có yêu cầu bổ sung thông tin nào để trả lời.',
   'FARE_CHANGED': 'Giá cước vừa thay đổi. Vui lòng xem lại giá mới trước khi đặt.',
   'ADDRESS_NOT_FOUND': 'Không tìm thấy địa chỉ lấy hoặc giao. Hãy nhập cụ thể hơn.',
@@ -90,9 +102,7 @@ const errorMessages = <String, String>{
   'TOP_UP_BELOW_MISSING_DEPOSIT': 'Số tiền nạp phải đủ phần tiền cọc còn thiếu.',
   'APPLICATION_NOT_EDITABLE': 'Hồ sơ đang chờ duyệt hoặc đã được duyệt nên không nộp lại được.',
   'RESUBMIT_MISSING_REJECTED_ITEMS': 'Hãy cập nhật đủ các mục đã bị từ chối rồi nộp lại.',
-  'COLLECT_CASH_WRONG_LOCATION': 'Bạn cần ở trong bán kính 500 m quanh điểm thu tiền.',
   'WRONG_BANK_ACCOUNT': 'Số tài khoản ngân hàng không đúng.',
-  'FILE_TOO_LARGE': 'Ảnh vượt quá 5 MB. Vui lòng chọn ảnh nhỏ hơn.',
   'UNSUPPORTED_FILE_TYPE': 'Chỉ hỗ trợ ảnh JPG hoặc PNG hợp lệ.',
   'UPLOAD_FAILED': 'Không tải được ảnh lên. Vui lòng thử lại.',
   'SERVER_ERROR': 'Lỗi máy chủ. Vui lòng thử lại sau.',

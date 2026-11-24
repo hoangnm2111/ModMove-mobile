@@ -1,4 +1,5 @@
 import '../entities/trip_models.dart';
+import '../../../../core/config/platform_config.dart';
 
 class ValidateCargoPhoto {
   const ValidateCargoPhoto();
@@ -21,11 +22,11 @@ class ValidateCargoPhoto {
         bytes[1] == 216 &&
         bytes[2] == 255;
     if (bytes.isEmpty ||
-        bytes.length > 5 * 1024 * 1024 ||
+        bytes.length > AppRules.rules.maxPhotoSizeMb * 1024 * 1024 ||
         !(name.endsWith('.png') && png ||
             (name.endsWith('.jpg') || name.endsWith('.jpeg')) && jpeg)) {
-      throw const TripFailure(
-        'Chọn ảnh JPG/PNG hợp lệ, dung lượng tối đa 5 MB.',
+      throw TripFailure(
+        'Chọn ảnh JPG/PNG hợp lệ, dung lượng tối đa ${AppRules.rules.maxPhotoSizeMb} MB.',
       );
     }
   }

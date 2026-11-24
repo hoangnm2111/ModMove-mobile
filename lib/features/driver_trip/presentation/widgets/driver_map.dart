@@ -30,14 +30,18 @@ class DriverMap extends StatefulWidget {
     this.route = false,
     this.available = true,
     this.searching = false,
-    this.searchRadiusMeters = DriverMatchingPolicy.searchRadiusMeters,
+    double? searchRadiusMeters,
     this.position,
     this.destination,
     this.loadRoute,
-  }) : assert(searchRadiusMeters > 0);
+  }) : _searchRadiusMeters = searchRadiusMeters,
+       assert(searchRadiusMeters == null || searchRadiusMeters >= 0);
 
   final bool route, available, searching;
-  final double searchRadiusMeters;
+  final double? _searchRadiusMeters;
+
+  /// Bán kính vùng nhận đơn: do nơi dùng chọn, không thì là số Admin cấu hình ở BE (0 = chưa biết, không vẽ vùng).
+  double get searchRadiusMeters => _searchRadiusMeters ?? DriverMatchingPolicy.searchRadiusMeters;
   final GeoPoint? position, destination;
 
   /// Lấy đường lái xe thật (qua backend). Lỗi hoặc `null` thì vẽ đường thẳng.
@@ -72,7 +76,7 @@ class _DriverMapState extends State<DriverMap>
 
   GeoPoint get _point => widget.position ?? const GeoPoint(10.724, 106.7057);
   mv.LatLng get _center => _latLng(_point);
-  bool get _coverageVisible => widget.searching && !widget.route;
+  bool get _coverageVisible => widget.searching && !widget.route && widget.searchRadiusMeters > 0;
   bool get _hasRoute => widget.route && widget.destination != null;
 
   @override

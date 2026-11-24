@@ -157,7 +157,7 @@ class _OverviewState extends State<_Overview> with WidgetsBindingObserver {
     try {
       await api.withdraw(amount);
       if (!mounted) return;
-      _snack(context, 'Đã gửi yêu cầu rút ${vnd(amount)}. Chờ Admin xử lý.');
+      _snack(context, 'Đã gửi yêu cầu rút ${vnd(amount)}. Chờ Quản trị viên xử lý.');
       setState(() => _epoch++);
     } catch (e) {
       if (mounted) _snack(context, errorText(e), error: true);
@@ -679,7 +679,7 @@ class _BankDialogState extends State<_BankDialog> {
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             Text(
-              'Dùng để Admin chuyển khoản khi bạn rút tiền.',
+              'Dùng để Quản trị viên chuyển khoản khi bạn rút tiền.',
               style: appText(size: 12, color: AppColors.muted),
             ),
             const SizedBox(height: 14),

@@ -8,6 +8,7 @@ import '../../domain/repositories/driver_trip_repository.dart';
 import '../../domain/usecases/validate_cargo_photo.dart';
 import '../driver_api.dart';
 import '../driver_location_source.dart';
+import '../../../../core/config/platform_config.dart';
 
 /// Chuyến đi của tài xế chạy trên BE thật (api/driver/*), dữ liệu lấy từ DB.
 ///
@@ -22,9 +23,11 @@ class ApiDriverTripRepository implements DriverTripRepository, TripSimulator {
     this._access = const DriverAccess(approved: false, active: true),
     this.availabilityGateway,
     this.pollInterval = AppConfig.driverPollInterval,
-    this.offerWindow = JobOffer.matchingWindow,
+    Duration? offerWindow,
     DateTime Function()? clock,
   }) : _location = location ?? const DeviceLocationSource(),
+       // ignore: prefer_initializing_formals (tham số có tên không thể là biến riêng tư)
+       _offerWindow = offerWindow,
        _clock = clock ?? DateTime.now;
 
   final DriverApi api;
@@ -34,7 +37,8 @@ class ApiDriverTripRepository implements DriverTripRepository, TripSimulator {
 
   /// GB-08 (K-02): đơn phát cho mọi tài xế trong bán kính, ai nhận trước được; BE tự huỷ sau 10 phút không ai nhận.
   /// Hạn thật lấy từ `matchingExpiresAt`; giá trị này chỉ dùng khi BE không trả hạn.
-  final Duration offerWindow;
+  final Duration? _offerWindow;
+  Duration get offerWindow => _offerWindow ?? JobOffer.matchingWindow;
   final DateTime Function() _clock;
 
   final _updates = StreamController<DriverSession>.broadcast();
@@ -49,7 +53,7 @@ class ApiDriverTripRepository implements DriverTripRepository, TripSimulator {
   bool _signedIn = false, _gps = true, _foreground = true, _closed = false;
   bool __online = false;
   Future<void>? _running;
-  int _deposit = 0, _earnings = 0, _pings = 0, _required = 200000, _missing = 0;
+  int _deposit = 0, _earnings = 0, _pings = 0, _required = 0, _missing = 0;
   ShiftSummary _shift = const ShiftSummary();
   GpsFix? _fix;
   JobOffer? _offer;
@@ -92,7 +96,8 @@ class ApiDriverTripRepository implements DriverTripRepository, TripSimulator {
     deposit: _deposit,
     earnings: _earnings,
     shift: _shift,
-    requiredDeposit: _required,
+    // Mức cọc thật: từ ví tài xế; chưa có thì từ cấu hình công khai của BE; chưa có nữa thì 0 (không hiện cảnh báo thiếu cọc).
+    requiredDeposit: _required > 0 ? _required : (AppRules.config?.requiredDeposit.round() ?? 0),
     missingDeposit: _missing,
     incidentOutcome: _outcome,
     pings: _pings,
@@ -131,7 +136,7 @@ class ApiDriverTripRepository implements DriverTripRepository, TripSimulator {
     _outcome = null;
     _jobs = const [];
     _deposit = _earnings = _pings = _missing = 0;
-    _required = 200000;
+    _required = 0;
     _shift = const ShiftSummary();
     _notice = null;
     _vehicleName = null;
@@ -720,7 +725,7 @@ class ApiDriverTripRepository implements DriverTripRepository, TripSimulator {
       throw const TripFailure('Không thể gửi ảnh ở trạng thái hiện tại.');
     }
     if (evidence.length < 2) {
-      throw const TripFailure('Cần tải đủ 2 ảnh bằng chứng.');
+      throw TripFailure('Cần tải đủ ${AppRules.rules.minPickupPhotos} ảnh bằng chứng.');
     }
     if (note.length > 500) throw const TripFailure('Ghi chú tối đa 500 ký tự.');
     if (trip.job.payment == PaymentMethod.cashSender && !trip.job.paid) {
@@ -896,14 +901,22 @@ class ApiDriverTripRepository implements DriverTripRepository, TripSimulator {
           fallback?.vehicle ??
           _vehicleName ??
           '',
+      // Ở điểm lấy tài xế làm việc với người gửi; đơn cũ chưa có người gửi thì dùng khách đặt.
       customerName:
+          _nonEmpty(j['senderName']) ??
           (j['customerName'] as String?) ??
           fallback?.customerName ??
           'Khách hàng',
       customerPhone:
-          (j['customerPhone'] as String?) ?? fallback?.customerPhone ?? '',
+          _nonEmpty(j['senderPhone']) ??
+          (j['customerPhone'] as String?) ??
+          fallback?.customerPhone ??
+          '',
     );
   }
+
+  static String? _nonEmpty(Object? v) =>
+      v is String && v.trim().isNotEmpty ? v : null;
 
   /// Chi tiết chuyến `Trips/{id}` hoặc `Trips/active`.
   ActiveTrip _tripFrom(Map<String, dynamic> j) {
@@ -948,8 +961,9 @@ class ApiDriverTripRepository implements DriverTripRepository, TripSimulator {
       paid: j['paymentStatus'] == 'Paid',
       fragile: false,
       vehicle: (j['vehicleTypeName'] as String?) ?? _vehicleName ?? '',
-      customerName: (j['customerName'] as String?) ?? 'Khách hàng',
-      customerPhone: (j['customerPhone'] as String?) ?? '',
+      // Người tài xế gặp ở điểm lấy: người gửi, hoặc khách đặt với đơn chưa có người gửi.
+      customerName: _nonEmpty(j['senderName']) ?? (j['customerName'] as String?) ?? 'Khách hàng',
+      customerPhone: _nonEmpty(j['senderPhone']) ?? (j['customerPhone'] as String?) ?? '',
     );
 
     final status = j['orderStatus'] as String?;

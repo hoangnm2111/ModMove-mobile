@@ -59,7 +59,7 @@ class MockDriverTripRepository implements DriverTripRepository, TripSimulator {
       (!_deadlines.containsKey(job.id) || now.isBefore(_deadlines[job.id]!)) &&
       !job.expiredAt(now) &&
       _fix!.point.distanceTo(job.pickupPoint) <=
-          DriverMatchingPolicy.searchRadiusMeters &&
+          DriverMatchingPolicy.mockSearchRadiusMeters &&
       job.weightKg <= 1000 &&
       job.vehicle == 'Xe tải 1 tấn' &&
       _deposit >= 200000 &&

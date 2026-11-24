@@ -1,3 +1,4 @@
+import '../../../../core/config/platform_config.dart';
 import 'dart:async';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:bloc_concurrency/bloc_concurrency.dart';
@@ -27,7 +28,7 @@ class ActiveTripState {
       ? double.infinity
       : session.fix!.point.distanceTo(session.trip!.job.pickupPoint);
   /// GB-52 (D-02): bán kính xác nhận đến điểm lấy hàng / hoàn tất giao hàng. Chỉ app kiểm tra, BE không kiểm tra lại.
-  static const arrivalRadiusM = 500.0;
+  static double get arrivalRadiusM => AppRules.rules.arrivalRadiusMeters.toDouble();
 
   /// GPS mới (nên đã có vị trí) và cách điểm giao không quá [arrivalRadiusM].
   bool get atDropoff =>

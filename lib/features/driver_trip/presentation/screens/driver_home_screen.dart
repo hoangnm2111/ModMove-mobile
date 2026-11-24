@@ -4,7 +4,6 @@ import 'package:flutter_svg/flutter_svg.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/widgets/app_widgets.dart';
 import '../../domain/entities/trip_models.dart';
-import '../../domain/entities/driver_matching_policy.dart';
 import '../bloc/driver_home_bloc.dart';
 import '../../../notifications/notifications_screen.dart';
 import '../widgets/driver_map.dart';
@@ -145,7 +144,6 @@ class DriverHomeScreen extends StatelessWidget {
                       session.online &&
                       session.gpsEnabled &&
                       !(session.trip?.ongoing ?? false),
-                  searchRadiusMeters: DriverMatchingPolicy.searchRadiusMeters,
                 ),
               ),
               Padding(

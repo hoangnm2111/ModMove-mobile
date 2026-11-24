@@ -1,3 +1,4 @@
+import '../../../../core/config/platform_config.dart';
 import 'dart:math' as math;
 import 'dart:typed_data';
 
@@ -254,8 +255,8 @@ class DeliveryJob {
 class JobOffer {
   const JobOffer(this.job, this.deadline);
 
-  /// GB-08 (K-02): đơn chờ tài xế tối đa 10 phút kể từ khi tạo, không có cửa sổ 30 giây cho từng tài xế.
-  static const matchingWindow = Duration(minutes: 10);
+  /// GB-08 (K-02): đơn chờ tài xế tối đa [AppRules.rules] `matchingTimeoutMinutes` kể từ khi tạo (BE), không có cửa sổ riêng cho từng tài xế.
+  static Duration get matchingWindow => Duration(minutes: AppRules.rules.matchingTimeoutMinutes);
 
   final DeliveryJob job;
   final DateTime deadline;
@@ -373,7 +374,7 @@ class DriverSession {
     this.pings = 0,
     List<DeliveryJob> jobs = const [],
     this.notice,
-    this.requiredDeposit = 200000,
+    this.requiredDeposit = 0,
     this.missingDeposit = 0,
     this.incidentOutcome,
   }) : jobs = List.unmodifiable(jobs);

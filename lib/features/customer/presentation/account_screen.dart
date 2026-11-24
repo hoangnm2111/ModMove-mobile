@@ -247,7 +247,7 @@ class _ChangePasswordState extends State<_ChangePassword> {
         'Đổi mật khẩu',
         busy: _busy,
         onPressed: () async {
-          if (!InputRules.password(_next.text)) return showSnack(context, 'Mật khẩu mới từ 8 đến 20 ký tự.', error: true);
+          if (!InputRules.password(_next.text)) return showSnack(context, 'Mật khẩu mới ${InputRules.passwordHint}.', error: true);
           setState(() => _busy = true);
           final auth = context.read<AuthCubit>();
           final ok = await runAction(context, () => context.read<CustomerApi>().changePassword(_current.text, _next.text), success: 'Đã đổi mật khẩu. Vui lòng đăng nhập lại.');

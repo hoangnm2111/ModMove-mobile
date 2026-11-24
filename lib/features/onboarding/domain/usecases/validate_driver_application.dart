@@ -1,12 +1,13 @@
 import 'dart:typed_data';
 import '../entities/driver_application.dart';
+import '../../../../core/config/platform_config.dart';
 
 class ValidateDriverApplication {
   const ValidateDriverApplication();
 
   String? image(String name, Uint8List bytes) {
-    if (bytes.length > 5 * 1024 * 1024) {
-      return 'Ảnh vượt quá 5 MB. Vui lòng chọn ảnh nhỏ hơn.';
+    if (bytes.length > AppRules.rules.maxPhotoSizeMb * 1024 * 1024) {
+      return 'Ảnh vượt quá ${AppRules.rules.maxPhotoSizeMb} MB. Vui lòng chọn ảnh nhỏ hơn.';
     }
     final lower = name.toLowerCase();
     const signature = [137, 80, 78, 71, 13, 10, 26, 10];

@@ -1,3 +1,4 @@
+import '../config/platform_config.dart';
 import 'app_notice.dart';
 
 typedef NoticeEntry = ({NoticeKind kind, String title, String body, NoticeTarget target});
@@ -15,7 +16,7 @@ const Map<String, NoticeEntry> noticeCatalog = {
   'DRIVER_ARRIVED': (kind: NoticeKind.info, title: 'Tài xế đã đến', body: 'Tài xế đã đến điểm lấy hàng của đơn {orderCode}.', target: _o),
   'DRIVER_ARRIVED_DROPOFF': (kind: NoticeKind.info, title: 'Tài xế đã đến điểm giao', body: 'Tài xế đã đến điểm giao hàng của đơn {orderCode}.', target: _o),
   'PICKUP_PHOTOS_TO_REVIEW': (kind: NoticeKind.warning, title: 'Ảnh lấy hàng chờ duyệt', body: 'Ảnh kiểm hàng của đơn {orderCode} đã sẵn sàng. Vui lòng duyệt trước khi xe khởi hành.', target: _o),
-  'ORDER_DELIVERED': (kind: NoticeKind.success, title: 'Đơn đã giao', body: 'Đơn {orderCode} đã được giao. Xác nhận nhận hàng hoặc khiếu nại trong 24 giờ.', target: _o),
+  'ORDER_DELIVERED': (kind: NoticeKind.success, title: 'Đơn đã giao', body: 'Đơn {orderCode} đã được giao. Xác nhận nhận hàng hoặc khiếu nại trong {complaintHours} giờ.', target: _o),
   'ORDER_COMPLETED': (kind: NoticeKind.success, title: 'Đơn đã hoàn thành', body: 'Đơn {orderCode} đã hoàn thành.', target: _o),
   'ORDER_CANCELLED': (kind: NoticeKind.error, title: 'Đơn đã bị hủy', body: 'Đơn {orderCode} đã bị hủy.', target: _o),
   'INCIDENT_RESOLVED': (kind: NoticeKind.success, title: 'Sự cố đã được xử lý', body: 'Sự cố của đơn {orderCode} đã có kết quả.', target: _o),
@@ -98,7 +99,9 @@ int _noticeSeq = 0;
 AppNotice noticeFor(String type, {Map<String, String> data = const {}, String? title, String? body, DateTime? at}) {
   final entry = noticeCatalog[type];
   final time = at ?? DateTime.now();
-  String pick(String? server, String? fallback) => (server != null && server.trim().isNotEmpty) ? server.trim() : _fill(fallback ?? '', data);
+  // Số trong chữ dự phòng lấy từ BE (AppRules), không gõ cứng trong danh mục.
+  final values = {'complaintHours': '${AppRules.rules.complaintWindowHours}', ...data};
+  String pick(String? server, String? fallback) => (server != null && server.trim().isNotEmpty) ? server.trim() : _fill(fallback ?? '', values);
   return AppNotice(
     // Số thứ tự tránh trùng id khi hai thông báo cùng loại được dựng trong cùng một micro giây.
     id: '${type}_${time.microsecondsSinceEpoch}_${_noticeSeq++}',

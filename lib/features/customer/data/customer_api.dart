@@ -2,6 +2,7 @@ import 'dart:io';
 
 import '../../../core/network/api_client.dart';
 import '../domain/entities/customer_models.dart';
+import '../../../core/config/platform_config.dart';
 
 /// Một hàm cho mỗi endpoint backend mà khách dùng (dịch từ ModMove-web/src/api/endpoints.ts).
 /// Path theo RoleConvention: api/{role}/{Controller}.
@@ -17,6 +18,9 @@ class CustomerApi {
   Future<List<LookupItem>> cancellationReasons() async => _items(await _api.get('/public/Lookups/cancellation-reasons'), LookupItem.fromJson);
 
   /// Ngân hàng nhận hoàn tiền: `code` là mã BIN 6 số, gửi làm payoutAccount.bankCode.
+  /// Phí bốc xếp, tiền cọc, bán kính ghép đơn và các giới hạn nghiệp vụ do BE giữ (không cần đăng nhập).
+  Future<PlatformConfig> publicConfig() async => PlatformConfig.fromJson(await _api.get('/public/Config') as Map<String, dynamic>);
+
   Future<List<LookupItem>> banks() async => _items(await _api.get('/public/Lookups/banks'), LookupItem.fromJson);
   Future<List<LookupItem>> complaintReasons() async => _items(await _api.get('/public/Lookups/complaint-reasons'), LookupItem.fromJson);
   Future<List<LookupItem>> policies() async => _items(await _api.get('/public/Policies'), LookupItem.fromJson);

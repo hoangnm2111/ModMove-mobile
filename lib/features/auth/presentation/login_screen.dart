@@ -69,7 +69,7 @@ class _LoginScreenState extends State<LoginScreen> {
         : !InputRules.email(_email.text)
         ? 'Email không hợp lệ.'
         : !InputRules.password(_password.text)
-        ? 'Mật khẩu từ 8 đến 20 ký tự.'
+        ? 'Mật khẩu ${InputRules.passwordHint}.'
         : null;
     if (error != null) showSnack(context, error, error: true);
     return error == null;
@@ -292,7 +292,7 @@ class _ForgotSheetState extends State<_ForgotSheet> {
 
   Future<void> _reset() async {
     if (_code.text.trim().length != 6) return showSnack(context, 'Mã OTP gồm 6 chữ số.', error: true);
-    if (!InputRules.password(_password.text)) return showSnack(context, 'Mật khẩu từ 8 đến 20 ký tự.', error: true);
+    if (!InputRules.password(_password.text)) return showSnack(context, 'Mật khẩu ${InputRules.passwordHint}.', error: true);
     setState(() => _busy = true);
     final ok = await runAction(
       context,

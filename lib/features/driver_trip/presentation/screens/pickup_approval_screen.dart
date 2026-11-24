@@ -8,6 +8,7 @@ import '../bloc/active_trip_bloc.dart';
 import '../widgets/trip_components.dart';
 import '../widgets/trip_contact_actions.dart';
 import 'driver_simulation_sheet.dart';
+import '../../../../core/config/platform_config.dart';
 
 class PickupApprovalScreen extends StatelessWidget {
   const PickupApprovalScreen({super.key, required this.state});
@@ -54,7 +55,7 @@ class PickupApprovalScreen extends StatelessWidget {
                 ),
                 const SizedBox(height: 6),
                 Text(
-                  'Ảnh đã gửi lúc $time · Lần ${trip.attempts}/5',
+                  'Ảnh đã gửi lúc $time · Lần ${trip.attempts}/${AppRules.rules.maxPickupSubmissions}',
                   style: appText(size: 12, color: AppColors.secondary),
                 ),
                 const SizedBox(height: 14),

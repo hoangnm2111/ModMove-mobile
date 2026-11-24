@@ -279,14 +279,17 @@ class PhotoPicker extends StatefulWidget {
     required this.urls,
     required this.onChanged,
     required this.upload,
-    this.max = OrderRules.maxCargoPhotos,
+    int? max,
     this.label,
-  });
+  }) : _max = max; // ignore: prefer_initializing_formals (tham số có tên không thể là biến riêng tư)
   final List<String> urls;
   final ValueChanged<List<String>> onChanged;
   final Future<String> Function(File file) upload;
-  final int max;
+  final int? _max;
   final String? label;
+
+  /// Số ảnh tối đa: do nơi dùng chọn, không thì là giới hạn ảnh hàng hoá của BE.
+  int get max => _max ?? OrderRules.maxCargoPhotos;
 
   @override
   State<PhotoPicker> createState() => _PhotoPickerState();
@@ -313,7 +316,7 @@ class _PhotoPickerState extends State<PhotoPicker> {
       return;
     }
     if (await file.length() > OrderRules.maxPhotoBytes) {
-      if (mounted) showSnack(context, 'Ảnh tối đa 5 MB.', error: true);
+      if (mounted) showSnack(context, 'Ảnh tối đa ${OrderRules.maxPhotoMb} MB.', error: true);
       return;
     }
     setState(() => _busy = true);
@@ -421,7 +424,7 @@ class _PhotoPickerState extends State<PhotoPicker> {
       ),
       const SizedBox(height: 4),
       Text(
-        'JPG/PNG, tối đa 5 MB mỗi ảnh.',
+        'JPG/PNG, tối đa ${OrderRules.maxPhotoMb} MB mỗi ảnh.',
         style: appText(size: 11, color: AppColors.muted),
       ),
     ],
