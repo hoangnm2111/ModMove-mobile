@@ -363,7 +363,6 @@ class BookingCubit extends Cubit<BookingState> {
           return 'Mô tả và ghi chú bốc xếp tổng cộng tối đa ${OrderRules.maxSpecialNotes} ký tự.';
         }
         if (d.photos.length < OrderRules.minCargoPhotos) return 'Thêm ít nhất 1 ảnh hàng hoá.';
-        if (!d.noProhibitedCargo) return 'Vui lòng cam kết không gửi hàng cấm.';
         return null;
       case 2:
         final v = state.vehicle;

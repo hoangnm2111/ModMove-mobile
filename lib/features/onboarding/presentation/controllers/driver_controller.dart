@@ -114,7 +114,12 @@ class DriverController extends Cubit<DriverPresentationState> {
     online: online,
     submittedAt: submittedAt,
     reviewedAt: reviewedAt,
+    rejectionReasons: _rejectionReasons,
+    // Cờ này quyết định có gửi kèm thông tin xe khi nộp lại; làm rơi nó thì BE trả 422 RESUBMIT_MISSING_REJECTED_ITEMS.
+    vehicleRejected: _vehicleRejected,
   );
+  List<String> _rejectionReasons = const [];
+  bool _vehicleRejected = false;
   bool get canEdit => application.canEdit;
   bool get canGoOnline => application.canGoOnline;
   bool canEditDocument(DocumentKind kind) => application.canEditDocument(kind);
@@ -132,6 +137,8 @@ class DriverController extends Cubit<DriverPresentationState> {
     online = cached.online;
     submittedAt = cached.submittedAt;
     reviewedAt = cached.reviewedAt;
+    _rejectionReasons = cached.rejectionReasons;
+    _vehicleRejected = cached.vehicleRejected;
     if (!initial) formRevision++;
   }
 
@@ -252,7 +259,16 @@ class DriverController extends Cubit<DriverPresentationState> {
     try {
       final uploaded = await _profile.upload(kind, photo);
       if (_disposed) return null;
-      documents[kind] = uploaded;
+      // Ảnh bị Admin từ chối: giữ lý do và đánh dấu đã thay, để nộp lại gửi đúng ảnh mới của mục đó
+      // (BE đòi mọi mục bị từ chối, 422 RESUBMIT_MISSING_REJECTED_ITEMS; thiếu hết thì 400 VALIDATION).
+      final rejection = documents[kind]?.rejectionReason;
+      documents[kind] = VerificationDocument(
+        bytes: uploaded.bytes,
+        fileName: uploaded.fileName,
+        remoteReference: uploaded.remoteReference,
+        rejectionReason: rejection,
+        replaced: rejection != null,
+      );
       uploadErrors.remove(kind);
     } catch (error) {
       final message = _error(error);

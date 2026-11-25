@@ -77,6 +77,9 @@ class CustomerApi {
   /// UC-CUS-27 4a (K-28): khách đóng màn thanh toán → huỷ mã PayOS đang chờ; đơn vẫn chờ thanh toán.
   Future<void> cancelPayment(int id) => _api.post('/customer/Orders/$id/payment/cancel', null);
 
+  /// Webhook PayOS chưa tới (tunnel, chưa đăng ký URL…): BE tự hỏi PayOS đơn đã trả chưa. Không có gì mới thì vẫn 204.
+  Future<void> syncPayment(int id) => _api.post('/customer/Orders/$id/payment/sync', null);
+
   Future<void> reviewPickup(int id, {required bool approve, String? reason}) => _api.post('/customer/Orders/$id/pickup-evidence', {'approve': approve, 'reason': approve ? null : reason});
 
   Future<void> confirmReceipt(int id) => _api.post('/customer/Orders/$id/confirm-receipt');

@@ -597,13 +597,6 @@ class _CargoStep extends StatelessWidget {
             onChanged: (p) => cubit.update((x) => x.copyWith(photos: p)),
           ),
         ),
-        CheckboxListTile(
-          contentPadding: EdgeInsets.zero,
-          controlAffinity: ListTileControlAffinity.leading,
-          value: d.noProhibitedCargo,
-          onChanged: (v) => cubit.update((x) => x.copyWith(noProhibitedCargo: v ?? false)),
-          title: Text('Tôi cam kết hàng hoá không thuộc danh mục hàng cấm.', style: appText(size: 13)),
-        ),
       ],
     );
   }
@@ -810,7 +803,7 @@ class _PaymentStep extends StatelessWidget {
           controlAffinity: ListTileControlAffinity.leading,
           value: d.noProhibitedCargo,
           onChanged: (v) => cubit.update((x) => x.copyWith(noProhibitedCargo: v ?? false)),
-          title: Text('Tôi cam kết không gửi hàng cấm.', style: appText(size: 13)),
+          title: Text('Tôi cam kết hàng hoá không thuộc danh mục hàng cấm.', style: appText(size: 13)),
         ),
         CheckboxListTile(
           contentPadding: EdgeInsets.zero,

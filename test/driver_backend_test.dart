@@ -14,6 +14,9 @@ import 'package:modmove_mobile/features/driver_trip/domain/entities/trip_models.
 import 'package:modmove_mobile/features/driver_trip/domain/repositories/driver_trip_repository.dart';
 import 'package:modmove_mobile/features/onboarding/data/repositories/backend_driver_repository.dart';
 import 'package:modmove_mobile/features/onboarding/domain/entities/driver_application.dart';
+import 'package:modmove_mobile/features/onboarding/domain/repositories/driver_repository.dart';
+import 'package:modmove_mobile/features/onboarding/domain/usecases/driver_usecases.dart';
+import 'package:modmove_mobile/features/onboarding/presentation/controllers/driver_controller.dart';
 
 /// Máy chủ giả trả đúng hình dạng JSON của ModMove.WebApi (docs/api/README.md),
 /// để kiểm tra phần ánh xạ + quy trình mà không cần BE chạy.
@@ -29,6 +32,15 @@ class FakeBackend {
   bool paid = false;
   bool activeGone = false;
   final incidents = <Map<String, Object?>>[];
+
+  /// URL mà POST /driver/uploads trả về lần tới (mặc định: ảnh POD cố định).
+  String Function()? nextUploadUrl;
+
+  /// BE từ chối mọi lần tải ảnh lên.
+  bool uploadFails = false;
+
+  /// Số ảnh giấy tờ trong hồ sơ: 5 = hồ sơ cũ chưa có ảnh CCCD, 7 = đủ.
+  int documentCount = 5;
 
   /// Trường thêm vào chi tiết chuyến (ví dụ người gửi, ghi chú); mặc định trống như đơn đặt trước khi có người gửi.
   Map<String, Object?> tripExtra = {};
@@ -119,7 +131,7 @@ class FakeBackend {
           'vehicleTypeName': 'Xe van 500kg',
           'licensePlate': '51C-222.22',
           'maxLoadWeightKg': 500.0,
-          'documentUrls': [for (var i = 1; i <= 5; i++) 'https://res.cloudinary.com/demo/image/upload/$i.jpg'],
+          'documentUrls': [for (var i = 1; i <= documentCount; i++) 'https://res.cloudinary.com/demo/image/upload/$i.jpg'],
           'rejectionReasons': null,
           'rejectedItems': profileApproval == 'Rejected'
               ? [
@@ -231,7 +243,8 @@ class FakeBackend {
         orderStatus = 'Delivered';
         return http.Response('', 204);
       case 'post /driver/uploads':
-        return json({'url': 'https://res.cloudinary.com/demo/image/upload/pod.jpg'});
+        if (uploadFails) return _problem(422, 'UPLOAD_FAILED');
+        return json({'url': nextUploadUrl?.call() ?? 'https://res.cloudinary.com/demo/image/upload/pod.jpg'});
       case 'get /driver/wallet':
         return json({
           'walletStatus': 'Active',
@@ -295,6 +308,14 @@ class FakeBackend {
 }
 
 final _png = Uint8List.fromList([137, 80, 78, 71, 13, 10, 26, 10, 0, 0]);
+
+/// Nguồn ảnh giả: luôn trả đúng một ảnh, như khi tài xế chọn ảnh từ thư viện.
+class _OnePhoto implements DocumentPhotoRepository {
+  const _OnePhoto(this.photo);
+  final SelectedPhoto photo;
+  @override
+  Future<SelectedPhoto?> pick(PhotoSource source) async => photo;
+}
 
 class _FixedLocation implements DriverLocationSource {
   const _FixedLocation([this.point = const GeoPoint(10.7769, 106.7009)]);
@@ -421,6 +442,67 @@ void main() {
       {'key': 'LicenseFront', 'url': 'https://res.cloudinary.com/demo/new-front.jpg'},
     ]);
     expect((body['vehicle'] as Map)['licensePlate'], '51C-333.33');
+  });
+
+  group('nộp lại hồ sơ bị từ chối qua controller (đúng cách app dùng: chọn ảnh → tải lên → gửi)', () {
+    final png = Uint8List.fromList([137, 80, 78, 71, 13, 10, 26, 10]);
+
+    Future<(DriverController, FakeBackend)> start({String plate = '51C-333.33'}) async {
+      final env = _setup(profileApproval: 'Rejected');
+      env.backend.documentCount = 7;
+      var n = 0;
+      env.backend.nextUploadUrl = () => 'https://res.cloudinary.com/demo/image/authenticated/new-${++n}.jpg';
+      final repository = BackendDriverRepository(api: env.api);
+      await repository.refresh(); // nạp hồ sơ bị từ chối: GPLX mặt trước + thông tin xe
+      final photos = _OnePhoto(SelectedPhoto('gplx-moi.png', png));
+      final controller = DriverController(
+        loadApplication: GetDriverApplication(repository),
+        submitApplication: SubmitDriverApplication(repository, requireUploadedDocuments: true),
+        pickPhoto: PickDocumentPhoto(photos),
+        profile: ManageDriverProfile(repository),
+      );
+      addTearDown(controller.close);
+      controller.fields['plate'] = plate;
+      return (controller, env.backend);
+    }
+
+    test('thay ảnh bị từ chối rồi nộp lại: gửi đúng ảnh mới của mục đó và thông tin xe', () async {
+      final (controller, backend) = await start();
+
+      expect(await controller.pickDocument(DocumentKind.licenseFront, PhotoSource.gallery), isNull);
+      final front = controller.documents[DocumentKind.licenseFront]!;
+      expect(front.rejectionReason, 'Ảnh mờ', reason: 'lý do từ chối không được mất sau khi tải ảnh mới lên');
+      expect(front.replaced, isTrue);
+      expect(controller.missingDocuments(), isNot(contains(DocumentKind.licenseFront)));
+
+      expect(await controller.submit(), isNull);
+
+      expect(backend.requests.where((r) => r.contains('onboarding')), contains('post /driver/onboarding/resubmit'));
+      final body = backend.bodies['post /driver/onboarding/resubmit'] as Map;
+      expect(body['items'], [
+        {'key': 'LicenseFront', 'url': front.remoteReference},
+      ]);
+      expect((body['vehicle'] as Map)['licensePlate'], '51C-333.33');
+    });
+
+    test('chưa thay ảnh bị từ chối thì bị chặn trước khi gửi, không gọi BE', () async {
+      final (controller, backend) = await start();
+
+      expect(controller.missingDocuments(), contains(DocumentKind.licenseFront));
+      await controller.submit();
+
+      expect(backend.requests, isNot(contains('post /driver/onboarding/resubmit')));
+    });
+
+    test('tải ảnh lên lỗi thì ảnh chưa được coi là đã thay: vẫn bị chặn', () async {
+      final (controller, backend) = await start();
+      backend.uploadFails = true;
+
+      expect(await controller.pickDocument(DocumentKind.licenseFront, PhotoSource.gallery), isNotNull);
+
+      expect(controller.documents[DocumentKind.licenseFront]!.replaced, isFalse);
+      expect(controller.missingDocuments(), contains(DocumentKind.licenseFront));
+    });
   });
 
   test('nộp hồ sơ lần đầu không gửi số CCCD và số giấy phép', () async {

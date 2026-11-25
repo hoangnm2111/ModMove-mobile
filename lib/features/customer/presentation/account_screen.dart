@@ -10,6 +10,7 @@ import '../data/customer_api.dart';
 import '../domain/entities/customer_models.dart';
 import '../domain/order_rules.dart';
 import 'widgets/customer_widgets.dart';
+import '../../../core/widgets/password_field.dart';
 
 /// Hồ sơ & bảo mật (UC-CUS-04..07), chính sách (UC-GST-04), hỗ trợ (UC-GST-05), đăng xuất.
 class AccountScreen extends StatefulWidget {
@@ -231,17 +232,9 @@ class _ChangePasswordState extends State<_ChangePassword> {
       const SizedBox(height: 6),
       Text('Sau khi đổi, mọi thiết bị sẽ phải đăng nhập lại.', style: appText(size: 12, color: AppColors.secondary)),
       const SizedBox(height: 12),
-      TextField(
-        controller: _current,
-        obscureText: true,
-        decoration: const InputDecoration(labelText: 'Mật khẩu hiện tại'),
-      ),
+      PasswordField(controller: _current, label: 'Mật khẩu hiện tại'),
       const SizedBox(height: 12),
-      TextField(
-        controller: _next,
-        obscureText: true,
-        decoration: const InputDecoration(labelText: 'Mật khẩu mới'),
-      ),
+      PasswordField(controller: _next, label: 'Mật khẩu mới'),
       const SizedBox(height: 16),
       PrimaryButton(
         'Đổi mật khẩu',

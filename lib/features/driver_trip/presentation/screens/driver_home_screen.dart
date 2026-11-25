@@ -300,7 +300,8 @@ class DriverHomeScreen extends StatelessWidget {
                       children: [
                         Expanded(
                           child: Text(
-                            '${onSimulation != null ? 'Mô phỏng • ' : ''}GPS ${session.online ? '5 giây/lần' : 'đã tắt'}',
+                            // Chỉ nêu trạng thái, không ghi chu kỳ gửi GPS (không có trong tài liệu nghiệp vụ).
+                            [if (onSimulation != null) 'Mô phỏng', if (!session.online) 'GPS đã tắt'].join(' • '),
                             style: appText(size: 9, color: AppColors.muted),
                           ),
                         ),

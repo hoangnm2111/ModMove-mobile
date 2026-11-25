@@ -10,6 +10,7 @@ import '../../../core/widgets/brand_logo.dart';
 import '../../customer/domain/order_rules.dart';
 import '../../customer/presentation/widgets/customer_widgets.dart';
 import 'auth_cubit.dart';
+import '../../../core/widgets/password_field.dart';
 
 /// SCR-02/03/04 – Đăng nhập, đăng ký khách (UC-GST-01), quên mật khẩu (UC-CUS-02).
 /// Trả về [Session] khi đăng nhập thành công (Navigator.pop).
@@ -317,7 +318,7 @@ class _ForgotSheetState extends State<_ForgotSheet> {
           const SizedBox(height: 12),
           TextField(controller: _code, keyboardType: TextInputType.number, inputFormatters: [FilteringTextInputFormatter.digitsOnly], maxLength: 6, decoration: const InputDecoration(labelText: 'Mã OTP', counterText: '')),
           const SizedBox(height: 12),
-          TextField(controller: _password, obscureText: true, decoration: const InputDecoration(labelText: 'Mật khẩu mới')),
+          PasswordField(controller: _password, label: 'Mật khẩu mới'),
         ],
         const SizedBox(height: 14),
         PrimaryButton(_sent ? 'Đặt lại mật khẩu' : 'Gửi mã OTP', busy: _busy, onPressed: _sent ? _reset : _send),

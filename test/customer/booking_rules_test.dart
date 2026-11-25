@@ -158,6 +158,11 @@ void main() {
       expect(BookingCubit.cargoNotes(cargo.copyWith(description: '', specialNotes: '')), isNull);
     });
 
+    test('cam kết hàng cấm chỉ hỏi ở bước cuối: bước hàng hoá không còn chặn vì chưa tick', () {
+      final cargo = _route.copyWith(cargoType: 'GOODS', description: 'Tủ lạnh', weightKg: 10, lengthCm: 10, widthCm: 10, heightCm: 10, photos: ['u']);
+      expect(cubit(cargo).validate(1), isNull);
+    });
+
     test('bước thanh toán cần cả cam kết hàng cấm và chính sách bảo hành', () {
       expect(
         cubit(_route.copyWith(agreedWarranty: true)).validate(3),

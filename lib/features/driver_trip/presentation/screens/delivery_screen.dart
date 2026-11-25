@@ -10,6 +10,7 @@ import '../bloc/active_trip_bloc.dart';
 import '../widgets/trip_components.dart';
 import '../widgets/trip_contact_actions.dart';
 import 'driver_simulation_sheet.dart';
+import '../../../../core/config/platform_config.dart';
 
 /// Đơn đã `InTransit` (khách xác nhận hàng): đến điểm giao → thu COD (nếu có) → ảnh giao hàng (POD).
 class DeliveryScreen extends StatefulWidget {
@@ -260,10 +261,10 @@ class _DeliveryScreenState extends State<DeliveryScreen> {
               const SizedBox(height: 10),
               if (!state.fresh)
                 const TripError(
-                  'Vị trí không khả dụng hoặc quá 30 giây. Bật lại GPS để hoàn tất giao hàng.',
+                  'Chưa có vị trí GPS mới. Bật lại GPS để hoàn tất giao hàng.',
                 ),
-              const Notice(
-                'Chỉ hoàn tất khi cách điểm giao không quá 500 m.',
+              Notice(
+                'Chỉ hoàn tất khi cách điểm giao không quá ${AppRules.rules.arrivalRadiusMeters} m.',
                 icon: 'warning',
                 peach: true,
               ),

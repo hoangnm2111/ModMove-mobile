@@ -8,6 +8,7 @@ import '../widgets/driver_map.dart';
 import '../widgets/trip_components.dart';
 import '../widgets/trip_contact_actions.dart';
 import 'driver_simulation_sheet.dart';
+import '../../../../core/config/platform_config.dart';
 
 class PickupNavigationScreen extends StatelessWidget {
   const PickupNavigationScreen({super.key, required this.state});
@@ -186,7 +187,7 @@ class PickupNavigationScreen extends StatelessWidget {
                     const SizedBox(height: 14),
                     if (!state.fresh)
                       const TripError(
-                        'Vị trí không khả dụng hoặc quá 30 giây. Bật lại GPS để xác nhận đến điểm.',
+                        'Chưa có vị trí GPS mới. Bật lại GPS để xác nhận đến điểm.',
                       ),
                     if (state.error != null) TripError(state.error!),
                     if (state.receipt != null)
@@ -194,8 +195,8 @@ class PickupNavigationScreen extends StatelessWidget {
                         state.receipt!,
                         icon: 'check',
                       ),
-                    const Notice(
-                      'Chỉ xác nhận khi cách điểm lấy hàng không quá 500 m.',
+                    Notice(
+                      'Chỉ xác nhận khi cách điểm lấy hàng không quá ${AppRules.rules.arrivalRadiusMeters} m.',
                       icon: 'warning',
                       peach: true,
                     ),

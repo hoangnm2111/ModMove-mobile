@@ -132,12 +132,20 @@ class _DetailViewState extends State<_DetailView> with WidgetsBindingObserver {
     super.dispose();
   }
 
-  /// Quay lại app từ trang PayOS (deep link) hoặc từ nền → tải lại đơn.
+  /// Quay lại app từ trang PayOS (deep link) hoặc từ ứng dụng ngân hàng → tải lại đơn.
+  /// Đơn còn chờ thanh toán thì để BE hỏi PayOS trước (webhook có thể chưa tới), rồi mới tải lại.
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
-    if (state == AppLifecycleState.resumed) {
-      context.read<OrderDetailCubit>().load();
+    if (state == AppLifecycleState.resumed) unawaited(_onResumed());
+  }
+
+  Future<void> _onResumed() async {
+    final cubit = context.read<OrderDetailCubit>();
+    final o = cubit.state.order;
+    if (o != null && OrderRules.awaitingPayment(o.status, o.paymentMethod, o.paymentStatus)) {
+      await cubit.api.syncPayment(o.id).catchError((Object _) {});
     }
+    if (mounted) await cubit.load();
   }
 
   Future<void> _sheet(Widget sheet) async {
@@ -153,6 +161,7 @@ class _DetailViewState extends State<_DetailView> with WidgetsBindingObserver {
         api: cubit.api,
         order: o,
         onCheck: () async {
+          await cubit.api.syncPayment(o.id).catchError((Object _) {});
           await cubit.load(withTracking: false);
           return cubit.state.order?.paymentStatus == 'Paid';
         },
@@ -461,7 +470,8 @@ class _NextActionState extends State<_NextAction> {
           await f();
         } on ApiException catch (e) {
           // BE từ chối vì tài xế vừa báo sự cố: tải lại để hiện banner và khóa nút.
-          pending = e.code == 'INCIDENT_PENDING';
+          // 409: đơn vừa đổi trạng thái ở nơi khác (vd tự hoàn tất) → cũng tải lại để hiện đúng trạng thái.
+          pending = e.code == 'INCIDENT_PENDING' || e.code == 'CONFLICT';
           rethrow;
         }
       },
