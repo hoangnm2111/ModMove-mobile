@@ -20,9 +20,11 @@ const _loadTimeout = Duration(seconds: 12);
 
 /// Bản đồ lộ trình đặt xe: điểm lấy (cam), điểm giao (xanh) và đường đi BE trả về trong báo giá.
 /// Không có đường đi thì nối thẳng hai điểm. Bản đồ lỗi thì hiện ô báo và nút thử lại.
+/// [driver] (theo dõi đơn): chấm xanh dương của tài xế, dời chỗ mỗi khi vị trí mới tới.
 class RouteMap extends StatefulWidget {
-  const RouteMap({super.key, required this.pickup, required this.dropoff, this.polyline, this.height = 220});
+  const RouteMap({super.key, required this.pickup, required this.dropoff, this.driver, this.polyline, this.height = 220});
   final GeoPoint pickup, dropoff;
+  final GeoPoint? driver;
   final String? polyline;
   final double height;
 
@@ -36,7 +38,7 @@ class _RouteMapState extends State<RouteMap> {
   var _generation = 0;
   var _keyed = false, _ready = false, _failed = false;
   mv.Line? _line;
-  mv.Circle? _from, _to;
+  mv.Circle? _from, _to, _car;
 
   mv.LatLng _ll(double lat, double lng) => mv.LatLng(lat, lng);
   mv.LatLng get _a => _ll(widget.pickup.latitude, widget.pickup.longitude);
@@ -58,7 +60,9 @@ class _RouteMapState extends State<RouteMap> {
         old.dropoff.latitude != widget.dropoff.latitude ||
         old.dropoff.longitude != widget.dropoff.longitude ||
         old.polyline != widget.polyline;
-    if (moved) unawaited(_draw(fit: true));
+    // Tài xế di chuyển thì chỉ dời chấm, giữ góc nhìn người dùng đang xem; lần đầu có GPS thì canh lại cho thấy cả xe.
+    final car = old.driver?.latitude != widget.driver?.latitude || old.driver?.longitude != widget.driver?.longitude;
+    if (moved || car) unawaited(_draw(fit: moved || old.driver == null));
   }
 
   Future<void> _onStyleLoaded() async {
@@ -72,7 +76,7 @@ class _RouteMapState extends State<RouteMap> {
         return;
       }
       _timeout?.cancel();
-      _line = _from = _to = null; // a reloaded style has no annotations left
+      _line = _from = _to = _car = null; // a reloaded style has no annotations left
       _ready = true;
       await _draw(fit: true);
     } on PlatformException {
@@ -98,10 +102,10 @@ class _RouteMapState extends State<RouteMap> {
       } else {
         await map.updateLine(_line!, line);
       }
-      Future<mv.Circle> dot(mv.Circle? c, mv.LatLng at, String color) async {
+      Future<mv.Circle> dot(mv.Circle? c, mv.LatLng at, String color, {double radius = 7}) async {
         final o = mv.CircleOptions(
           geometry: at,
-          circleRadius: 7,
+          circleRadius: radius,
           circleColor: color,
           circleStrokeColor: '#FFFFFF',
           circleStrokeWidth: 3,
@@ -113,8 +117,16 @@ class _RouteMapState extends State<RouteMap> {
 
       _from = await dot(_from, _a, '#F66818');
       _to = await dot(_to, _b, '#1E9E5A');
+      final d = widget.driver;
+      final car = d == null ? null : _ll(d.latitude, d.longitude);
+      if (car != null) {
+        _car = await dot(_car, car, '#2563EB', radius: 9);
+      } else if (_car != null) {
+        await map.removeCircle(_car!);
+        _car = null;
+      }
       if (fit) {
-        final pts = [...path, _a, _b];
+        final pts = [...path, _a, _b, ?car];
         final lats = pts.map((p) => p.latitude), lngs = pts.map((p) => p.longitude);
         await map.animateCamera(
           mv.CameraUpdate.newLatLngBounds(

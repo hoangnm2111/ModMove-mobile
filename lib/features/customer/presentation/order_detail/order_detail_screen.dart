@@ -14,6 +14,7 @@ import '../../domain/order_rules.dart';
 import '../booking/booking_cubit.dart';
 import '../labels.dart';
 import '../widgets/customer_widgets.dart';
+import '../widgets/route_map.dart';
 import 'order_detail_cubit.dart';
 import '../../../../core/widgets/phone_button.dart';
 import '../../../../core/network/api_exception.dart';
@@ -801,6 +802,8 @@ class _TrackingCard extends StatelessWidget {
                     ),
                   ],
                 ),
+                const SizedBox(height: 10),
+                RouteMap(pickup: t.pickup, dropoff: t.dropoff, driver: t.driver),
                 const SizedBox(height: 10),
                 OutlinedButton.icon(
                   onPressed: () => openDirections(
